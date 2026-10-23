@@ -83,6 +83,9 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
                     onNavigateToAddExpense = {
                         navController.navigate("addExpense")
                     },
+                    onNavigateToEditExpense = { expenseId ->
+                        navController.navigate("editExpense/$expenseId")
+                    },
                     onSignOut = { authViewModel.logout() }
                 )
             }
@@ -91,6 +94,18 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
             val addExpenseViewModel: com.clarity.finance.viewmodel.AddExpenseViewModel = viewModel(factory = viewModelFactory)
             com.clarity.finance.ui.expenses.AddExpenseScreen(
                 viewModel = addExpenseViewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(
+            route = "editExpense/{expenseId}",
+            arguments = listOf(androidx.navigation.navArgument("expenseId") { type = androidx.navigation.NavType.StringType })
+        ) { backStackEntry ->
+            val expenseId = backStackEntry.arguments?.getString("expenseId") ?: return@composable
+            val editExpenseViewModel: com.clarity.finance.viewmodel.EditExpenseViewModel = viewModel(factory = viewModelFactory)
+            com.clarity.finance.ui.expenses.EditExpenseScreen(
+                viewModel = editExpenseViewModel,
+                expenseId = expenseId,
                 onNavigateBack = { navController.popBackStack() }
             )
         }

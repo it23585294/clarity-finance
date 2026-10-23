@@ -9,6 +9,7 @@ data class Expense(
     val spendingType: String,
     val expenseDate: String, // yyyy-MM-dd
     val note: String? = null,
+    val updatedAt: com.google.firebase.Timestamp? = null,
     
     // UI-only metadata (not saved explicitly to Firestore via Map)
     val isPending: Boolean = false,

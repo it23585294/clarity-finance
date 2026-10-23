@@ -6,6 +6,7 @@ import com.clarity.finance.data.repository.AuthRepository
 import com.clarity.finance.data.repository.ExpenseRepository
 import com.clarity.finance.viewmodel.AddExpenseViewModel
 import com.clarity.finance.viewmodel.AuthViewModel
+import com.clarity.finance.viewmodel.EditExpenseViewModel
 import com.clarity.finance.viewmodel.ExpenseListViewModel
 
 class ViewModelFactory(
@@ -22,6 +23,9 @@ class ViewModelFactory(
         }
         if (modelClass.isAssignableFrom(AddExpenseViewModel::class.java)) {
             return AddExpenseViewModel(authRepository, expenseRepository) as T
+        }
+        if (modelClass.isAssignableFrom(EditExpenseViewModel::class.java)) {
+            return EditExpenseViewModel(authRepository, expenseRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

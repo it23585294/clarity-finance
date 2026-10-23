@@ -1,5 +1,6 @@
 package com.clarity.finance.ui.expenses
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,6 +20,7 @@ import com.clarity.finance.viewmodel.ExpensesUiState
 fun ExpensesScreen(
     viewModel: ExpenseListViewModel,
     onNavigateToAddExpense: () -> Unit,
+    onNavigateToEditExpense: (String) -> Unit,
     onSignOut: () -> Unit
 ) {
     val uiState by viewModel.expensesState.collectAsStateWithLifecycle()
@@ -66,8 +68,10 @@ fun ExpensesScreen(
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(state.expenses, key = { it.id }) { expense ->
+                            val isClickable = !expense.isPending && expense.syncError == null && !expense.isConflict
                             ExpenseItem(
-                                expense = expense, 
+                                expense = expense,
+                                modifier = if (isClickable) Modifier.clickable { onNavigateToEditExpense(expense.id) } else Modifier,
                                 onRetry = { viewModel.retryExpense(expense) }
                             )
                             HorizontalDivider()
@@ -80,7 +84,7 @@ fun ExpensesScreen(
 }
 
 @Composable
-fun ExpenseItem(expense: Expense, onRetry: () -> Unit) {
+fun ExpenseItem(expense: Expense, modifier: Modifier = Modifier, onRetry: () -> Unit) {
     val categoryUiMap = mapOf(
         "food_dining" to "Food & Dining",
         "transport" to "Transport",
@@ -100,7 +104,7 @@ fun ExpenseItem(expense: Expense, onRetry: () -> Unit) {
         "other" to "Other"
     )
     
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+    Column(modifier = modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(text = "${expense.expenseDate} - ${categoryUiMap[expense.categoryId] ?: expense.categoryId}", style = MaterialTheme.typography.bodyLarge)
             val amountStr = String.format(java.util.Locale.US, "%.2f", expense.amountMinor / 100.0)
