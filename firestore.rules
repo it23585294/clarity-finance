@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isValidExpense(data, isCreate) {
+      return data.keys().hasOnly(['amountMinor', 'currency', 'categoryId', 'paymentChannelId', 'spendingType', 'expenseDate', 'note', 'createdAt', 'updatedAt'])
+        && data.amountMinor is int && data.amountMinor > 0
+        && data.currency == 'LKR'
+        && data.categoryId in ['food_dining', 'transport', 'housing', 'utilities', 'shopping', 'health', 'entertainment', 'education', 'other']
+        && data.paymentChannelId in ['cash', 'primary_bank_card', 'secondary_bank_card', 'other']
+        && data.spendingType in ['committed', 'discretionary']
+        && data.expenseDate is string && data.expenseDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && data.note is string && data.note.size() <= 500
+        && data.updatedAt == request.time
+        && (isCreate ? data.createdAt == request.time : true);
+    }
+
+    match /users/{userId}/expenses/{expenseId} {
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
+
+      allow create: if request.auth != null && request.auth.uid == userId
+                    && isValidExpense(request.resource.data, true);
+
+      allow update: if request.auth != null && request.auth.uid == userId
+                    && isValidExpense(request.resource.data, false)
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amountMinor', 'currency', 'categoryId', 'paymentChannelId', 'spendingType', 'expenseDate', 'note', 'updatedAt'])
+                    && request.resource.data.createdAt == resource.data.createdAt;
+    }
+  }
+}

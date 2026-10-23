@@ -1,0 +1,14 @@
+{
+  "name": "firestore-tests",
+  "version": "1.0.0",
+  "description": "",
+  "main": "test.js",
+  "scripts": {
+    "test": "mocha test.js --timeout 30000"
+  },
+  "dependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
+    "firebase": "^10.0.0",
+    "mocha": "^10.4.0"
+  }
+}
