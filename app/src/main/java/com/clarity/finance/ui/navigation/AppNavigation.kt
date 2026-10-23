@@ -16,8 +16,8 @@ import androidx.navigation.compose.rememberNavController
 import com.clarity.finance.di.ViewModelFactory
 import com.clarity.finance.ui.auth.LoginScreen
 import com.clarity.finance.ui.auth.RegisterScreen
-import com.clarity.finance.ui.dashboard.DashboardScreen
 import com.clarity.finance.viewmodel.AuthViewModel
+import com.clarity.finance.viewmodel.ExpenseListViewModel
 import com.clarity.finance.viewmodel.SessionState
 
 @Composable
@@ -77,11 +77,22 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
         composable("dashboard") {
             val user = (sessionState as? SessionState.SignedIn)?.user
             if (user != null) {
-                DashboardScreen(
-                    user = user,
+                val expenseListViewModel: ExpenseListViewModel = viewModel(factory = viewModelFactory)
+                com.clarity.finance.ui.expenses.ExpensesScreen(
+                    viewModel = expenseListViewModel,
+                    onNavigateToAddExpense = {
+                        navController.navigate("addExpense")
+                    },
                     onSignOut = { authViewModel.logout() }
                 )
             }
+        }
+        composable("addExpense") {
+            val addExpenseViewModel: com.clarity.finance.viewmodel.AddExpenseViewModel = viewModel(factory = viewModelFactory)
+            com.clarity.finance.ui.expenses.AddExpenseScreen(
+                viewModel = addExpenseViewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
     }
 }
