@@ -29,8 +29,8 @@ service cloud.firestore {
 
     function isValidIncome(data, isCreate) {
       let baseKeys = ['sourceId', 'receiptDate', 'currency', 'originalAmountStr', 'lkrAmountMinor', 'conversionBasis', 'note', 'updatedAt'];
-      let requiredKeys = baseKeys.concat(['createdAt']);
-      let allowedKeys = requiredKeys.concat(['conversionRateStr']);
+      let requiredKeys = isCreate ? baseKeys.concat(['createdAt']) : baseKeys;
+      let allowedKeys = requiredKeys.concat(['conversionRateStr', 'linkedPaymentId', 'linkedMilestoneId', 'originalAmountMinor']);
 
       return data.keys().hasAll(requiredKeys)
         && data.keys().hasOnly(allowedKeys)
@@ -39,6 +39,7 @@ service cloud.firestore {
         && data.conversionBasis in ['native_lkr', 'confirmed_rate', 'actual_credit']
         && isValidAmountStr(data.originalAmountStr)
         && data.lkrAmountMinor is int && data.lkrAmountMinor > 0
+        && (!('originalAmountMinor' in data.keys()) || (data.originalAmountMinor is int && data.originalAmountMinor > 0))
         && data.receiptDate is string && data.receiptDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
         && data.note is string && data.note.size() <= 500
         && data.updatedAt == request.time
@@ -63,15 +64,90 @@ service cloud.firestore {
     }
 
     match /users/{userId}/incomeReceipts/{receiptId} {
-      allow read, delete: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      allow delete: if request.auth != null && request.auth.uid == userId
+                    && (!('linkedPaymentId' in resource.data) || resource.data.linkedPaymentId == null);
 
       allow create: if request.auth != null && request.auth.uid == userId
-                    && isValidIncome(request.resource.data, true);
+                    && isValidIncome(request.resource.data, true)
+                    && (
+                      !('linkedPaymentId' in request.resource.data) || request.resource.data.linkedPaymentId == null ||
+                      (
+                        getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(request.resource.data.linkedPaymentId)).data.lastReceiptId == receiptId
+                        && ('linkedMilestoneId' in request.resource.data && request.resource.data.linkedMilestoneId != null ?
+                              getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(request.resource.data.linkedPaymentId)/milestones/$(request.resource.data.linkedMilestoneId)).data.lastReceiptId == receiptId
+                              : true)
+                      )
+                    );
 
       allow update: if request.auth != null && request.auth.uid == userId
                     && isValidIncome(request.resource.data, false)
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sourceId', 'receiptDate', 'currency', 'originalAmountStr', 'lkrAmountMinor', 'conversionBasis', 'conversionRateStr', 'note', 'updatedAt'])
+                    && (!('linkedPaymentId' in resource.data) || resource.data.linkedPaymentId == null)
+                    && (!('linkedPaymentId' in request.resource.data) || request.resource.data.linkedPaymentId == null)
                     && request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    match /users/{userId}/expectedPayments/{paymentId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      allow create: if request.auth != null && request.auth.uid == userId
+                    && request.resource.data.keys().hasAll(['type', 'title', 'sourceId', 'currency', 'dueDate', 'agreedAmountMinor', 'allocatedAmountMinor', 'directReceivedAmountMinor', 'milestoneReceivedAmountMinor', 'isCancelled', 'note', 'createdAt', 'updatedAt'])
+                    && request.resource.data.type in ['standalone', 'project']
+                    && request.resource.data.agreedAmountMinor is int && request.resource.data.agreedAmountMinor > 0
+                    && request.resource.data.allocatedAmountMinor == 0
+                    && request.resource.data.directReceivedAmountMinor == 0
+                    && request.resource.data.milestoneReceivedAmountMinor == 0
+                    && request.resource.data.isCancelled == false
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time;
+
+      allow update: if request.auth != null && request.auth.uid == userId
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.type == resource.data.type
+                    && request.resource.data.currency == resource.data.currency
+                    && request.resource.data.sourceId == resource.data.sourceId
+                    && request.resource.data.directReceivedAmountMinor <= request.resource.data.agreedAmountMinor - request.resource.data.allocatedAmountMinor
+                    && request.resource.data.allocatedAmountMinor <= request.resource.data.agreedAmountMinor - request.resource.data.directReceivedAmountMinor
+                    && (
+                      (request.resource.data.lastReceiptId != resource.data.lastReceiptId && request.resource.data.directReceivedAmountMinor > resource.data.directReceivedAmountMinor) ?
+                        (!exists(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)) &&
+                         getAfter(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)).data.originalAmountMinor == request.resource.data.directReceivedAmountMinor - resource.data.directReceivedAmountMinor)
+                      : true
+                    )
+                    && (
+                      (request.resource.data.lastReceiptId != resource.data.lastReceiptId && request.resource.data.milestoneReceivedAmountMinor > resource.data.milestoneReceivedAmountMinor) ?
+                        (!exists(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)) &&
+                         getAfter(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)).data.originalAmountMinor == request.resource.data.milestoneReceivedAmountMinor - resource.data.milestoneReceivedAmountMinor)
+                      : true
+                    )
+                    && (
+                      request.resource.data.lastMilestoneOpId != resource.data.lastMilestoneOpId ?
+                        getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)/milestones/$(request.resource.data.lastMilestoneId)).data.lastMilestoneOpId == request.resource.data.lastMilestoneOpId
+                      : true
+                    );
+    }
+
+    match /users/{userId}/expectedPayments/{paymentId}/milestones/{milestoneId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      allow create: if request.auth != null && request.auth.uid == userId
+                    && request.resource.data.keys().hasAll(['title', 'dueDate', 'agreedAmountMinor', 'receivedAmountMinor', 'isCancelled', 'lastMilestoneOpId', 'createdAt', 'updatedAt'])
+                    && request.resource.data.agreedAmountMinor is int && request.resource.data.agreedAmountMinor > 0
+                    && request.resource.data.receivedAmountMinor == 0
+                    && request.resource.data.isCancelled == false
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time
+                    && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.lastMilestoneOpId == request.resource.data.lastMilestoneOpId;
+
+      allow update: if request.auth != null && request.auth.uid == userId
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.receivedAmountMinor <= request.resource.data.agreedAmountMinor
+                    && (
+                      request.resource.data.lastMilestoneOpId != resource.data.lastMilestoneOpId ?
+                        getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.lastMilestoneOpId == request.resource.data.lastMilestoneOpId
+                      : true
+                    );
     }
   }
 }
