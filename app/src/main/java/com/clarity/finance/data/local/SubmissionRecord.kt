@@ -29,15 +29,19 @@ data class SubmissionRecord(
     }
     
     companion object {
-        fun fromExpense(uid: String, expense: Expense, status: String, errorReason: String? = null): SubmissionRecord {
+        fun create(uid: String, recordId: String, payload: Any, status: String, type: String, errorReason: String? = null): SubmissionRecord {
             return SubmissionRecord(
                 uid = uid,
-                recordId = expense.id,
-                payloadJson = Gson().toJson(expense),
+                recordId = recordId,
+                payloadJson = Gson().toJson(payload),
                 status = status,
                 errorReason = errorReason,
-                type = "EXPENSE"
+                type = type
             )
+        }
+
+        fun fromExpense(uid: String, expense: Expense, status: String, errorReason: String? = null): SubmissionRecord {
+            return create(uid, expense.id, expense, status, "EXPENSE", errorReason)
         }
     }
 }

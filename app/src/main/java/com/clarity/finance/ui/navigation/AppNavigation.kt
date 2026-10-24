@@ -81,9 +81,54 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
                 com.clarity.finance.ui.HomeScreen(
                     viewModel = homeViewModel,
                     onNavigateToExpenses = { navController.navigate("dashboard") },
-                    onNavigateToIncome = { navController.navigate("income") }
+                    onNavigateToIncome = { navController.navigate("income") },
+                    onNavigateToPendingPayments = { navController.navigate("pendingPayments") }
                 )
             }
+        }
+        composable("pendingPayments") {
+            val paymentListViewModel: com.clarity.finance.viewmodel.PaymentListViewModel = viewModel(factory = viewModelFactory)
+            com.clarity.finance.ui.payments.ExpectedPaymentsScreen(
+                viewModel = paymentListViewModel,
+                onNavigateToProjectDetail = { id -> navController.navigate("projectDetail/$id") },
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(
+            route = "projectDetail/{paymentId}",
+            arguments = listOf(androidx.navigation.navArgument("paymentId") { type = androidx.navigation.NavType.StringType })
+        ) { backStackEntry ->
+            val paymentId = backStackEntry.arguments?.getString("paymentId") ?: return@composable
+            val paymentDetailViewModel: com.clarity.finance.viewmodel.PaymentDetailViewModel = viewModel(factory = viewModelFactory)
+            com.clarity.finance.ui.payments.ProjectDetailScreen(
+                viewModel = paymentDetailViewModel,
+                paymentId = paymentId,
+                onNavigateToConfirmation = { pId, msId ->
+                    if (msId != null) {
+                        navController.navigate("confirmPayment/$pId/$msId")
+                    } else {
+                        navController.navigate("confirmPayment/$pId/null")
+                    }
+                },
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(
+            route = "confirmPayment/{paymentId}/{milestoneId}",
+            arguments = listOf(
+                androidx.navigation.navArgument("paymentId") { type = androidx.navigation.NavType.StringType },
+                androidx.navigation.navArgument("milestoneId") { type = androidx.navigation.NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val paymentId = backStackEntry.arguments?.getString("paymentId") ?: return@composable
+            val milestoneId = backStackEntry.arguments?.getString("milestoneId")?.takeIf { it != "null" }
+            val confirmationViewModel: com.clarity.finance.viewmodel.PaymentConfirmationViewModel = viewModel(factory = viewModelFactory)
+            com.clarity.finance.ui.payments.PaymentConfirmationScreen(
+                viewModel = confirmationViewModel,
+                paymentId = paymentId,
+                milestoneId = milestoneId,
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
         composable("income") {
             val incomeListViewModel: com.clarity.finance.viewmodel.IncomeListViewModel = viewModel(factory = viewModelFactory)

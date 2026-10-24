@@ -6,6 +6,8 @@ import com.clarity.finance.data.repository.FirebaseAuthRepository
 import com.clarity.finance.data.repository.FirestoreExpenseRepository
 import com.clarity.finance.data.repository.IncomeRepository
 import com.clarity.finance.data.repository.FirestoreIncomeRepository
+import com.clarity.finance.data.repository.PaymentRepository
+import com.clarity.finance.data.repository.FirestorePaymentRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import android.content.Context
@@ -25,5 +27,9 @@ class AppContainer(private val context: Context) {
 
     val incomeRepository: IncomeRepository by lazy {
         FirestoreIncomeRepository(FirebaseFirestore.getInstance(), recoveryStore)
+    }
+
+    val paymentRepository: PaymentRepository by lazy {
+        FirestorePaymentRepository(FirebaseFirestore.getInstance(), recoveryStore)
     }
 }

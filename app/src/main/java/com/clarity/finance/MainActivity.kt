@@ -21,7 +21,8 @@ class MainActivity : ComponentActivity() {
         val viewModelFactory = ViewModelFactory(
             appContainer.authRepository, 
             appContainer.expenseRepository,
-            appContainer.incomeRepository
+            appContainer.incomeRepository,
+            appContainer.paymentRepository
         )
 
         setContent {

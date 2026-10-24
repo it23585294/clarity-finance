@@ -15,7 +15,8 @@ import com.clarity.finance.viewmodel.HomeViewModel
 fun HomeScreen(
     viewModel: HomeViewModel,
     onNavigateToExpenses: () -> Unit,
-    onNavigateToIncome: () -> Unit
+    onNavigateToIncome: () -> Unit,
+    onNavigateToPendingPayments: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -60,6 +61,13 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
                 ) {
                     Text("Income")
+                }
+                
+                Button(
+                    onClick = onNavigateToPendingPayments,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                ) {
+                    Text("Pending Payments")
                 }
 
                 OutlinedButton(

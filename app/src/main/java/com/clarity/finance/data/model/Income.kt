@@ -10,6 +10,9 @@ data class Income(
     val conversionBasis: String,
     val conversionRateStr: String?,
     val note: String,
+    val originalAmountMinor: Long? = null,
+    val linkedPaymentId: String? = null,
+    val linkedMilestoneId: String? = null,
     val createdAt: com.google.firebase.Timestamp? = null,
     val updatedAt: com.google.firebase.Timestamp? = null,
     

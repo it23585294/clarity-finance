@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import com.clarity.finance.data.repository.AuthRepository
 import com.clarity.finance.data.repository.ExpenseRepository
 import com.clarity.finance.data.repository.IncomeRepository
+import com.clarity.finance.data.repository.PaymentRepository
 import com.clarity.finance.viewmodel.AddExpenseViewModel
 import com.clarity.finance.viewmodel.AuthViewModel
 import com.clarity.finance.viewmodel.EditExpenseViewModel
@@ -12,11 +13,15 @@ import com.clarity.finance.viewmodel.ExpenseListViewModel
 import com.clarity.finance.viewmodel.HomeViewModel
 import com.clarity.finance.viewmodel.IncomeListViewModel
 import com.clarity.finance.viewmodel.AddEditIncomeViewModel
+import com.clarity.finance.viewmodel.PaymentListViewModel
+import com.clarity.finance.viewmodel.PaymentDetailViewModel
+import com.clarity.finance.viewmodel.PaymentConfirmationViewModel
 
 class ViewModelFactory(
     private val authRepository: AuthRepository,
     private val expenseRepository: ExpenseRepository,
-    private val incomeRepository: IncomeRepository
+    private val incomeRepository: IncomeRepository,
+    private val paymentRepository: PaymentRepository
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -40,6 +45,15 @@ class ViewModelFactory(
         }
         if (modelClass.isAssignableFrom(AddEditIncomeViewModel::class.java)) {
             return AddEditIncomeViewModel(authRepository, incomeRepository) as T
+        }
+        if (modelClass.isAssignableFrom(PaymentListViewModel::class.java)) {
+            return PaymentListViewModel(authRepository, paymentRepository) as T
+        }
+        if (modelClass.isAssignableFrom(PaymentDetailViewModel::class.java)) {
+            return PaymentDetailViewModel(authRepository, paymentRepository) as T
+        }
+        if (modelClass.isAssignableFrom(PaymentConfirmationViewModel::class.java)) {
+            return PaymentConfirmationViewModel(authRepository, paymentRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

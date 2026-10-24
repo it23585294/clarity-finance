@@ -120,7 +120,12 @@ fun IncomeItem(income: Income, modifier: Modifier = Modifier, onRetry: () -> Uni
         }
         Spacer(modifier = Modifier.height(4.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(text = "Original: ${income.currency} ${income.originalAmountStr}", style = MaterialTheme.typography.bodyMedium)
+            val displayOriginalAmount = if (income.originalAmountMinor != null) {
+                String.format(java.util.Locale.US, "%.2f", income.originalAmountMinor / 100.0)
+            } else {
+                income.originalAmountStr
+            }
+            Text(text = "Original: ${income.currency} $displayOriginalAmount", style = MaterialTheme.typography.bodyMedium)
             
             if (income.syncError != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
