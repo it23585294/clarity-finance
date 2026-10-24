@@ -18,7 +18,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val appContainer = (application as ClarityApplication).container
-        val viewModelFactory = ViewModelFactory(appContainer.authRepository, appContainer.expenseRepository)
+        val viewModelFactory = ViewModelFactory(
+            appContainer.authRepository, 
+            appContainer.expenseRepository,
+            appContainer.incomeRepository
+        )
 
         setContent {
             ClarityTheme {

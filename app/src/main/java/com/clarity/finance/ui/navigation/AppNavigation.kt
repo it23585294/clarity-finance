@@ -34,14 +34,14 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
     }
 
     // Determine initial route based on auth state
-    val startDestination = if (sessionState is SessionState.SignedIn) "dashboard" else "login"
+    val startDestination = if (sessionState is SessionState.SignedIn) "home" else "login"
 
     // Listen to session state changes to enforce redirection and clear backstack
     LaunchedEffect(sessionState) {
         when (sessionState) {
             is SessionState.SignedIn -> {
-                if (navController.currentDestination?.route != "dashboard") {
-                    navController.navigate("dashboard") {
+                if (navController.currentDestination?.route != "home" && navController.currentDestination?.route != "dashboard" && navController.currentDestination?.route != "income") {
+                    navController.navigate("home") {
                         popUpTo(0) { inclusive = true }
                     }
                 }
@@ -74,6 +74,39 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
                 }
             )
         }
+        composable("home") {
+            val user = (sessionState as? SessionState.SignedIn)?.user
+            if (user != null) {
+                val homeViewModel: com.clarity.finance.viewmodel.HomeViewModel = viewModel(factory = viewModelFactory)
+                com.clarity.finance.ui.HomeScreen(
+                    viewModel = homeViewModel,
+                    onNavigateToExpenses = { navController.navigate("dashboard") },
+                    onNavigateToIncome = { navController.navigate("income") }
+                )
+            }
+        }
+        composable("income") {
+            val incomeListViewModel: com.clarity.finance.viewmodel.IncomeListViewModel = viewModel(factory = viewModelFactory)
+            com.clarity.finance.ui.income.IncomeListScreen(
+                viewModel = incomeListViewModel,
+                onNavigateToAddIncome = { navController.navigate("addEditIncome/new") },
+                onNavigateToEditIncome = { id -> navController.navigate("addEditIncome/$id") },
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(
+            route = "addEditIncome/{incomeId}",
+            arguments = listOf(androidx.navigation.navArgument("incomeId") { type = androidx.navigation.NavType.StringType })
+        ) { backStackEntry ->
+            val incomeId = backStackEntry.arguments?.getString("incomeId")
+            val effectiveId = if (incomeId == "new") null else incomeId
+            val addEditIncomeViewModel: com.clarity.finance.viewmodel.AddEditIncomeViewModel = viewModel(factory = viewModelFactory)
+            com.clarity.finance.ui.income.AddEditIncomeScreen(
+                viewModel = addEditIncomeViewModel,
+                incomeId = effectiveId,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
         composable("dashboard") {
             val user = (sessionState as? SessionState.SignedIn)?.user
             if (user != null) {
@@ -86,7 +119,7 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
                     onNavigateToEditExpense = { expenseId ->
                         navController.navigate("editExpense/$expenseId")
                     },
-                    onSignOut = { authViewModel.logout() }
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
         }

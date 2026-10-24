@@ -2,15 +2,20 @@ package com.clarity.finance.data.local
 
 import com.clarity.finance.data.model.Expense
 import com.google.gson.Gson
+import com.google.gson.annotations.SerializedName
 
 data class SubmissionRecord(
     val uid: String,
-    val expenseId: String,
+    @SerializedName("expenseId") val recordId: String,
     val payloadJson: String,
     val status: String, // "PENDING", "FAILED", "CONFLICT"
-    val errorReason: String? = null
+    val errorReason: String? = null,
+    val type: String? = null // Defaults to null for backward compatibility
 ) {
+    val resolvedType: String get() = type ?: "EXPENSE"
+
     fun toExpense(): Expense? {
+        if (resolvedType != "EXPENSE") return null
         return try {
             val expense = Gson().fromJson(payloadJson, Expense::class.java)
             expense.copy(
@@ -27,10 +32,11 @@ data class SubmissionRecord(
         fun fromExpense(uid: String, expense: Expense, status: String, errorReason: String? = null): SubmissionRecord {
             return SubmissionRecord(
                 uid = uid,
-                expenseId = expense.id,
+                recordId = expense.id,
                 payloadJson = Gson().toJson(expense),
                 status = status,
-                errorReason = errorReason
+                errorReason = errorReason,
+                type = "EXPENSE"
             )
         }
     }

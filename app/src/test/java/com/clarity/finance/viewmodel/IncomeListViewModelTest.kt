@@ -7,6 +7,7 @@ import com.clarity.finance.data.repository.IncomeRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -51,41 +52,70 @@ class IncomeListViewModelTest {
         // LKR 128,000.00 = 12,800,000 cents
         val income2 = Income("2", "salary", "2026-10-21", "LKR", "128000.00", 12800000L, "native_lkr", "1", "")
         
-        // Ensure month matches our mock data
-        val currentMonthStr = YearMonth.now(ZoneId.of("Asia/Colombo")).toString()
-        val i1 = income1.copy(receiptDate = "\$currentMonthStr-20")
-        val i2 = income2.copy(receiptDate = "\$currentMonthStr-21")
+        val currentMonthStr = YearMonth.now(ZoneId.of("Asia/Colombo"))
+        val i1 = income1.copy(receiptDate = "${currentMonthStr}-20")
+        val i2 = income2.copy(receiptDate = "${currentMonthStr}-21")
         
         `when`(incomeRepository.getIncomes("uid1")).thenReturn(MutableStateFlow(listOf(i1, i2)))
         mockAuthState.value = user1
         
+        val collectJob = launch(testDispatcher) { viewModel.uiState.collect {} }
         advanceUntilIdle()
         
         val state = viewModel.uiState.value as IncomeListUiState.Success
         // 1230000 + 12800000 = 14030000
         assertEquals(14030000L, state.confirmedTotalLkr)
+        collectJob.cancel()
     }
     
     @Test
     fun `month boundaries restrict items`() = runTest(testDispatcher) {
         val user1 = User("uid1", "test@example.com")
         
-        val targetMonth = YearMonth.of(2026, 10)
+        val now = YearMonth.now(ZoneId.of("Asia/Colombo"))
         
-        // Items in Oct
-        val i1 = Income("1", "salary", "2026-10-01", "LKR", "100", 10000L, "native_lkr", "1", "")
-        val i2 = Income("2", "salary", "2026-10-31", "LKR", "100", 10000L, "native_lkr", "1", "")
-        
-        // Items outside Oct
-        val i3 = Income("3", "salary", "2026-09-30", "LKR", "100", 10000L, "native_lkr", "1", "")
-        val i4 = Income("4", "salary", "2026-11-01", "LKR", "100", 10000L, "native_lkr", "1", "")
+        val i1 = Income("1", "salary", now.atDay(1).toString(), "LKR", "100", 10000L, "native_lkr", "1", "")
+        val i2 = Income("2", "salary", now.atEndOfMonth().toString(), "LKR", "100", 10000L, "native_lkr", "1", "")
+        val i3 = Income("3", "salary", now.minusMonths(1).atEndOfMonth().toString(), "LKR", "100", 10000L, "native_lkr", "1", "")
+        val i4 = Income("4", "salary", now.plusMonths(1).atDay(1).toString(), "LKR", "100", 10000L, "native_lkr", "1", "")
 
         `when`(incomeRepository.getIncomes("uid1")).thenReturn(MutableStateFlow(listOf(i1, i2, i3, i4)))
         mockAuthState.value = user1
+        
+        val collectJob = launch(testDispatcher) { viewModel.uiState.collect {} }
         advanceUntilIdle()
         
-        // Hack: change the internal month to targetMonth so test relies on static dates
-        val method = viewModel.javaClass.getDeclaredMethod("changeMonth", Long::class.java)
-        // Just mock the month calculation: 
+        val state = viewModel.uiState.value as IncomeListUiState.Success
+        assertEquals(2, state.incomes.size)
+        assertTrue(state.incomes.contains(i1))
+        assertTrue(state.incomes.contains(i2))
+        assertFalse(state.incomes.contains(i3))
+        assertFalse(state.incomes.contains(i4))
+        collectJob.cancel()
+    }
+    
+    @Test
+    fun `account isolation resets state`() = runTest(testDispatcher) {
+        val user1 = User("uid1", "test@example.com")
+        val now = YearMonth.now(ZoneId.of("Asia/Colombo"))
+        val i1 = Income("1", "salary", now.atDay(1).toString(), "LKR", "100", 10000L, "native_lkr", "1", "")
+        
+        `when`(incomeRepository.getIncomes("uid1")).thenReturn(MutableStateFlow(listOf(i1)))
+        `when`(incomeRepository.getIncomes("uid2")).thenReturn(MutableStateFlow(emptyList()))
+        
+        mockAuthState.value = user1
+        
+        val collectJob = launch(testDispatcher) { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+        
+        val state1 = viewModel.uiState.value as IncomeListUiState.Success
+        assertEquals(1, state1.incomes.size)
+        
+        mockAuthState.value = User("uid2", "user2@example.com")
+        advanceUntilIdle()
+        
+        val state2 = viewModel.uiState.value as IncomeListUiState.Success
+        assertEquals(0, state2.incomes.size)
+        collectJob.cancel()
     }
 }

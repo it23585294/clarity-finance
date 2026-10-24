@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
-import com.clarity.finance.data.local.ExpenseRecoveryStore
+import com.clarity.finance.data.local.SubmissionRecoveryStore
 import com.clarity.finance.data.local.SubmissionRecord
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.launch
@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 
 class FirestoreExpenseRepository(
     private val firestore: FirebaseFirestore,
-    private val recoveryStore: ExpenseRecoveryStore
+    private val recoveryStore: SubmissionRecoveryStore
 ) : ExpenseRepository {
 
     override fun getExpenses(userId: String): Flow<List<Expense>> {
@@ -59,7 +59,7 @@ class FirestoreExpenseRepository(
             awaitClose { listener.remove() }
         }
 
-        return combine(firestoreFlow, recoveryStore.getRecordsFlow(userId)) { firestoreExpenses, pendingRecords ->
+        return combine(firestoreFlow, recoveryStore.getRecordsFlow(userId, "EXPENSE")) { firestoreExpenses, pendingRecords ->
             val pendingExpenses = pendingRecords.mapNotNull { it.toExpense() }
             
             // Only show pending/failed if they are not already in firestoreExpenses
@@ -110,7 +110,7 @@ class FirestoreExpenseRepository(
                     }
                 }.addOnSuccessListener {
                     kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-                        recoveryStore.removeRecord(expense.id)
+                        recoveryStore.removeRecord(expense.id, "EXPENSE")
                     }
                 }
             } catch (e: Exception) {
@@ -135,7 +135,7 @@ class FirestoreExpenseRepository(
                     val remoteAmount = doc.getLong("amountMinor")
                     val remoteDate = doc.getString("expenseDate")
                     if (remoteAmount == expense.amountMinor && remoteDate == expense.expenseDate) {
-                        recoveryStore.removeRecord(expense.id) // Confirmed successful
+                        recoveryStore.removeRecord(expense.id, "EXPENSE") // Confirmed successful
                     } else {
                         recoveryStore.saveRecord(SubmissionRecord.fromExpense(userId, expense, "CONFLICT", "Conflicting fields on server"))
                     }
@@ -148,7 +148,7 @@ class FirestoreExpenseRepository(
                         }
                     }.addOnSuccessListener {
                         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-                            recoveryStore.removeRecord(expense.id)
+                            recoveryStore.removeRecord(expense.id, "EXPENSE")
                         }
                     }
                 }

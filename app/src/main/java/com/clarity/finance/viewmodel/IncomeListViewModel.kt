@@ -85,9 +85,12 @@ class IncomeListViewModel(
     }
 
     fun retryIncome(income: Income) {
-        val currentUser = authRepository.authState.value
-        if (currentUser != null) {
-            incomeRepository.retryFailedIncome(currentUser.uid, income)
+        viewModelScope.launch {
+            authRepository.authState.collect { user ->
+                if (user != null) {
+                    incomeRepository.retryFailedIncome(user.uid, income)
+                }
+            }
         }
     }
 }

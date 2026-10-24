@@ -21,7 +21,7 @@ fun ExpensesScreen(
     viewModel: ExpenseListViewModel,
     onNavigateToAddExpense: () -> Unit,
     onNavigateToEditExpense: (String) -> Unit,
-    onSignOut: () -> Unit
+    onNavigateBack: () -> Unit
 ) {
     val uiState by viewModel.expensesState.collectAsStateWithLifecycle()
 
@@ -32,8 +32,8 @@ fun ExpensesScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("Clarity Expenses", style = MaterialTheme.typography.headlineMedium)
-            Button(onClick = onSignOut) {
-                Text("Sign Out")
+            Button(onClick = onNavigateBack) {
+                Text("Back")
             }
         }
         
