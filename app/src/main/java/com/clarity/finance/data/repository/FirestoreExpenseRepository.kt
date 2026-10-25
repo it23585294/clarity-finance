@@ -110,7 +110,7 @@ class FirestoreExpenseRepository(
                     }
                 }.addOnSuccessListener {
                     kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-                        recoveryStore.removeRecord(expense.id, "EXPENSE")
+                        recoveryStore.removeRecord(userId, expense.id, "EXPENSE")
                     }
                 }
             } catch (e: Exception) {
@@ -135,7 +135,7 @@ class FirestoreExpenseRepository(
                     val remoteAmount = doc.getLong("amountMinor")
                     val remoteDate = doc.getString("expenseDate")
                     if (remoteAmount == expense.amountMinor && remoteDate == expense.expenseDate) {
-                        recoveryStore.removeRecord(expense.id, "EXPENSE") // Confirmed successful
+                        recoveryStore.removeRecord(userId, expense.id, "EXPENSE") // Confirmed successful
                     } else {
                         recoveryStore.saveRecord(SubmissionRecord.fromExpense(userId, expense, "CONFLICT", "Conflicting fields on server"))
                     }
@@ -148,7 +148,7 @@ class FirestoreExpenseRepository(
                         }
                     }.addOnSuccessListener {
                         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-                            recoveryStore.removeRecord(expense.id, "EXPENSE")
+                            recoveryStore.removeRecord(userId, expense.id, "EXPENSE")
                         }
                     }
                 }

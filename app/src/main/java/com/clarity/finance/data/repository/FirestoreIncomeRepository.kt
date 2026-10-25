@@ -113,7 +113,7 @@ class FirestoreIncomeRepository(
                     }
                 }.addOnSuccessListener {
                     CoroutineScope(Dispatchers.IO).launch {
-                        recoveryStore.removeRecord(income.id, "INCOME")
+                        recoveryStore.removeRecord(userId, income.id, "INCOME")
                     }
                 }
             } catch (e: Exception) {
@@ -137,7 +137,7 @@ class FirestoreIncomeRepository(
                     val remoteAmount = doc.getLong("lkrAmountMinor")
                     val remoteDate = doc.getString("receiptDate")
                     if (remoteAmount == income.lkrAmountMinor && remoteDate == income.receiptDate) {
-                        recoveryStore.removeRecord(income.id, "INCOME")
+                        recoveryStore.removeRecord(userId, income.id, "INCOME")
                     } else {
                         recoveryStore.saveRecord(SubmissionRecord(userId, income.id, Gson().toJson(income), "CONFLICT", "Conflicting fields on server", "INCOME"))
                     }
@@ -149,7 +149,7 @@ class FirestoreIncomeRepository(
                         }
                     }.addOnSuccessListener {
                         CoroutineScope(Dispatchers.IO).launch {
-                            recoveryStore.removeRecord(income.id, "INCOME")
+                            recoveryStore.removeRecord(userId, income.id, "INCOME")
                         }
                     }
                 }

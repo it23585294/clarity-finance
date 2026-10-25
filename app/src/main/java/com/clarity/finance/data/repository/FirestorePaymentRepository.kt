@@ -345,7 +345,7 @@ class FirestorePaymentRepository(
                 tx.set(incomeRef, incMap)
             }.await()
             
-            recoveryStore.removeRecord(income.id, payloadType)
+            recoveryStore.removeRecord(userId, income.id, payloadType)
             return Result.success(Unit)
         } catch (e: Exception) {
             val msg = e.message ?: "Failed"
