@@ -1,0 +1,75 @@
+package com.clarity.finance
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.unit.dp
+import com.clarity.finance.data.model.*
+import com.clarity.finance.data.repository.*
+import com.clarity.finance.di.ViewModelFactory
+import com.clarity.finance.ui.navigation.AppNavigation
+import com.clarity.finance.ui.theme.ClarityTheme
+import com.google.firebase.Timestamp
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
+import org.junit.Rule
+import org.junit.Test
+import java.lang.reflect.Proxy
+
+/** Exercises the production navigation graph and buttons on Android; data is isolated from Firebase. */
+class PaymentNavigationTest {
+    @get:Rule val compose = createComposeRule()
+
+    @Test fun directAndMilestoneButtonsOpenConfirmationOnNarrowScreen() {
+        val auth = object : AuthRepository {
+            override val authState = MutableStateFlow<User?>(User("navigation-test", "test@example.com"))
+            override suspend fun login(email: String, password: String) = error("Unused")
+            override suspend fun register(email: String, password: String) = error("Unused")
+            override suspend fun logout() { authState.value = null }
+        }
+        val payments = NavigationPayments()
+        val factory = ViewModelFactory(auth, unused(ExpenseRepository::class.java), unused(IncomeRepository::class.java), payments)
+        compose.setContent { ClarityTheme { Box(Modifier.width(320.dp)) { AppNavigation(factory) } } }
+        compose.onNodeWithText("Pending Payments").performClick()
+        compose.onNodeWithText("Navigation Project").performClick()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Record Direct"))
+        compose.onNodeWithText("Record Direct").performClick()
+        compose.onNodeWithText("Record Payment").assertIsDisplayed()
+        compose.onNodeWithText("Payment for: Navigation Project").assertIsDisplayed()
+        compose.onNodeWithText("Back").performClick()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Record", substring = false))
+        compose.onNodeWithText("Record", substring = false).performClick()
+        compose.onNodeWithText("Record Payment").assertIsDisplayed()
+        compose.onNodeWithText("Payment for: Navigation Milestone").assertIsDisplayed()
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> unused(type: Class<T>): T = Proxy.newProxyInstance(type.classLoader, arrayOf(type)) { _, method, _ ->
+        error("Unexpected repository call: ${method.name}")
+    } as T
+
+    private class NavigationPayments : PaymentRepository {
+        val project = ExpectedPayment("p1", "project", "Navigation Project", "freelance", "LKR", "2026-10-30",
+            100000L, allocatedAmountMinor = 40000L, updatedAt = Timestamp(1, 0))
+        val milestone = Milestone("m1", "p1", "Navigation Milestone", "2026-10-30", 40000L, updatedAt = Timestamp(1, 0))
+        override fun getExpectedPayments(userId: String) = flowOf(listOf(project))
+        override fun getMilestones(userId: String, paymentId: String) = flowOf(listOf(milestone))
+        override suspend fun getExpectedPayment(userId: String, paymentId: String) = Result.success(project)
+        override suspend fun getUnresolvedPayment(userId: String, paymentId: String, milestoneId: String?): Income? = null
+        override suspend fun createExpectedPayment(userId: String, payment: ExpectedPayment) = error("Unused")
+        override suspend fun updateExpectedPayment(userId: String, payment: ExpectedPayment, originalUpdatedAt: Timestamp) = error("Unused")
+        override suspend fun cancelExpectedPayment(userId: String, paymentId: String, originalUpdatedAt: Timestamp) = error("Unused")
+        override suspend fun createMilestone(userId: String, milestone: Milestone, opId: String) = error("Unused")
+        override suspend fun updateMilestone(userId: String, milestone: Milestone, originalUpdatedAt: Timestamp, opId: String) = error("Unused")
+        override suspend fun cancelMilestone(userId: String, milestoneId: String, paymentId: String, originalUpdatedAt: Timestamp, opId: String) = error("Unused")
+        override suspend fun confirmPayment(userId: String, paymentId: String, milestoneId: String?, income: Income) = error("Unused")
+        override suspend fun retryFailedPayment(userId: String, paymentId: String, milestoneId: String?, income: Income) = error("Unused")
+    }
+}
