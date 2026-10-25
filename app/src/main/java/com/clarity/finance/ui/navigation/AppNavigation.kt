@@ -105,23 +105,23 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
                 paymentId = paymentId,
                 onNavigateToConfirmation = { pId, msId ->
                     if (msId != null) {
-                        navController.navigate("confirmPayment/$pId/$msId")
+                        navController.navigate("confirmPayment/${android.net.Uri.encode(pId)}?milestoneId=${android.net.Uri.encode(msId)}")
                     } else {
-                        navController.navigate("confirmPayment/$pId/null")
+                        navController.navigate("confirmPayment/${android.net.Uri.encode(pId)}")
                     }
                 },
                 onNavigateBack = { navController.popBackStack() }
             )
         }
         composable(
-            route = "confirmPayment/{paymentId}/{milestoneId}",
+            route = "confirmPayment/{paymentId}?milestoneId={milestoneId}",
             arguments = listOf(
                 androidx.navigation.navArgument("paymentId") { type = androidx.navigation.NavType.StringType },
-                androidx.navigation.navArgument("milestoneId") { type = androidx.navigation.NavType.StringType }
+                androidx.navigation.navArgument("milestoneId") { type = androidx.navigation.NavType.StringType; nullable = true; defaultValue = null }
             )
         ) { backStackEntry ->
             val paymentId = backStackEntry.arguments?.getString("paymentId") ?: return@composable
-            val milestoneId = backStackEntry.arguments?.getString("milestoneId")?.takeIf { it != "null" }
+            val milestoneId = backStackEntry.arguments?.getString("milestoneId")
             val confirmationViewModel: com.clarity.finance.viewmodel.PaymentConfirmationViewModel = viewModel(factory = viewModelFactory)
             com.clarity.finance.ui.payments.PaymentConfirmationScreen(
                 viewModel = confirmationViewModel,
