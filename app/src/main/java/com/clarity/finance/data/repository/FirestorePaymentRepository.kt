@@ -18,6 +18,13 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+private data class MilestoneCancellation(
+    val paymentId: String,
+    val milestoneId: String,
+    val updatedAt: com.google.firebase.Timestamp,
+    val opId: String
+)
+
 class FirestorePaymentRepository(
     private val firestore: FirebaseFirestore,
     private val recoveryStore: SubmissionRecoveryStore
@@ -25,7 +32,7 @@ class FirestorePaymentRepository(
 
     override fun getExpectedPayments(userId: String): Flow<List<ExpectedPayment>> = callbackFlow {
         val listener = firestore.collection("users").document(userId).collection("expectedPayments")
-            .addSnapshotListener { snapshot, error ->
+            .addSnapshotListener(com.google.firebase.firestore.MetadataChanges.INCLUDE) { snapshot, error ->
                 if (error != null) {
                     close(error)
                     return@addSnapshotListener
@@ -50,9 +57,11 @@ class FirestorePaymentRepository(
                                 lastMilestoneId = doc.getString("lastMilestoneId"),
                                 lastMilestoneOpId = doc.getString("lastMilestoneOpId"),
                                 createdAt = doc.getTimestamp("createdAt"),
-                                updatedAt = doc.getTimestamp("updatedAt")
+                                updatedAt = doc.getTimestamp("updatedAt"),
+                                hasPendingWrites = doc.metadata.hasPendingWrites(),
+                                isFromCache = doc.metadata.isFromCache
                             )
-                        } catch (e: Exception) { null }
+                        } catch (e: Exception) { close(IllegalStateException("Invalid payment document ${doc.id}", e)); return@addSnapshotListener }
                     }
                     trySend(payments.sortedBy { it.dueDate })
                 }
@@ -62,7 +71,7 @@ class FirestorePaymentRepository(
 
     override fun getMilestones(userId: String, paymentId: String): Flow<List<Milestone>> = callbackFlow {
         val listener = firestore.collection("users").document(userId).collection("expectedPayments").document(paymentId).collection("milestones")
-            .addSnapshotListener { snapshot, error ->
+            .addSnapshotListener(com.google.firebase.firestore.MetadataChanges.INCLUDE) { snapshot, error ->
                 if (error != null) {
                     close(error)
                     return@addSnapshotListener
@@ -81,9 +90,11 @@ class FirestorePaymentRepository(
                                 lastReceiptId = doc.getString("lastReceiptId"),
                                 lastMilestoneOpId = doc.getString("lastMilestoneOpId"),
                                 createdAt = doc.getTimestamp("createdAt"),
-                                updatedAt = doc.getTimestamp("updatedAt")
+                                updatedAt = doc.getTimestamp("updatedAt"),
+                                hasPendingWrites = doc.metadata.hasPendingWrites(),
+                                isFromCache = doc.metadata.isFromCache
                             )
-                        } catch (e: Exception) { null }
+                        } catch (e: Exception) { close(IllegalStateException("Invalid payment document ${doc.id}", e)); return@addSnapshotListener }
                     }
                     trySend(milestones.sortedBy { it.dueDate })
                 }
@@ -93,7 +104,8 @@ class FirestorePaymentRepository(
 
     override suspend fun getExpectedPayment(userId: String, paymentId: String): Result<ExpectedPayment> {
         return try {
-            val doc = firestore.collection("users").document(userId).collection("expectedPayments").document(paymentId).get().await()
+            val doc = firestore.collection("users").document(userId).collection("expectedPayments").document(paymentId)
+                .get(com.google.firebase.firestore.Source.SERVER).await()
             if (doc.exists()) {
                 val p = ExpectedPayment(
                     id = doc.id,
@@ -112,176 +124,288 @@ class FirestorePaymentRepository(
                     lastMilestoneId = doc.getString("lastMilestoneId"),
                     lastMilestoneOpId = doc.getString("lastMilestoneOpId"),
                     createdAt = doc.getTimestamp("createdAt"),
-                    updatedAt = doc.getTimestamp("updatedAt")
+                    updatedAt = doc.getTimestamp("updatedAt"),
+                    hasPendingWrites = doc.metadata.hasPendingWrites(),
+                                isFromCache = doc.metadata.isFromCache
                 )
                 Result.success(p)
             } else {
                 Result.failure(Exception("Payment not found"))
             }
-        } catch (e: Exception) { Result.failure(e) }
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (e: Exception) { Result.failure(e) }
     }
+
+    override suspend fun getUnresolvedProjectCreation(userId: String): ExpectedPayment? =
+        recoveryStore.getRecords(userId, "CREATE_PROJECT").firstOrNull()?.let {
+            Gson().fromJson(it.payloadJson, ExpectedPayment::class.java).also { payment ->
+                check(payment.id == it.recordId) { "Invalid saved creation identity" }
+            }
+        }
+
+    override suspend fun getUnresolvedMilestoneCreation(userId: String, paymentId: String): Milestone? =
+        recoveryStore.getRecords(userId, "CREATE_MILESTONE").map {
+            Gson().fromJson(it.payloadJson, Milestone::class.java).also { milestone ->
+                check(milestone.id == it.recordId) { "Invalid saved milestone identity" }
+            }
+        }.firstOrNull { it.paymentId == paymentId }
 
     override suspend fun createExpectedPayment(userId: String, payment: ExpectedPayment): Result<Unit> {
         return try {
+            recoveryStore.saveOperation(SubmissionRecord.create(userId, payment.id, payment, "PENDING", "CREATE_PROJECT"))
             val ref = firestore.collection("users").document(userId).collection("expectedPayments").document(payment.id)
-            val map = payment.toFirestoreMap().toMutableMap()
-            map["createdAt"] = FieldValue.serverTimestamp()
-            ref.set(map).await()
+            firestore.runTransaction<Unit> { tx ->
+                val existing = tx.get(ref)
+                if (existing.exists()) {
+                    val matches = existing.getString("type") == payment.type &&
+                        existing.getString("title") == payment.title &&
+                        existing.getString("sourceId") == payment.sourceId &&
+                        existing.getString("currency") == payment.currency &&
+                        existing.getString("dueDate") == payment.dueDate &&
+                        existing.getLong("agreedAmountMinor") == payment.agreedAmountMinor &&
+                        existing.getString("note") == payment.note
+                    check(matches) { "Creation conflict: this ID already has different data." }
+                    // Reconciliation must never reset balances, timestamps or cancellation.
+                } else {
+                    tx.set(ref, payment.toCreateMap())
+                }
+                Unit
+            }.await()
+            recoveryStore.removeRecord(userId, payment.id, "CREATE_PROJECT")
             Result.success(Unit)
-        } catch (e: Exception) { Result.failure(e) }
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (e: Exception) { Result.failure(e) }
     }
 
     override suspend fun updateExpectedPayment(userId: String, payment: ExpectedPayment, originalUpdatedAt: com.google.firebase.Timestamp): Result<Unit> {
         return try {
             val ref = firestore.collection("users").document(userId).collection("expectedPayments").document(payment.id)
-            firestore.runTransaction { tx ->
+            firestore.runTransaction<Unit> { tx ->
                 val snap = tx.get(ref)
                 if (!snap.exists()) throw FirebaseFirestoreException("Not found", FirebaseFirestoreException.Code.NOT_FOUND)
                 if (snap.getTimestamp("updatedAt") != originalUpdatedAt) throw FirebaseFirestoreException("Aborted", FirebaseFirestoreException.Code.ABORTED)
-                tx.update(ref, payment.toFirestoreMap())
+                if (snap.getBoolean("isCancelled") == true) throw FirebaseFirestoreException("Cancelled", FirebaseFirestoreException.Code.FAILED_PRECONDITION)
+                tx.update(ref, payment.toUpdateMap())
+                Unit
             }.await()
             Result.success(Unit)
-        } catch (e: Exception) { Result.failure(e) }
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (e: Exception) { Result.failure(e) }
     }
 
     override suspend fun cancelExpectedPayment(userId: String, paymentId: String, originalUpdatedAt: com.google.firebase.Timestamp): Result<Unit> {
         return try {
             val ref = firestore.collection("users").document(userId).collection("expectedPayments").document(paymentId)
-            firestore.runTransaction { tx ->
+            firestore.runTransaction<Unit> { tx ->
                 val snap = tx.get(ref)
                 if (!snap.exists()) throw FirebaseFirestoreException("Not found", FirebaseFirestoreException.Code.NOT_FOUND)
+                if (snap.getBoolean("isCancelled") == true) return@runTransaction
                 if (snap.getTimestamp("updatedAt") != originalUpdatedAt) throw FirebaseFirestoreException("Aborted", FirebaseFirestoreException.Code.ABORTED)
                 tx.update(ref, mapOf("isCancelled" to true, "updatedAt" to FieldValue.serverTimestamp()))
+                Unit
             }.await()
             Result.success(Unit)
-        } catch (e: Exception) { Result.failure(e) }
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (e: Exception) { Result.failure(e) }
     }
 
     override suspend fun createMilestone(userId: String, milestone: Milestone, opId: String): Result<Unit> {
         return try {
+            recoveryStore.saveOperation(SubmissionRecord.create(userId, milestone.id,
+                milestone.copy(lastMilestoneOpId = opId), "PENDING", "CREATE_MILESTONE"))
             val parentRef = firestore.collection("users").document(userId).collection("expectedPayments").document(milestone.paymentId)
             val msRef = parentRef.collection("milestones").document(milestone.id)
-            firestore.runTransaction { tx ->
+            firestore.runTransaction<Unit> { tx ->
+                val msSnap = tx.get(msRef)
+                if (msSnap.exists()) {
+                    check(msSnap.getString("title") == milestone.title &&
+                        msSnap.getString("dueDate") == milestone.dueDate &&
+                        msSnap.getLong("agreedAmountMinor") == milestone.agreedAmountMinor) {
+                        "Creation conflict: milestone ID already has different data."
+                    }
+                    return@runTransaction
+                }
+
                 val parentSnap = tx.get(parentRef)
                 if (!parentSnap.exists()) throw FirebaseFirestoreException("Parent not found", FirebaseFirestoreException.Code.NOT_FOUND)
-                
+                if (parentSnap.getString("type") != "project") throw FirebaseFirestoreException("Not a project", FirebaseFirestoreException.Code.FAILED_PRECONDITION)
+                if (parentSnap.getBoolean("isCancelled") == true) throw FirebaseFirestoreException("Parent cancelled", FirebaseFirestoreException.Code.FAILED_PRECONDITION)
+
                 val currentAllocated = parentSnap.getLong("allocatedAmountMinor") ?: 0L
+                val directReceived = parentSnap.getLong("directReceivedAmountMinor") ?: 0L
+                val agreed = parentSnap.getLong("agreedAmountMinor") ?: 0L
+
                 val newAllocated = Math.addExact(currentAllocated, milestone.agreedAmountMinor)
-                
+                if (newAllocated > Math.subtractExact(agreed, directReceived)) {
+                    throw FirebaseFirestoreException("Allocation exceeded", FirebaseFirestoreException.Code.OUT_OF_RANGE)
+                }
+
                 tx.update(parentRef, mapOf(
                     "allocatedAmountMinor" to newAllocated,
                     "lastMilestoneId" to milestone.id,
                     "lastMilestoneOpId" to opId,
                     "updatedAt" to FieldValue.serverTimestamp()
                 ))
-                
-                val msMap = milestone.toFirestoreMap().toMutableMap()
-                msMap["createdAt"] = FieldValue.serverTimestamp()
-                msMap["lastMilestoneOpId"] = opId
+
+                val msMap = milestone.toCreateMap(opId)
                 tx.set(msRef, msMap)
+                Unit
             }.await()
+            recoveryStore.removeRecord(userId, milestone.id, "CREATE_MILESTONE")
             Result.success(Unit)
-        } catch (e: Exception) { Result.failure(e) }
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (e: Exception) { Result.failure(e) }
     }
 
     override suspend fun updateMilestone(userId: String, milestone: Milestone, originalUpdatedAt: com.google.firebase.Timestamp, opId: String): Result<Unit> {
         return try {
             val parentRef = firestore.collection("users").document(userId).collection("expectedPayments").document(milestone.paymentId)
             val msRef = parentRef.collection("milestones").document(milestone.id)
-            firestore.runTransaction { tx ->
+            firestore.runTransaction<Unit> { tx ->
                 val msSnap = tx.get(msRef)
                 if (!msSnap.exists()) throw FirebaseFirestoreException("Not found", FirebaseFirestoreException.Code.NOT_FOUND)
                 if (msSnap.getTimestamp("updatedAt") != originalUpdatedAt) throw FirebaseFirestoreException("Aborted", FirebaseFirestoreException.Code.ABORTED)
-                
+
+                if (msSnap.getBoolean("isCancelled") == true) throw FirebaseFirestoreException("Cancelled", FirebaseFirestoreException.Code.FAILED_PRECONDITION)
+
                 val oldAgreed = msSnap.getLong("agreedAmountMinor") ?: 0L
                 val diff = Math.subtractExact(milestone.agreedAmountMinor, oldAgreed)
-                
+
                 val parentSnap = tx.get(parentRef)
                 val currentAllocated = parentSnap.getLong("allocatedAmountMinor") ?: 0L
                 val newAllocated = Math.addExact(currentAllocated, diff)
-                
+
                 tx.update(parentRef, mapOf(
                     "allocatedAmountMinor" to newAllocated,
                     "lastMilestoneId" to milestone.id,
                     "lastMilestoneOpId" to opId,
                     "updatedAt" to FieldValue.serverTimestamp()
                 ))
-                
-                val msMap = milestone.toFirestoreMap().toMutableMap()
-                msMap["lastMilestoneOpId"] = opId
-                tx.update(msRef, msMap)
+
+                tx.update(msRef, milestone.toUpdateMap(opId))
+                Unit
             }.await()
             Result.success(Unit)
-        } catch (e: Exception) { Result.failure(e) }
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (e: Exception) { Result.failure(e) }
     }
 
     override suspend fun cancelMilestone(userId: String, milestoneId: String, paymentId: String, originalUpdatedAt: com.google.firebase.Timestamp, opId: String): Result<Unit> {
+        val recordId = "$paymentId/$milestoneId"
         return try {
+            val saved = recoveryStore.getRecords(userId, "CANCEL_MILESTONE").firstOrNull { it.recordId == recordId }
+            val operation = saved?.let { Gson().fromJson(it.payloadJson, MilestoneCancellation::class.java) }
+                ?: MilestoneCancellation(paymentId, milestoneId, originalUpdatedAt, opId)
+            check(operation.paymentId == paymentId && operation.milestoneId == milestoneId) { "Cancellation target mismatch" }
+            recoveryStore.saveOperation(SubmissionRecord.create(userId, recordId, operation, "PENDING", "CANCEL_MILESTONE"))
             val parentRef = firestore.collection("users").document(userId).collection("expectedPayments").document(paymentId)
             val msRef = parentRef.collection("milestones").document(milestoneId)
-            firestore.runTransaction { tx ->
+            firestore.runTransaction<Unit> { tx ->
                 val msSnap = tx.get(msRef)
                 if (!msSnap.exists()) throw FirebaseFirestoreException("Not found", FirebaseFirestoreException.Code.NOT_FOUND)
-                if (msSnap.getTimestamp("updatedAt") != originalUpdatedAt) throw FirebaseFirestoreException("Aborted", FirebaseFirestoreException.Code.ABORTED)
-                
+                if (msSnap.getBoolean("isCancelled") == true) return@runTransaction
+                if (msSnap.getTimestamp("updatedAt") != operation.updatedAt) throw FirebaseFirestoreException("Aborted", FirebaseFirestoreException.Code.ABORTED)
+
                 val agreed = msSnap.getLong("agreedAmountMinor") ?: 0L
                 val received = msSnap.getLong("receivedAmountMinor") ?: 0L
                 val diffToRelease = Math.subtractExact(agreed, received)
-                
+
                 val parentSnap = tx.get(parentRef)
                 val currentAllocated = parentSnap.getLong("allocatedAmountMinor") ?: 0L
                 val newAllocated = Math.subtractExact(currentAllocated, diffToRelease)
-                
+
                 tx.update(parentRef, mapOf(
                     "allocatedAmountMinor" to newAllocated,
                     "lastMilestoneId" to milestoneId,
-                    "lastMilestoneOpId" to opId,
+                    "lastMilestoneOpId" to operation.opId,
                     "updatedAt" to FieldValue.serverTimestamp()
                 ))
-                
                 tx.update(msRef, mapOf(
                     "isCancelled" to true,
-                    "agreedAmountMinor" to received, // lock effective allocation
-                    "lastMilestoneOpId" to opId,
+                    "lastMilestoneOpId" to operation.opId,
                     "updatedAt" to FieldValue.serverTimestamp()
                 ))
+                Unit
             }.await()
+            recoveryStore.removeRecord(userId, recordId, "CANCEL_MILESTONE")
             Result.success(Unit)
-        } catch (e: Exception) { Result.failure(e) }
-    }
-
-    override suspend fun confirmPayment(userId: String, paymentId: String, milestoneId: String?, income: Income): Result<Unit> {
-        return executePaymentTransaction(userId, paymentId, milestoneId, income, isRetry = false)
-    }
-
-    override fun retryFailedPayment(userId: String, paymentId: String, milestoneId: String?, income: Income) {
-        CoroutineScope(Dispatchers.IO).launch {
-            executePaymentTransaction(userId, paymentId, milestoneId, income, isRetry = true)
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (e: Exception) {
+            // A completed concurrency rejection is definite; the next attempt can use freshly loaded state.
+            if (e is FirebaseFirestoreException && e.code == FirebaseFirestoreException.Code.ABORTED) {
+                recoveryStore.removeRecord(userId, recordId, "CANCEL_MILESTONE")
+            }
+            Result.failure(e)
         }
     }
 
-    private suspend fun executePaymentTransaction(userId: String, paymentId: String, milestoneId: String?, income: Income, isRetry: Boolean): Result<Unit> {
+    override suspend fun confirmPayment(userId: String, paymentId: String, milestoneId: String?, income: Income): Result<Unit> {
+        return executePaymentTransaction(userId, paymentId, milestoneId, income)
+    }
+
+    override suspend fun retryFailedPayment(userId: String, paymentId: String, milestoneId: String?, income: Income): Result<Unit> {
+        return executePaymentTransaction(userId, paymentId, milestoneId, income)
+    }
+
+    override suspend fun getUnresolvedPayment(userId: String, paymentId: String, milestoneId: String?): Income? {
+        val payloadType = if (milestoneId != null) "PAYMENT_MILESTONE" else "PAYMENT_DIRECT"
+        val records = recoveryStore.getRecords(userId, payloadType)
+        for (record in records) {
+                val payload = Gson().fromJson(record.payloadJson, PaymentConfirmationPayload::class.java)
+                check(payload.income.id == record.recordId) { "Invalid saved receipt identity" }
+                if (payload.paymentId == paymentId && payload.milestoneId == milestoneId) {
+                    return payload.income
+                }
+        }
+        return null
+    }
+
+    private suspend fun executePaymentTransaction(userId: String, paymentId: String, milestoneId: String?, income: Income): Result<Unit> {
         val payloadType = if (milestoneId != null) "PAYMENT_MILESTONE" else "PAYMENT_DIRECT"
         val payload = PaymentConfirmationPayload(paymentId, milestoneId, income)
-        
+        if (income.linkedPaymentId != paymentId || income.linkedMilestoneId != milestoneId) {
+            return Result.failure(IllegalArgumentException("Receipt target mismatch"))
+        }
+
+        var operationSaved = false
         try {
-            if (!isRetry) {
-                recoveryStore.saveRecord(SubmissionRecord.create(userId, income.id, payload, "PENDING", payloadType))
-            }
+            recoveryStore.saveOperation(SubmissionRecord.create(userId, income.id, payload, "PENDING", payloadType))
+            operationSaved = true
 
             val parentRef = firestore.collection("users").document(userId).collection("expectedPayments").document(paymentId)
             val incomeRef = firestore.collection("users").document(userId).collection("incomeReceipts").document(income.id)
 
-            firestore.runTransaction { tx ->
+            firestore.runTransaction<Unit> { tx ->
                 val incomeSnap = tx.get(incomeRef)
                 if (incomeSnap.exists()) {
                     // Check if payload exactly matches
                     val rAmt = incomeSnap.getLong("originalAmountMinor")
                     val rPayId = incomeSnap.getString("linkedPaymentId")
-                    if (rAmt == income.originalAmountMinor && rPayId == paymentId) {
+                    val rMilId = incomeSnap.getString("linkedMilestoneId")
+                    val rSourceId = incomeSnap.getString("sourceId")
+                    val rCurrency = incomeSnap.getString("currency")
+                    val rReceiptDate = incomeSnap.getString("receiptDate")
+                    val rOriginalAmountStr = incomeSnap.getString("originalAmountStr")
+                    val rLkrAmountMinor = incomeSnap.getLong("lkrAmountMinor")
+                    val rConversionBasis = incomeSnap.getString("conversionBasis")
+                    val rConversionRateStr = incomeSnap.getString("conversionRateStr")
+                    val rNote = incomeSnap.getString("note")
+
+                    if (rAmt == income.originalAmountMinor &&
+                        rPayId == paymentId &&
+                        rMilId == milestoneId &&
+                        rSourceId == income.sourceId &&
+                        rCurrency == income.currency &&
+                        rReceiptDate == income.receiptDate &&
+                        rOriginalAmountStr == income.originalAmountStr &&
+                        rLkrAmountMinor == income.lkrAmountMinor &&
+                        rConversionBasis == income.conversionBasis &&
+                        rConversionRateStr == income.conversionRateStr &&
+                        rNote == income.note
+                    ) {
                         return@runTransaction // Already succeeded
                     }
-                    throw FirebaseFirestoreException("Conflict", FirebaseFirestoreException.Code.ALREADY_EXISTS)
+                    throw Exception("Conflict")
                 }
 
                 val parentSnap = tx.get(parentRef)
@@ -294,7 +418,7 @@ class FirestorePaymentRepository(
                     val msRef = parentRef.collection("milestones").document(milestoneId)
                     val msSnap = tx.get(msRef)
                     if (!msSnap.exists() || msSnap.getBoolean("isCancelled") == true) throw FirebaseFirestoreException("Milestone missing/cancelled", FirebaseFirestoreException.Code.FAILED_PRECONDITION)
-                    
+
                     val curMsRec = msSnap.getLong("receivedAmountMinor") ?: 0L
                     val msAgreed = msSnap.getLong("agreedAmountMinor") ?: 0L
                     if (Math.addExact(curMsRec, amount) > msAgreed) throw FirebaseFirestoreException("Overpayment", FirebaseFirestoreException.Code.OUT_OF_RANGE)
@@ -315,7 +439,7 @@ class FirestorePaymentRepository(
                     val curDirRec = parentSnap.getLong("directReceivedAmountMinor") ?: 0L
                     val agreed = parentSnap.getLong("agreedAmountMinor") ?: 0L
                     val allocated = parentSnap.getLong("allocatedAmountMinor") ?: 0L
-                    
+
                     if (Math.addExact(curDirRec, amount) > Math.subtractExact(agreed, allocated)) {
                         throw FirebaseFirestoreException("Overpayment", FirebaseFirestoreException.Code.OUT_OF_RANGE)
                     }
@@ -343,13 +467,17 @@ class FirestorePaymentRepository(
                 if (income.conversionRateStr != null) incMap["conversionRateStr"] = income.conversionRateStr
                 if (milestoneId != null) incMap["linkedMilestoneId"] = milestoneId
                 tx.set(incomeRef, incMap)
+                Unit
             }.await()
-            
+
             recoveryStore.removeRecord(userId, income.id, payloadType)
             return Result.success(Unit)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             val msg = e.message ?: "Failed"
-            if (e is FirebaseFirestoreException && e.code == FirebaseFirestoreException.Code.ALREADY_EXISTS) {
+            if (!operationSaved) return Result.failure(e)
+            if (msg == "Conflict" || msg.contains("Conflict")) {
                 recoveryStore.saveRecord(SubmissionRecord.create(userId, income.id, payload, "CONFLICT", payloadType, msg))
             } else {
                 recoveryStore.saveRecord(SubmissionRecord.create(userId, income.id, payload, "FAILED", payloadType, msg))
@@ -358,29 +486,54 @@ class FirestorePaymentRepository(
         }
     }
 
-    private fun ExpectedPayment.toFirestoreMap(): Map<String, Any> {
-        val map = mutableMapOf<String, Any>(
+    private fun ExpectedPayment.toCreateMap(): Map<String, Any> {
+        return mapOf(
             "type" to type,
             "title" to title,
             "sourceId" to sourceId,
             "currency" to currency,
             "dueDate" to dueDate,
             "agreedAmountMinor" to agreedAmountMinor,
-            "isCancelled" to isCancelled,
+            "allocatedAmountMinor" to 0L,
+            "directReceivedAmountMinor" to 0L,
+            "milestoneReceivedAmountMinor" to 0L,
+            "isCancelled" to false,
             "note" to note,
+            "createdAt" to FieldValue.serverTimestamp(),
             "updatedAt" to FieldValue.serverTimestamp()
         )
-        return map
     }
 
-    private fun Milestone.toFirestoreMap(): Map<String, Any> {
-        val map = mutableMapOf<String, Any>(
+    private fun ExpectedPayment.toUpdateMap(): Map<String, Any> {
+        return mapOf(
             "title" to title,
             "dueDate" to dueDate,
             "agreedAmountMinor" to agreedAmountMinor,
-            "isCancelled" to isCancelled,
+            "note" to note,
             "updatedAt" to FieldValue.serverTimestamp()
         )
-        return map
+    }
+
+    private fun Milestone.toCreateMap(opId: String): Map<String, Any> {
+        return mapOf(
+            "title" to title,
+            "dueDate" to dueDate,
+            "agreedAmountMinor" to agreedAmountMinor,
+            "receivedAmountMinor" to 0L,
+            "isCancelled" to false,
+            "lastMilestoneOpId" to opId,
+            "createdAt" to FieldValue.serverTimestamp(),
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+    }
+
+    private fun Milestone.toUpdateMap(opId: String): Map<String, Any> {
+        return mapOf(
+            "title" to title,
+            "dueDate" to dueDate,
+            "agreedAmountMinor" to agreedAmountMinor,
+            "lastMilestoneOpId" to opId,
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
     }
 }

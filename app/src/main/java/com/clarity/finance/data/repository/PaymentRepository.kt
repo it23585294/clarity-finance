@@ -10,6 +10,8 @@ interface PaymentRepository {
     fun getMilestones(userId: String, paymentId: String): Flow<List<Milestone>>
     suspend fun getExpectedPayment(userId: String, paymentId: String): Result<ExpectedPayment>
 
+    suspend fun getUnresolvedProjectCreation(userId: String): ExpectedPayment? = null
+    suspend fun getUnresolvedMilestoneCreation(userId: String, paymentId: String): Milestone? = null
     suspend fun createExpectedPayment(userId: String, payment: ExpectedPayment): Result<Unit>
     suspend fun updateExpectedPayment(userId: String, payment: ExpectedPayment, originalUpdatedAt: com.google.firebase.Timestamp): Result<Unit>
     suspend fun cancelExpectedPayment(userId: String, paymentId: String, originalUpdatedAt: com.google.firebase.Timestamp): Result<Unit>
@@ -19,5 +21,6 @@ interface PaymentRepository {
     suspend fun cancelMilestone(userId: String, milestoneId: String, paymentId: String, originalUpdatedAt: com.google.firebase.Timestamp, opId: String): Result<Unit>
 
     suspend fun confirmPayment(userId: String, paymentId: String, milestoneId: String?, income: Income): Result<Unit>
-    fun retryFailedPayment(userId: String, paymentId: String, milestoneId: String?, income: Income)
+    suspend fun retryFailedPayment(userId: String, paymentId: String, milestoneId: String?, income: Income): Result<Unit>
+    suspend fun getUnresolvedPayment(userId: String, paymentId: String, milestoneId: String?): Income?
 }
