@@ -57,6 +57,7 @@ fun ProjectDetailScreen(
             is PaymentDetailUiState.Error -> {
                 Text(text = "Error: ${state.message}", color = MaterialTheme.colorScheme.error)
             }
+            is PaymentDetailUiState.SignedOut -> {}
             is PaymentDetailUiState.Success -> {
                 val p = state.payment
                 Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
