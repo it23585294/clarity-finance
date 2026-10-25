@@ -3,18 +3,18 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     function isValidExpense(data, isCreate) {
-      let baseKeys = ['amountMinor', 'currency', 'categoryId', 'paymentChannelId', 'spendingType', 'expenseDate', 'note', 'updatedAt'];
+      let baseKeys = ['amountMinor', 'currency', 'categoryId', 'paymentChannelId', 'spendingType', 'expenseDate', 'updatedAt'];
       let requiredKeys = baseKeys.concat(['createdAt']);
 
       return data.keys().hasAll(requiredKeys)
-        && data.keys().hasOnly(requiredKeys)
+        && data.keys().hasOnly(requiredKeys.concat(['note']))
         && data.amountMinor is int && data.amountMinor > 0
         && data.currency == 'LKR'
         && data.categoryId in ['food_dining', 'transport', 'housing', 'utilities', 'shopping', 'health', 'entertainment', 'education', 'other']
         && data.paymentChannelId in ['cash', 'primary_bank_card', 'secondary_bank_card', 'other']
         && data.spendingType in ['committed', 'discretionary']
         && data.expenseDate is string && data.expenseDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
-        && data.note is string && data.note.size() <= 500
+        && (!('note' in data) || (data.note is string && data.note.size() <= 500))
         && data.updatedAt == request.time
         && (isCreate ? data.createdAt == request.time : true);
     }
@@ -30,7 +30,7 @@ service cloud.firestore {
     function isValidIncome(data, isCreate) {
       let baseKeys = ['sourceId', 'receiptDate', 'currency', 'originalAmountStr', 'lkrAmountMinor', 'conversionBasis', 'note', 'updatedAt'];
       let requiredKeys = isCreate ? baseKeys.concat(['createdAt']) : baseKeys;
-      let allowedKeys = requiredKeys.concat(['conversionRateStr', 'linkedPaymentId', 'linkedMilestoneId', 'originalAmountMinor']);
+      let allowedKeys = baseKeys.concat(['createdAt', 'conversionRateStr', 'linkedPaymentId', 'linkedMilestoneId', 'originalAmountMinor']);
 
       return data.keys().hasAll(requiredKeys)
         && data.keys().hasOnly(allowedKeys)
@@ -49,6 +49,55 @@ service cloud.firestore {
         && (data.currency == 'USD' ? (data.conversionBasis in ['confirmed_rate', 'actual_credit']) : true)
         && (data.conversionBasis == 'confirmed_rate' ? ('conversionRateStr' in data && isValidRateStr(data.conversionRateStr)) : true)
         && (data.conversionBasis == 'actual_credit' ? (!('conversionRateStr' in data) || data.conversionRateStr == null) : true);
+    }
+
+    function isValidPaymentAmounts(data) {
+      return data.agreedAmountMinor is int
+        && data.agreedAmountMinor > 0
+        && data.agreedAmountMinor <= 100000000000
+        && data.allocatedAmountMinor is int
+        && data.allocatedAmountMinor >= 0
+        && data.directReceivedAmountMinor is int
+        && data.directReceivedAmountMinor >= 0
+        && data.milestoneReceivedAmountMinor is int
+        && data.milestoneReceivedAmountMinor >= 0;
+    }
+
+    function isValidMilestoneAmounts(data) {
+      return data.agreedAmountMinor is int
+        && data.agreedAmountMinor > 0
+        && data.agreedAmountMinor <= 100000000000
+        && data.receivedAmountMinor is int
+        && data.receivedAmountMinor >= 0;
+    }
+
+    // A matching pointer alone is not proof of a payment. Require existing
+    // records and the corresponding counter deltas in this atomic operation.
+    function isValidMilestoneReceipt(userId, receiptId, data, parentBefore, parentAfter) {
+      let milestonePath = /databases/$(database)/documents/users/$(userId)/expectedPayments/$(data.linkedPaymentId)/milestones/$(data.linkedMilestoneId);
+      let before = get(milestonePath).data;
+      let after = getAfter(milestonePath).data;
+      return exists(milestonePath)
+        && parentBefore.type == 'project'
+        && before.isCancelled == false && after.isCancelled == false
+        && after.lastReceiptId == receiptId
+        && after.receivedAmountMinor - before.receivedAmountMinor == data.originalAmountMinor
+        && parentAfter.milestoneReceivedAmountMinor - parentBefore.milestoneReceivedAmountMinor == data.originalAmountMinor;
+    }
+
+    function isValidLinkedReceipt(userId, receiptId, data) {
+      let parentPath = /databases/$(database)/documents/users/$(userId)/expectedPayments/$(data.linkedPaymentId);
+      let before = get(parentPath).data;
+      let after = getAfter(parentPath).data;
+      return exists(parentPath)
+        && before.isCancelled == false && after.isCancelled == false
+        && data.originalAmountMinor is int && data.originalAmountMinor > 0
+        && data.currency == before.currency && data.sourceId == before.sourceId
+        && after.lastReceiptId == receiptId
+        && ('linkedMilestoneId' in data && data.linkedMilestoneId != null
+            ? (data.linkedMilestoneId is string && data.linkedMilestoneId.size() > 0
+               && isValidMilestoneReceipt(userId, receiptId, data, before, after))
+            : after.directReceivedAmountMinor - before.directReceivedAmountMinor == data.originalAmountMinor);
     }
 
     match /users/{userId}/expenses/{expenseId} {
@@ -72,19 +121,17 @@ service cloud.firestore {
       allow create: if request.auth != null && request.auth.uid == userId
                     && isValidIncome(request.resource.data, true)
                     && (
-                      !('linkedPaymentId' in request.resource.data) || request.resource.data.linkedPaymentId == null ||
-                      (
-                        getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(request.resource.data.linkedPaymentId)).data.lastReceiptId == receiptId
-                        && ('linkedMilestoneId' in request.resource.data && request.resource.data.linkedMilestoneId != null ?
-                              getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(request.resource.data.linkedPaymentId)/milestones/$(request.resource.data.linkedMilestoneId)).data.lastReceiptId == receiptId
-                              : true)
-                      )
+                      (!('linkedPaymentId' in request.resource.data) || request.resource.data.linkedPaymentId == null)
+                      ? (!('linkedMilestoneId' in request.resource.data) || request.resource.data.linkedMilestoneId == null)
+                      : (request.resource.data.linkedPaymentId is string && request.resource.data.linkedPaymentId.size() > 0
+                         && isValidLinkedReceipt(userId, receiptId, request.resource.data))
                     );
 
       allow update: if request.auth != null && request.auth.uid == userId
                     && isValidIncome(request.resource.data, false)
                     && (!('linkedPaymentId' in resource.data) || resource.data.linkedPaymentId == null)
                     && (!('linkedPaymentId' in request.resource.data) || request.resource.data.linkedPaymentId == null)
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sourceId', 'receiptDate', 'currency', 'originalAmountStr', 'lkrAmountMinor', 'conversionBasis', 'conversionRateStr', 'originalAmountMinor', 'note', 'updatedAt'])
                     && request.resource.data.createdAt == resource.data.createdAt;
     }
 
@@ -93,8 +140,9 @@ service cloud.firestore {
 
       allow create: if request.auth != null && request.auth.uid == userId
                     && request.resource.data.keys().hasAll(['type', 'title', 'sourceId', 'currency', 'dueDate', 'agreedAmountMinor', 'allocatedAmountMinor', 'directReceivedAmountMinor', 'milestoneReceivedAmountMinor', 'isCancelled', 'note', 'createdAt', 'updatedAt'])
+                    && request.resource.data.keys().hasOnly(['type', 'title', 'sourceId', 'currency', 'dueDate', 'agreedAmountMinor', 'allocatedAmountMinor', 'directReceivedAmountMinor', 'milestoneReceivedAmountMinor', 'isCancelled', 'note', 'createdAt', 'updatedAt'])
                     && request.resource.data.type in ['standalone', 'project']
-                    && request.resource.data.agreedAmountMinor is int && request.resource.data.agreedAmountMinor > 0
+                    && isValidPaymentAmounts(request.resource.data)
                     && request.resource.data.allocatedAmountMinor == 0
                     && request.resource.data.directReceivedAmountMinor == 0
                     && request.resource.data.milestoneReceivedAmountMinor == 0
@@ -103,28 +151,66 @@ service cloud.firestore {
                     && request.resource.data.updatedAt == request.time;
 
       allow update: if request.auth != null && request.auth.uid == userId
+                    && request.resource.data.updatedAt == request.time
                     && request.resource.data.createdAt == resource.data.createdAt
                     && request.resource.data.type == resource.data.type
                     && request.resource.data.currency == resource.data.currency
                     && request.resource.data.sourceId == resource.data.sourceId
-                    && request.resource.data.directReceivedAmountMinor <= request.resource.data.agreedAmountMinor - request.resource.data.allocatedAmountMinor
-                    && request.resource.data.allocatedAmountMinor <= request.resource.data.agreedAmountMinor - request.resource.data.directReceivedAmountMinor
+                    && isValidPaymentAmounts(request.resource.data)
                     && (
-                      (request.resource.data.lastReceiptId != resource.data.lastReceiptId && request.resource.data.directReceivedAmountMinor > resource.data.directReceivedAmountMinor) ?
-                        (!exists(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)) &&
-                         getAfter(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)).data.originalAmountMinor == request.resource.data.directReceivedAmountMinor - resource.data.directReceivedAmountMinor)
-                      : true
-                    )
-                    && (
-                      (request.resource.data.lastReceiptId != resource.data.lastReceiptId && request.resource.data.milestoneReceivedAmountMinor > resource.data.milestoneReceivedAmountMinor) ?
-                        (!exists(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)) &&
-                         getAfter(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)).data.originalAmountMinor == request.resource.data.milestoneReceivedAmountMinor - resource.data.milestoneReceivedAmountMinor)
-                      : true
-                    )
-                    && (
-                      request.resource.data.lastMilestoneOpId != resource.data.lastMilestoneOpId ?
-                        getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)/milestones/$(request.resource.data.lastMilestoneId)).data.lastMilestoneOpId == request.resource.data.lastMilestoneOpId
-                      : true
+                      // Branch 1: Direct Payment
+                      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['directReceivedAmountMinor', 'lastReceiptId', 'updatedAt'])
+                       && resource.data.isCancelled == false
+                       && request.resource.data.directReceivedAmountMinor > resource.data.directReceivedAmountMinor
+                       && request.resource.data.directReceivedAmountMinor <= request.resource.data.agreedAmountMinor - request.resource.data.allocatedAmountMinor
+                       && !exists(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId))
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)).data.originalAmountMinor == request.resource.data.directReceivedAmountMinor - resource.data.directReceivedAmountMinor
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)).data.linkedPaymentId == paymentId
+                       && (!('linkedMilestoneId' in getAfter(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)).data) || getAfter(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)).data.linkedMilestoneId == null)
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)).data.currency == resource.data.currency
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)).data.sourceId == resource.data.sourceId
+                      )
+                      ||
+                      // Branch 2: Milestone Payment
+                      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['milestoneReceivedAmountMinor', 'lastReceiptId', 'updatedAt'])
+                       && resource.data.isCancelled == false
+                       && request.resource.data.milestoneReceivedAmountMinor > resource.data.milestoneReceivedAmountMinor
+                       && !exists(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId))
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)).data.originalAmountMinor == request.resource.data.milestoneReceivedAmountMinor - resource.data.milestoneReceivedAmountMinor
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)).data.linkedPaymentId == paymentId
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)).data.currency == resource.data.currency
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)).data.sourceId == resource.data.sourceId
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)/milestones/$(getAfter(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)).data.linkedMilestoneId)).data.lastReceiptId == request.resource.data.lastReceiptId
+                      )
+                      ||
+                      // Branch 3: Milestone Allocation change
+                      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['allocatedAmountMinor', 'lastMilestoneId', 'lastMilestoneOpId', 'updatedAt'])
+                       && resource.data.type == 'project'
+                       && (resource.data.isCancelled == false ||
+                           (request.resource.data.allocatedAmountMinor <= resource.data.allocatedAmountMinor
+                            && get(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)/milestones/$(request.resource.data.lastMilestoneId)).data.isCancelled == false
+                            && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)/milestones/$(request.resource.data.lastMilestoneId)).data.isCancelled == true))
+                       && request.resource.data.allocatedAmountMinor <= request.resource.data.agreedAmountMinor - request.resource.data.directReceivedAmountMinor
+                       && (!('lastMilestoneOpId' in resource.data) || request.resource.data.lastMilestoneOpId != resource.data.lastMilestoneOpId)
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)/milestones/$(request.resource.data.lastMilestoneId)).data.lastMilestoneOpId == request.resource.data.lastMilestoneOpId
+                       && request.resource.data.allocatedAmountMinor - resource.data.allocatedAmountMinor ==
+                          (getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)/milestones/$(request.resource.data.lastMilestoneId)).data.isCancelled ? getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)/milestones/$(request.resource.data.lastMilestoneId)).data.receivedAmountMinor : getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)/milestones/$(request.resource.data.lastMilestoneId)).data.agreedAmountMinor) -
+                          (exists(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)/milestones/$(request.resource.data.lastMilestoneId)) ?
+                             (get(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)/milestones/$(request.resource.data.lastMilestoneId)).data.isCancelled ? get(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)/milestones/$(request.resource.data.lastMilestoneId)).data.receivedAmountMinor : get(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)/milestones/$(request.resource.data.lastMilestoneId)).data.agreedAmountMinor)
+                           : 0)
+                      )
+                      ||
+                      // Branch 4: Cancellation
+                      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isCancelled', 'updatedAt'])
+                       && resource.data.isCancelled == false
+                       && request.resource.data.isCancelled == true
+                      )
+                      ||
+                      // Branch 5: Metadata edit (including agreedAmountMinor)
+                      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'dueDate', 'agreedAmountMinor', 'note', 'updatedAt'])
+                       && resource.data.isCancelled == false
+                       && request.resource.data.agreedAmountMinor >= request.resource.data.allocatedAmountMinor + request.resource.data.directReceivedAmountMinor
+                      )
                     );
     }
 
@@ -132,21 +218,62 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == userId;
 
       allow create: if request.auth != null && request.auth.uid == userId
+                    && exists(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId))
+                    && get(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.isCancelled == false
+                    && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.isCancelled == false
+                    && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.type == 'project'
                     && request.resource.data.keys().hasAll(['title', 'dueDate', 'agreedAmountMinor', 'receivedAmountMinor', 'isCancelled', 'lastMilestoneOpId', 'createdAt', 'updatedAt'])
-                    && request.resource.data.agreedAmountMinor is int && request.resource.data.agreedAmountMinor > 0
+                    && request.resource.data.keys().hasOnly(['title', 'dueDate', 'agreedAmountMinor', 'receivedAmountMinor', 'isCancelled', 'lastMilestoneOpId', 'createdAt', 'updatedAt'])
+                    && isValidMilestoneAmounts(request.resource.data)
                     && request.resource.data.receivedAmountMinor == 0
                     && request.resource.data.isCancelled == false
                     && request.resource.data.createdAt == request.time
                     && request.resource.data.updatedAt == request.time
-                    && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.lastMilestoneOpId == request.resource.data.lastMilestoneOpId;
+                    && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.allocatedAmountMinor -
+                       get(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.allocatedAmountMinor == request.resource.data.agreedAmountMinor
+                    && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.lastMilestoneOpId == request.resource.data.lastMilestoneOpId
+                    && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.lastMilestoneId == milestoneId;
 
       allow update: if request.auth != null && request.auth.uid == userId
+                    && exists(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId))
+                    && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.type == 'project'
+                    && request.resource.data.updatedAt == request.time
                     && request.resource.data.createdAt == resource.data.createdAt
-                    && request.resource.data.receivedAmountMinor <= request.resource.data.agreedAmountMinor
+                    && isValidMilestoneAmounts(request.resource.data)
                     && (
-                      request.resource.data.lastMilestoneOpId != resource.data.lastMilestoneOpId ?
-                        getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.lastMilestoneOpId == request.resource.data.lastMilestoneOpId
-                      : true
+                      // Branch 1: Payment
+                      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['receivedAmountMinor', 'lastReceiptId', 'updatedAt'])
+                       && resource.data.isCancelled == false
+                       && request.resource.data.receivedAmountMinor > resource.data.receivedAmountMinor
+                       && request.resource.data.receivedAmountMinor <= request.resource.data.agreedAmountMinor
+                       && !exists(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId))
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)).data.originalAmountMinor == request.resource.data.receivedAmountMinor - resource.data.receivedAmountMinor
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)).data.linkedPaymentId == paymentId
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/incomeReceipts/$(request.resource.data.lastReceiptId)).data.linkedMilestoneId == milestoneId
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.lastReceiptId == request.resource.data.lastReceiptId
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.type == 'project'
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.isCancelled == false
+                      )
+                      ||
+                      // Branch 2: Edit
+                      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'dueDate', 'agreedAmountMinor', 'lastMilestoneOpId', 'updatedAt'])
+                       && get(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.isCancelled == false
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.isCancelled == false
+                       && request.resource.data.agreedAmountMinor >= request.resource.data.receivedAmountMinor
+                       && request.resource.data.isCancelled == false
+                       && (!('lastMilestoneOpId' in resource.data) || request.resource.data.lastMilestoneOpId != resource.data.lastMilestoneOpId)
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.lastMilestoneOpId == request.resource.data.lastMilestoneOpId
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.lastMilestoneId == milestoneId
+                      )
+                      ||
+                      // Branch 3: Cancellation
+                      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isCancelled', 'lastMilestoneOpId', 'updatedAt'])
+                       && resource.data.isCancelled == false
+                       && request.resource.data.isCancelled == true
+                       && (!('lastMilestoneOpId' in resource.data) || request.resource.data.lastMilestoneOpId != resource.data.lastMilestoneOpId)
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.lastMilestoneOpId == request.resource.data.lastMilestoneOpId
+                       && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.lastMilestoneId == milestoneId
+                      )
                     );
     }
   }
