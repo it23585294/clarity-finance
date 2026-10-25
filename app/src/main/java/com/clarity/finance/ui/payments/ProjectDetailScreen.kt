@@ -3,18 +3,23 @@ package com.clarity.finance.ui.payments
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.clarity.finance.data.model.ExpectedPayment
+import com.clarity.finance.data.model.Milestone
 import com.clarity.finance.viewmodel.PaymentDetailUiState
 import com.clarity.finance.viewmodel.PaymentDetailViewModel
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ProjectDetailScreen(
     viewModel: PaymentDetailViewModel,
@@ -24,9 +29,28 @@ fun ProjectDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val cancelError by viewModel.cancelError.collectAsStateWithLifecycle()
+    val milestoneState by viewModel.milestoneState.collectAsStateWithLifecycle()
+    val isCancelling by viewModel.isCancelling.collectAsStateWithLifecycle()
 
+    var showAddMilestoneDialog by remember { mutableStateOf(false) }
+    var showCancelProjectDialog by remember { mutableStateOf(false) }
+    var milestoneToCancel by remember { mutableStateOf<Milestone?>(null) }
+
+    val owner = (uiState as? PaymentDetailUiState.Success)?.ownerUid
+    LaunchedEffect(owner, paymentId) {
+        showAddMilestoneDialog = false
+        showCancelProjectDialog = false
+        milestoneToCancel = null
+    }
     LaunchedEffect(paymentId) {
         viewModel.load(paymentId)
+    }
+
+    LaunchedEffect(milestoneState.isSuccess) {
+        if (milestoneState.isSuccess) {
+            showAddMilestoneDialog = false
+            viewModel.resetMilestoneState()
+        }
     }
 
     if (cancelError != null) {
@@ -38,17 +62,91 @@ fun ProjectDetailScreen(
         )
     }
 
+    if (showCancelProjectDialog && uiState is PaymentDetailUiState.Success) {
+        val p = (uiState as PaymentDetailUiState.Success).payment
+        AlertDialog(
+            onDismissRequest = { showCancelProjectDialog = false },
+            title = { Text("Cancel Project") },
+            text = { Text("Are you sure you want to cancel '${p.title}'? Existing agreements and receipts will be retained. No further payments can be recorded.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCancelProjectDialog = false
+                        viewModel.cancelPayment(p)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Confirm Cancel")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showCancelProjectDialog = false }) {
+                    Text("Keep Project")
+                }
+            }
+        )
+    }
+
+    if (milestoneToCancel != null && uiState is PaymentDetailUiState.Success) {
+        val ms = milestoneToCancel!!
+        val p = (uiState as PaymentDetailUiState.Success).payment
+        val unpaidStr = java.math.BigDecimal.valueOf(ms.outstandingAmountMinor, 2).toPlainString()
+        AlertDialog(
+            onDismissRequest = { milestoneToCancel = null },
+            title = { Text("Cancel Milestone") },
+            text = { Text("Are you sure you want to cancel '${ms.title}'? Unpaid balance of ${p.currency} $unpaidStr will be released.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val targetMs = ms
+                        milestoneToCancel = null
+                        viewModel.cancelMilestone(p.id, targetMs)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Confirm Cancel")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { milestoneToCancel = null }) {
+                    Text("Keep Milestone")
+                }
+            }
+        )
+    }
+
+    if (showAddMilestoneDialog && uiState is PaymentDetailUiState.Success) {
+        val p = (uiState as PaymentDetailUiState.Success).payment
+        AddMilestoneDialog(
+            project = p,
+            isSubmitting = milestoneState.isSubmitting,
+            retryMilestone = milestoneState.retryMilestone,
+            error = milestoneState.error,
+            onDismiss = {
+                showAddMilestoneDialog = false
+                viewModel.resetMilestoneState()
+            },
+            onConfirm = { title, amountStr, dueDate ->
+                viewModel.createMilestone(p, title, amountStr, dueDate)
+            }
+        )
+    }
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text("Project Details", style = MaterialTheme.typography.headlineMedium)
             Button(onClick = onNavigateBack) { Text("Back") }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+        if (isCancelling) {
+            Text("Waiting for server cancellation confirmation…")
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
 
         when (val state = uiState) {
             is PaymentDetailUiState.Loading -> {
@@ -56,53 +154,104 @@ fun ProjectDetailScreen(
             }
             is PaymentDetailUiState.Error -> {
                 Text(text = "Error: ${state.message}", color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = { viewModel.retryLoad() }) { Text("Retry loading") }
             }
             is PaymentDetailUiState.SignedOut -> {}
             is PaymentDetailUiState.Success -> {
                 val p = state.payment
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                item {
                 Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(text = p.title, style = MaterialTheme.typography.titleLarge)
                         Text(text = "Due: ${p.dueDate}", style = MaterialTheme.typography.bodyMedium)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = "Agreement: ${p.currency} ${String.format(java.util.Locale.US, "%.2f", p.agreedAmountMinor / 100.0)}")
-                        Text(text = "Received: ${p.currency} ${String.format(java.util.Locale.US, "%.2f", p.totalReceivedAmountMinor / 100.0)}")
-                        Text(text = "Outstanding: ${p.currency} ${String.format(java.util.Locale.US, "%.2f", p.outstandingAmountMinor / 100.0)}")
-                        Text(text = "Unallocated: ${p.currency} ${String.format(java.util.Locale.US, "%.2f", p.unallocatedAmountMinor / 100.0)}")
+                        Text(text = "Agreement: ${p.currency} ${java.math.BigDecimal.valueOf(p.agreedAmountMinor, 2).toPlainString()}")
+                        Text(text = "Received: ${p.currency} ${java.math.BigDecimal.valueOf(p.totalReceivedAmountMinor, 2).toPlainString()}")
+                        Text(text = "Outstanding: ${p.currency} ${java.math.BigDecimal.valueOf(p.outstandingAmountMinor, 2).toPlainString()}")
+                        Text(text = "Unallocated: ${p.currency} ${java.math.BigDecimal.valueOf(p.unallocatedAmountMinor, 2).toPlainString()}")
                         
+                        if (p.confirmationMessage != null) {
+                            Text(
+                                text = p.confirmationMessage ?: "",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                            TextButton(onClick = { viewModel.retryLoad() }) { Text("Refresh confirmation") }
+                        }
+
                         if (p.isCancelled) {
                             Text(text = "CANCELLED", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
                         } else {
-                            Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FlowRow(
+                                modifier = Modifier.padding(top = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
                                 if (p.unallocatedAmountMinor > 0) {
-                                    Button(onClick = { onNavigateToConfirmation(p.id, null) }) { Text("Record Direct") }
+                                    Button(enabled = p.canModify && !isCancelling, onClick = { onNavigateToConfirmation(p.id, null) }) { Text("Record Direct") }
                                 }
-                                OutlinedButton(onClick = { viewModel.cancelPayment(p) }) { Text("Cancel Project", color = MaterialTheme.colorScheme.error) }
+                                if (p.type == "project") {
+                                    Button(enabled = p.canModify && !isCancelling, onClick = {
+                                        viewModel.resetMilestoneState()
+                                        showAddMilestoneDialog = true
+                                    }) { Text("Add Milestone") }
+                                }
+                                val canCancel = p.canModify && !isCancelling
+                                OutlinedButton(
+                                    onClick = { showCancelProjectDialog = true },
+                                    enabled = canCancel
+                                ) {
+                                    Text("Cancel Project", color = if (canCancel) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
+                                }
                             }
                         }
                     }
                 }
+                }
 
                 if (state.milestones.isNotEmpty()) {
+                    item {
                     Text("Milestones", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    }
                         items(state.milestones, key = { it.id }) { ms ->
                             Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     Text(text = ms.title, style = MaterialTheme.typography.titleMedium)
                                     Text(text = "Due: ${ms.dueDate}", style = MaterialTheme.typography.bodySmall)
-                                    Text(text = "Agreed: ${p.currency} ${String.format(java.util.Locale.US, "%.2f", ms.agreedAmountMinor / 100.0)}")
-                                    Text(text = "Outstanding: ${p.currency} ${String.format(java.util.Locale.US, "%.2f", ms.outstandingAmountMinor / 100.0)}")
+                                    Text(text = "Agreed: ${p.currency} ${java.math.BigDecimal.valueOf(ms.agreedAmountMinor, 2).toPlainString()}")
+                                    Text(text = "Received: ${p.currency} ${java.math.BigDecimal.valueOf(ms.receivedAmountMinor, 2).toPlainString()}")
+                                    Text(text = "Unpaid agreement: ${p.currency} ${java.math.BigDecimal.valueOf(ms.outstandingAmountMinor, 2).toPlainString()}")
                                     
+                                    if (ms.confirmationMessage != null) {
+                                        Text(
+                                            text = ms.confirmationMessage ?: "",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.secondary,
+                                            modifier = Modifier.padding(top = 2.dp)
+                                        )
+                                    }
+
                                     if (ms.isCancelled) {
                                         Text(text = "CANCELLED", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                                    } else {
-                                        Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    } else if (!p.isCancelled) {
+                                        FlowRow(
+                                            modifier = Modifier.padding(top = 8.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
                                             if (ms.outstandingAmountMinor > 0) {
-                                                Button(onClick = { onNavigateToConfirmation(p.id, ms.id) }) { Text("Record") }
+                                                Button(enabled = p.canModify && ms.canModify && !isCancelling, onClick = { onNavigateToConfirmation(p.id, ms.id) }) { Text("Record") }
                                             }
-                                            if (ms.receivedAmountMinor == 0L) { // Only allow cancel if no payments made
-                                                OutlinedButton(onClick = { viewModel.cancelMilestone(p.id, ms) }) { Text("Cancel", color = MaterialTheme.colorScheme.error) }
+                                            if (ms.outstandingAmountMinor > 0) {
+                                                val canCancelMs = p.canModify && ms.canModify && !isCancelling
+                                                OutlinedButton(
+                                                    onClick = { milestoneToCancel = ms },
+                                                    enabled = canCancelMs
+                                                ) {
+                                                    Text("Cancel", color = if (canCancelMs) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
+                                                }
                                             }
                                         }
                                     }
@@ -114,4 +263,91 @@ fun ProjectDetailScreen(
             }
         }
     }
+}
+
+@Composable
+fun AddMilestoneDialog(
+    project: ExpectedPayment,
+    isSubmitting: Boolean,
+    error: String?,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String, String) -> Unit,
+    retryMilestone: Milestone? = null
+) {
+    var title by remember { mutableStateOf("") }
+    var amountStr by remember { mutableStateOf("") }
+    var dueDate by remember { mutableStateOf(java.time.LocalDate.now(java.time.ZoneId.of("Asia/Colombo")).toString()) }
+    LaunchedEffect(retryMilestone) {
+        retryMilestone?.let {
+            title = it.title
+            amountStr = java.math.BigDecimal.valueOf(it.agreedAmountMinor, 2).toPlainString()
+            dueDate = it.dueDate
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = { if (!isSubmitting) onDismiss() },
+        title = { Text("Add Milestone") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (error != null) {
+                    Text(text = error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+
+                Text("Inherited Currency: ${project.currency} • Source: ${project.sourceId}", style = MaterialTheme.typography.bodySmall)
+                val unallocStr = java.math.BigDecimal.valueOf(project.unallocatedAmountMinor, 2).toPlainString()
+                Text("Unallocated Capacity: ${project.currency} $unallocStr", style = MaterialTheme.typography.bodySmall)
+
+                OutlinedTextField(
+                    enabled = !isSubmitting && retryMilestone == null,
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Milestone Title *") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    enabled = !isSubmitting && retryMilestone == null,
+                    value = amountStr,
+                    onValueChange = { amountStr = it },
+                    label = { Text("Agreed Amount *") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    enabled = !isSubmitting && retryMilestone == null,
+                    value = dueDate,
+                    onValueChange = { dueDate = it },
+                    label = { Text("Due Date (yyyy-MM-dd) *") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(title, amountStr, dueDate) },
+                enabled = !isSubmitting
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onPrimary)
+                } else {
+                    Text(if (retryMilestone != null) "Retry Add" else "Add")
+                }
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss, enabled = !isSubmitting) {
+                Text("Cancel")
+            }
+        }
+    )
 }

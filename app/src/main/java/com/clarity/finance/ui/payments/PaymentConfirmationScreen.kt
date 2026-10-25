@@ -1,7 +1,9 @@
 package com.clarity.finance.ui.payments
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -10,10 +12,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarity.finance.viewmodel.PaymentConfirmationViewModel
-import java.math.BigDecimal
-import java.math.RoundingMode
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun PaymentConfirmationScreen(
     viewModel: PaymentConfirmationViewModel,
@@ -38,8 +38,17 @@ fun PaymentConfirmationScreen(
         return
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Record Payment", style = MaterialTheme.typography.headlineMedium)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .imePadding()
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Record Payment", style = MaterialTheme.typography.headlineMedium)
+            TextButton(onClick = onNavigateBack) { Text("Back") }
+        }
         Spacer(modifier = Modifier.height(16.dp))
 
         Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
@@ -57,7 +66,7 @@ fun PaymentConfirmationScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         if (formState.currency == "USD") {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = formState.conversionBasis == "confirmed_rate", onClick = { viewModel.updateForm(conversionBasis = "confirmed_rate") })
                     Text("Exchange Rate")
@@ -111,13 +120,16 @@ fun PaymentConfirmationScreen(
             Spacer(modifier = Modifier.height(8.dp))
         }
 
+        if (formState.error != null && !formState.isRetry && formState.sourceId.isEmpty()) {
+            TextButton(onClick = { viewModel.load(paymentId, milestoneId) }) { Text("Retry loading") }
+        }
         Button(
             onClick = { viewModel.confirmPayment() },
             modifier = Modifier.fillMaxWidth(),
-            enabled = !formState.isSubmitting
+            enabled = !formState.isSubmitting && formState.sourceId.isNotEmpty()
         ) {
             if (formState.isSubmitting) CircularProgressIndicator(modifier = Modifier.size(24.dp))
-            else Text("Confirm Payment")
+            else Text(if (formState.isRetry) "Retry Payment" else "Confirm Payment")
         }
         
         Spacer(modifier = Modifier.height(8.dp))
