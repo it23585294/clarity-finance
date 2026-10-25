@@ -14,6 +14,7 @@ import com.clarity.finance.viewmodel.HomeViewModel
 import com.clarity.finance.viewmodel.IncomeListViewModel
 import com.clarity.finance.viewmodel.AddEditIncomeViewModel
 import com.clarity.finance.viewmodel.PaymentListViewModel
+import com.clarity.finance.viewmodel.AddPaymentViewModel
 import com.clarity.finance.viewmodel.PaymentDetailViewModel
 import com.clarity.finance.viewmodel.PaymentConfirmationViewModel
 
@@ -48,6 +49,9 @@ class ViewModelFactory(
         }
         if (modelClass.isAssignableFrom(PaymentListViewModel::class.java)) {
             return PaymentListViewModel(authRepository, paymentRepository) as T
+        }
+        if (modelClass.isAssignableFrom(AddPaymentViewModel::class.java)) {
+            return AddPaymentViewModel(authRepository, paymentRepository) as T
         }
         if (modelClass.isAssignableFrom(PaymentDetailViewModel::class.java)) {
             return PaymentDetailViewModel(authRepository, paymentRepository) as T

@@ -33,10 +33,8 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
         return
     }
 
-    // Determine initial route based on auth state
     val startDestination = if (sessionState is SessionState.SignedIn) "home" else "login"
 
-    // Listen to session state changes to enforce redirection and clear backstack
     LaunchedEffect(sessionState) {
         when (sessionState) {
             is SessionState.SignedIn -> {
@@ -91,6 +89,14 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
             com.clarity.finance.ui.payments.ExpectedPaymentsScreen(
                 viewModel = paymentListViewModel,
                 onNavigateToProjectDetail = { id -> navController.navigate("projectDetail/$id") },
+                onNavigateToAddPayment = { navController.navigate("addPayment") },
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable("addPayment") {
+            val addPaymentViewModel: com.clarity.finance.viewmodel.AddPaymentViewModel = viewModel(factory = viewModelFactory)
+            com.clarity.finance.ui.payments.AddPaymentScreen(
+                viewModel = addPaymentViewModel,
                 onNavigateBack = { navController.popBackStack() }
             )
         }
