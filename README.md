@@ -30,3 +30,13 @@ To enforce the strict data model above, deploy the security rules:
 ```bash
 firebase deploy --only firestore:rules
 ```
+
+## Pending Payments and Project Milestones
+
+Pending payments support standalone agreements, project milestones, direct receipts, and cancellation that retains payment history. Amounts use exact integer minor units, and linked income receipts are protected from independent edits and deletion.
+
+- [Repair behavior and maintenance checks](REPAIR_VERIFICATION.md)
+- [Reviewed security rules and publication procedure](RULES_PUBLICATION_REVIEW.md)
+- [Sanitized live acceptance results and opt-in read-only audit](LIVE_VERIFICATION.md)
+
+The accepted online checklist does not establish live network-interruption or account-switch behavior. Those scenarios have separate coroutine unit coverage. The live audit is skipped unless explicitly opted in and requires an existing signed-in session.
