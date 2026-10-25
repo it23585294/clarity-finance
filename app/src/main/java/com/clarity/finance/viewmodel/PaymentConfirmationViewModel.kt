@@ -21,19 +21,20 @@ import java.util.UUID
 data class PaymentConfirmationFormState(
     val isSubmitting: Boolean = false,
     val isSuccess: Boolean = false,
+    val isRetry: Boolean = false,
     val error: String? = null,
-    
+
     val isLoading: Boolean = false,
     val paymentId: String = "",
     val milestoneId: String? = null,
     val sourceId: String = "",
     val currency: String = "LKR",
-    
+
     val amountStr: String = "",
     val conversionBasis: String = "native_lkr",
     val conversionRateStr: String = "",
     val actualLkrCreditStr: String = "",
-    
+
     val receiptDate: String = "",
     val note: String = ""
 )
@@ -48,43 +49,131 @@ class PaymentConfirmationViewModel(
 
     private var maxAmountMinor: Long = 0L
 
-    fun load(paymentId: String, milestoneId: String?) {
-        _formState.value = _formState.value.copy(isLoading = true, paymentId = paymentId, milestoneId = milestoneId)
+    private var receiptId: String = ""
+    private var currentUserId: String = ""
+    private var unresolvedIncome: Income? = null
+    private var operationToken: Long = 0L
+
+    init {
         viewModelScope.launch {
+            authRepository.authState.collect { user ->
+                val newUid = user?.uid ?: ""
+                if (currentUserId.isNotEmpty() && currentUserId != newUid) {
+                    operationToken++
+                    unresolvedIncome = null
+                    currentUserId = newUid
+                    if (user == null) {
+                        _formState.value = PaymentConfirmationFormState(error = "User not authenticated")
+                    } else {
+                        _formState.value = PaymentConfirmationFormState(error = "Account changed.")
+                    }
+                }
+            }
+        }
+    }
+
+    fun load(paymentId: String, milestoneId: String?) {
+        val token = ++operationToken
+        unresolvedIncome = null
+        maxAmountMinor = 0L
+        _formState.value = PaymentConfirmationFormState(isLoading = true, paymentId = paymentId, milestoneId = milestoneId, receiptDate = getDefaultDate())
+        viewModelScope.launch {
+            try {
+                kotlinx.coroutines.withTimeout(15000L) {
             val user = authRepository.authState.first()
+            if (operationToken != token) return@withTimeout
             if (user == null) {
-                _formState.value = _formState.value.copy(error = "User not authenticated", isLoading = false)
-                return@launch
+                if (operationToken == token) {
+                    _formState.value = _formState.value.copy(error = "User not authenticated", isLoading = false)
+                }
+                return@withTimeout
+            }
+            if (operationToken != token) return@withTimeout
+
+            currentUserId = user.uid
+            val unresolved = paymentRepository.getUnresolvedPayment(user.uid, paymentId, milestoneId)
+            if (operationToken != token) return@withTimeout
+
+            if (unresolved != null) {
+                unresolvedIncome = unresolved
+                receiptId = unresolved.id
+                _formState.value = _formState.value.copy(
+                    isRetry = true, isLoading = false,
+                    amountStr = unresolved.originalAmountStr,
+                    sourceId = unresolved.sourceId,
+                    currency = unresolved.currency,
+                    conversionBasis = unresolved.conversionBasis,
+                    conversionRateStr = unresolved.conversionRateStr ?: "",
+                    receiptDate = unresolved.receiptDate,
+                    actualLkrCreditStr = BigDecimal.valueOf(unresolved.lkrAmountMinor, 2).toPlainString(),
+                    note = unresolved.note,
+                    error = "Unresolved payment found. Please retry."
+                )
+                return@withTimeout
+            } else {
+                unresolvedIncome = null
+                receiptId = UUID.randomUUID().toString()
             }
 
             val result = paymentRepository.getExpectedPayment(user.uid, paymentId)
+            if (operationToken != token) return@withTimeout
+
             if (result.isSuccess) {
                 val p = result.getOrThrow()
+                check(!p.isCancelled && !p.hasPendingWrites && !p.isFromCache) {
+                    p.confirmationMessage ?: "Project is cancelled"
+                }
                 var title = p.title
-                
+
                 if (milestoneId != null) {
                     val msFlow = paymentRepository.getMilestones(user.uid, paymentId).first()
+                    if (operationToken != token) return@withTimeout
                     val ms = msFlow.find { it.id == milestoneId }
                     if (ms != null) {
+                        check(!ms.isCancelled && !ms.hasPendingWrites && !ms.isFromCache) {
+                            ms.confirmationMessage ?: "Milestone is cancelled"
+                        }
                         maxAmountMinor = ms.outstandingAmountMinor
                         title = ms.title
                     } else {
-                        _formState.value = _formState.value.copy(error = "Milestone not found", isLoading = false)
-                        return@launch
+                        if (operationToken == token) {
+                            _formState.value = _formState.value.copy(error = "Milestone not found", isLoading = false)
+                        }
+                        return@withTimeout
                     }
                 } else {
                     maxAmountMinor = Math.subtractExact(p.agreedAmountMinor, Math.addExact(p.allocatedAmountMinor, p.directReceivedAmountMinor))
                 }
 
-                _formState.value = _formState.value.copy(
-                    isLoading = false,
-                    sourceId = p.sourceId,
-                    currency = p.currency,
-                    conversionBasis = if (p.currency == "LKR") "native_lkr" else "confirmed_rate",
-                    note = "Payment for: $title"
-                )
+                if (operationToken == token) {
+                    _formState.value = _formState.value.copy(
+                        isLoading = false,
+                        sourceId = unresolved?.sourceId ?: p.sourceId,
+                        currency = unresolved?.currency ?: p.currency,
+                        amountStr = unresolved?.originalAmountStr ?: _formState.value.amountStr,
+                        conversionBasis = unresolved?.conversionBasis ?: (if (p.currency == "LKR") "native_lkr" else "confirmed_rate"),
+                        conversionRateStr = unresolved?.conversionRateStr ?: _formState.value.conversionRateStr,
+                        receiptDate = unresolved?.receiptDate ?: _formState.value.receiptDate,
+                        note = unresolved?.note ?: "Payment for: $title"
+                    )
+                }
             } else {
-                _formState.value = _formState.value.copy(isLoading = false, error = "Payment not found.")
+                if (operationToken == token) {
+                    _formState.value = _formState.value.copy(isLoading = false, error = result.exceptionOrNull()?.message ?: "Payment not found.")
+                }
+            }
+
+                }
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                if (operationToken == token) _formState.value = _formState.value.copy(
+                    isLoading = false, isSubmitting = false, isRetry = unresolvedIncome != null,
+                    error = "Server confirmation unavailable. Check your connection, then retry.")
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (operationToken == token) _formState.value = _formState.value.copy(
+                    isLoading = false, isSubmitting = false, isRetry = unresolvedIncome != null,
+                    error = e.message ?: "Unable to contact server")
             }
         }
     }
@@ -97,9 +186,10 @@ class PaymentConfirmationViewModel(
         receiptDate: String = _formState.value.receiptDate,
         note: String = _formState.value.note
     ) {
+        if (_formState.value.isLoading || _formState.value.isSubmitting || _formState.value.isRetry) return
         val currency = _formState.value.currency
         val finalBasis = if (currency == "LKR") "native_lkr" else if (conversionBasis == "native_lkr") "confirmed_rate" else conversionBasis
-        
+
         _formState.value = _formState.value.copy(
             amountStr = amountStr,
             conversionBasis = finalBasis,
@@ -112,11 +202,62 @@ class PaymentConfirmationViewModel(
     }
 
     fun confirmPayment() {
-        if (_formState.value.isSubmitting) return
         val state = _formState.value
+        if (state.isSubmitting || state.isLoading || state.isSuccess) return
+        if (state.sourceId.isEmpty()) return
+
+        val token = operationToken
+        val targetUserId = currentUserId
+        val targetPaymentId = state.paymentId
+        val targetMilestoneId = state.milestoneId
+
+        if (state.isRetry && unresolvedIncome != null) {
+            val targetIncome = unresolvedIncome!!
+            _formState.value = state.copy(isSubmitting = true, error = null)
+            viewModelScope.launch {
+            try {
+                kotlinx.coroutines.withTimeout(15000L) {
+                if (operationToken != token) return@withTimeout
+                val user = authRepository.authState.first()
+                if (operationToken != token) return@withTimeout
+                if (user == null || user.uid != targetUserId) {
+                    if (operationToken == token) {
+                        _formState.value = _formState.value.copy(isSubmitting = false, error = "Account changed.")
+                    }
+                    return@withTimeout
+                }
+                val result = paymentRepository.retryFailedPayment(user.uid, targetPaymentId, targetMilestoneId, targetIncome)
+                if (operationToken != token || currentUserId != targetUserId) return@withTimeout
+                if (result.isSuccess) {
+                    _formState.value = _formState.value.copy(isSubmitting = false, isSuccess = true)
+                } else {
+                    val message = result.exceptionOrNull()?.message ?: "Failed to save"
+                    _formState.value = _formState.value.copy(isSubmitting = false, isRetry = true, error = message)
+                }
+
+                }
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                if (operationToken == token) _formState.value = _formState.value.copy(
+                    isLoading = false, isSubmitting = false, isRetry = unresolvedIncome != null,
+                    error = "Server confirmation unavailable. Check your connection, then retry.")
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (operationToken == token) _formState.value = _formState.value.copy(
+                    isLoading = false, isSubmitting = false, isRetry = unresolvedIncome != null,
+                    error = e.message ?: "Unable to contact server")
+            }
+        }
+            return
+        }
 
         if (!isValidDate(state.receiptDate)) {
             _formState.value = state.copy(error = "Invalid date format or future date.")
+            return
+        }
+
+        if (state.note.length > 500) {
+            _formState.value = state.copy(error = "Note cannot exceed 500 characters")
             return
         }
 
@@ -134,7 +275,7 @@ class PaymentConfirmationViewModel(
         }
 
         if (originalMinor > maxAmountMinor) {
-            _formState.value = state.copy(error = "Cannot exceed outstanding balance: ${maxAmountMinor / 100.0} ${state.currency}")
+            _formState.value = state.copy(error = "Cannot exceed outstanding balance: ${BigDecimal.valueOf(maxAmountMinor, 2).toPlainString()} ${state.currency}")
             return
         }
 
@@ -174,37 +315,59 @@ class PaymentConfirmationViewModel(
             return
         }
 
+        val targetIncome = Income(
+            id = receiptId,
+            sourceId = state.sourceId,
+            receiptDate = state.receiptDate,
+            currency = state.currency,
+            originalAmountStr = state.amountStr.trim(),
+            originalAmountMinor = originalMinor,
+            lkrAmountMinor = lkrAmountMinor,
+            conversionBasis = state.conversionBasis,
+            conversionRateStr = finalRateStr,
+            note = state.note.trim(),
+            linkedPaymentId = state.paymentId,
+            linkedMilestoneId = state.milestoneId
+        )
+
+        unresolvedIncome = targetIncome
         _formState.value = state.copy(isSubmitting = true, error = null)
 
         viewModelScope.launch {
+            try {
+                kotlinx.coroutines.withTimeout(15000L) {
+            if (operationToken != token) return@withTimeout
             val user = authRepository.authState.first()
-            if (user == null) {
-                _formState.value = _formState.value.copy(isSubmitting = false, error = "Account changed.")
-                return@launch
+            if (operationToken != token) return@withTimeout
+            if (user == null || user.uid != targetUserId) {
+                if (operationToken == token) {
+                    _formState.value = _formState.value.copy(isSubmitting = false, error = "Account changed.")
+                }
+                return@withTimeout
             }
 
-            val income = Income(
-                id = UUID.randomUUID().toString(),
-                sourceId = state.sourceId,
-                receiptDate = state.receiptDate,
-                currency = state.currency,
-                originalAmountStr = state.amountStr.trim(),
-                originalAmountMinor = originalMinor,
-                lkrAmountMinor = lkrAmountMinor,
-                conversionBasis = state.conversionBasis,
-                conversionRateStr = finalRateStr,
-                note = state.note.trim(),
-                linkedPaymentId = state.paymentId,
-                linkedMilestoneId = state.milestoneId
-            )
-
-            val result = paymentRepository.confirmPayment(user.uid, state.paymentId, state.milestoneId, income)
+            val result = paymentRepository.confirmPayment(user.uid, targetPaymentId, targetMilestoneId, targetIncome)
+            if (operationToken != token || currentUserId != targetUserId) return@withTimeout
 
             if (result.isSuccess) {
                 _formState.value = _formState.value.copy(isSubmitting = false, isSuccess = true)
             } else {
+                unresolvedIncome = targetIncome
                 val message = result.exceptionOrNull()?.message ?: "Failed to save"
-                _formState.value = _formState.value.copy(isSubmitting = false, error = message)
+                _formState.value = _formState.value.copy(isSubmitting = false, isRetry = true, error = message)
+            }
+
+                }
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                if (operationToken == token) _formState.value = _formState.value.copy(
+                    isLoading = false, isSubmitting = false, isRetry = unresolvedIncome != null,
+                    error = "Server confirmation unavailable. Check your connection, then retry.")
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (operationToken == token) _formState.value = _formState.value.copy(
+                    isLoading = false, isSubmitting = false, isRetry = unresolvedIncome != null,
+                    error = e.message ?: "Unable to contact server")
             }
         }
     }
@@ -214,6 +377,8 @@ class PaymentConfirmationViewModel(
             val bd = BigDecimal(amount.trim())
             if (bd <= BigDecimal.ZERO) return Result.failure(Exception("Amount must be positive"))
             if (bd.scale() > 2) return Result.failure(Exception("Maximum 2 decimal places allowed"))
+            // Check scientific notation specifically if we want, or just rely on bd parsing
+            if (amount.trim().lowercase().contains('e')) return Result.failure(Exception("Scientific notation not allowed"))
             Result.success(bd)
         } catch (e: NumberFormatException) {
             Result.failure(Exception("Invalid amount format"))
@@ -225,6 +390,7 @@ class PaymentConfirmationViewModel(
             val bd = BigDecimal(rate.trim())
             if (bd <= BigDecimal.ZERO) return Result.failure(Exception("Rate must be positive"))
             if (bd.scale() > 8) return Result.failure(Exception("Maximum 8 decimal places allowed"))
+            if (rate.trim().lowercase().contains('e')) return Result.failure(Exception("Scientific notation not allowed"))
             Result.success(bd)
         } catch (e: NumberFormatException) {
             Result.failure(Exception("Invalid rate format"))
