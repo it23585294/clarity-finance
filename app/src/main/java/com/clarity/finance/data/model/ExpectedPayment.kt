@@ -4,7 +4,7 @@ import com.google.firebase.Timestamp
 
 data class ExpectedPayment(
     val id: String,
-    val type: String, // "standalone" or "project"
+    val type: String,
     val title: String,
     val sourceId: String,
     val currency: String,
@@ -19,8 +19,18 @@ data class ExpectedPayment(
     val lastMilestoneId: String? = null,
     val lastMilestoneOpId: String? = null,
     val createdAt: Timestamp? = null,
-    val updatedAt: Timestamp? = null
+    val updatedAt: Timestamp? = null,
+    val hasPendingWrites: Boolean = false,
+    val isFromCache: Boolean = false
 ) {
+    val confirmationMessage: String?
+        get() = when {
+            hasPendingWrites -> "Awaiting server confirmation. Check your internet connection."
+            isFromCache -> "Showing cached data. Connect to refresh before making changes."
+            updatedAt == null -> "This record is missing its server timestamp. Refresh or inspect the saved document."
+            else -> null
+        }
+    val canModify: Boolean get() = confirmationMessage == null && !isCancelled
     val totalReceivedAmountMinor: Long
         get() = Math.addExact(directReceivedAmountMinor, milestoneReceivedAmountMinor)
         
@@ -28,7 +38,7 @@ data class ExpectedPayment(
         get() = Math.subtractExact(agreedAmountMinor, totalReceivedAmountMinor)
 
     val unallocatedAmountMinor: Long
-        get() = Math.subtractExact(agreedAmountMinor, allocatedAmountMinor)
+        get() = Math.subtractExact(Math.subtractExact(agreedAmountMinor, allocatedAmountMinor), directReceivedAmountMinor)
 }
 
 data class Milestone(
@@ -42,8 +52,18 @@ data class Milestone(
     val lastReceiptId: String? = null,
     val lastMilestoneOpId: String? = null,
     val createdAt: Timestamp? = null,
-    val updatedAt: Timestamp? = null
+    val updatedAt: Timestamp? = null,
+    val hasPendingWrites: Boolean = false,
+    val isFromCache: Boolean = false
 ) {
+    val confirmationMessage: String?
+        get() = when {
+            hasPendingWrites -> "Awaiting server confirmation. Check your internet connection."
+            isFromCache -> "Showing cached data. Connect to refresh before making changes."
+            updatedAt == null -> "This record is missing its server timestamp. Refresh or inspect the saved document."
+            else -> null
+        }
+    val canModify: Boolean get() = confirmationMessage == null && !isCancelled
     val outstandingAmountMinor: Long
         get() = Math.subtractExact(agreedAmountMinor, receivedAmountMinor)
 }

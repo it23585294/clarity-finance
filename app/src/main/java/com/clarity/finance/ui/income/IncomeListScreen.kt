@@ -67,11 +67,11 @@ fun IncomeListScreen(
                 // Totals
                 Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        val totalStr = String.format(java.util.Locale.US, "%.2f", state.confirmedTotalLkr / 100.0)
+                        val totalStr = java.math.BigDecimal.valueOf(state.confirmedTotalLkr, 2).toPlainString()
                         Text("Confirmed Total: LKR $totalStr", style = MaterialTheme.typography.titleLarge)
                         
                         if (state.pendingTotalLkr > 0) {
-                            val pendStr = String.format(java.util.Locale.US, "%.2f", state.pendingTotalLkr / 100.0)
+                            val pendStr = java.math.BigDecimal.valueOf(state.pendingTotalLkr, 2).toPlainString()
                             Text("+ Pending: LKR $pendStr", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
                         }
 
@@ -79,7 +79,7 @@ fun IncomeListScreen(
                             Spacer(modifier = Modifier.height(8.dp))
                             Text("By Source:", style = MaterialTheme.typography.labelLarge)
                             state.totalsBySource.forEach { (source, amount) ->
-                                val srcStr = String.format(java.util.Locale.US, "%.2f", amount / 100.0)
+                                val srcStr = java.math.BigDecimal.valueOf(amount, 2).toPlainString()
                                 Text("• $source: LKR $srcStr", style = MaterialTheme.typography.bodySmall)
                             }
                         }
@@ -95,7 +95,7 @@ fun IncomeListScreen(
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(state.incomes, key = { it.id }) { income ->
-                            val isClickable = !income.isPending && income.syncError == null && !income.isConflict
+                            val isClickable = !income.isPending && income.syncError == null && !income.isConflict && income.linkedPaymentId == null
                             IncomeItem(
                                 income = income,
                                 modifier = if (isClickable) Modifier.clickable { onNavigateToEditIncome(income.id) } else Modifier,
@@ -115,13 +115,13 @@ fun IncomeItem(income: Income, modifier: Modifier = Modifier, onRetry: () -> Uni
     Column(modifier = modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(text = "${income.receiptDate} - ${income.sourceId}", style = MaterialTheme.typography.bodyLarge)
-            val lkrStr = String.format(java.util.Locale.US, "%.2f", income.lkrAmountMinor / 100.0)
+            val lkrStr = java.math.BigDecimal.valueOf(income.lkrAmountMinor, 2).toPlainString()
             Text(text = "LKR $lkrStr", style = MaterialTheme.typography.titleMedium)
         }
         Spacer(modifier = Modifier.height(4.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             val displayOriginalAmount = if (income.originalAmountMinor != null) {
-                String.format(java.util.Locale.US, "%.2f", income.originalAmountMinor / 100.0)
+                java.math.BigDecimal.valueOf(income.originalAmountMinor, 2).toPlainString()
             } else {
                 income.originalAmountStr
             }
@@ -140,6 +140,10 @@ fun IncomeItem(income: Income, modifier: Modifier = Modifier, onRetry: () -> Uni
         if (income.note.isNotBlank()) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(text = "Note: ${income.note}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+        }
+        if (income.linkedPaymentId != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = "(Linked Payment - Read Only)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
         }
     }
 }
