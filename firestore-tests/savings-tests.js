@@ -159,6 +159,67 @@ module.exports = (environment) => describe('Savings allocation integrity', funct
         }
         assert.equal((await getDoc(goal(d))).data().savedMinor, 1120000);
     });
+    it('read-only rejection verifies receipt absence so a racing earlier commit reconciles instead', async () => {
+        const d = db(); await create(d);
+        let release, sawAbsent;
+        const gate = new Promise(resolve => { release = resolve; });
+        const firstRead = new Promise(resolve => { sawAbsent = resolve; });
+        let first = true, callbacks = 0;
+        const proof = runTransaction(d, async tx => {
+            callbacks++;
+            const accepted = await tx.get(receipt(d, 'op-1'));
+            if (accepted.exists()) return 'confirmed';
+            await tx.get(goal(d));
+            if (first) { first = false; sawAbsent(); await gate; }
+            // Models the production no-write result: the SDK verifies every read before returning it.
+            return 'rejected';
+        });
+        try { await firstRead; await ledger(d, 'c', {}); }
+        finally { release(); }
+        assert.equal(await proof, 'confirmed');
+        assert(callbacks >= 2, 'A stale receipt-absence read must not establish rejection');
+        assert.equal((await getDoc(goal(d))).data().savedMinor, 2120000);
+        assert.equal((await getDocs(collection(goal(d), 'entries'))).size, 1);
+    });
+    it('verified stale version prevents an older outstanding allocation from committing later', async () => {
+        const d = db(); await create(d);
+        let release, didRead;
+        const gate = new Promise(resolve => { release = resolve; });
+        const started = new Promise(resolve => { didRead = resolve; });
+        let first = true;
+        const allocation = runTransaction(d, async tx => {
+            const accepted = await tx.get(receipt(d, 'old-op'));
+            if (accepted.exists()) return 'confirmed';
+            const parent = (await tx.get(goal(d))).data();
+            if (parent.version > 0) return 'rejected';
+            if (first) { first = false; didRead(); await gate; }
+            const e = { kind: 'contribution', amountMinor: 100, entryDate: now(), note: '', deleted: false, version: 1,
+                lastOperationId: 'old-op', createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
+            tx.update(goal(d), { savedMinor: parent.savedMinor + 100, version: 1, lastOperationId: 'old-op', lastEntryId: 'old-entry', updatedAt: serverTimestamp() });
+            tx.set(entry(d, 'old-entry'), e);
+            tx.set(receipt(d, 'old-op'), { kind: 'ENTRY_CREATE', entryId: 'old-entry', version: 1, payload: ev(e), createdAt: serverTimestamp() });
+            return 'confirmed';
+        });
+        try {
+            await started; await edit(d, { name: 'Newer confirmed version' });
+            const rejection = await runTransaction(d, async tx => {
+                const accepted = await tx.get(receipt(d, 'old-op'));
+                const parent = await tx.get(goal(d));
+                return !accepted.exists() && parent.data().version > 0 ? 'rejected' : 'unproven';
+            });
+            assert.equal(rejection, 'rejected');
+        } finally { release(); }
+        const lateOutcome = await allocation.catch(error => {
+            // Depending on SDK validation order, the stale write can be denied by the atomic rules
+            // before it retries its callback. The earlier verified contradiction is the rejection proof.
+            assert.equal(error.code, 'permission-denied');
+            return 'rejected';
+        });
+        assert.equal(lateOutcome, 'rejected');
+        assert.equal((await getDoc(receipt(d, 'old-op'))).exists(), false);
+        assert.equal((await getDoc(goal(d))).data().savedMinor, 1120000);
+        assert.equal((await getDocs(collection(goal(d), 'entries'))).size, 0);
+    });
     it('rejects signed delta wraparound using exact 64-bit REST integers', async () => {
         // JS Number cannot represent Long.MAX_VALUE. REST integerValue strings keep this adversarial fixture exact.
         const project = 'demo-clarity-test';

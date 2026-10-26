@@ -24,7 +24,11 @@ data class GoalOperation(val operationId: String, val kind: String, val expected
         }
     }
 }
-data class GoalAttempt(val operation: GoalOperation, val status: String, val error: String? = null)
+data class GoalAttempt(val operation: GoalOperation, val status: String, val error: String? = null) {
+    // Legacy FAILED records did not establish logical rejection and must be reconciled again.
+    val isRejected get() = status == "REJECTED"
+    val isUncertain get() = status in setOf("UNCERTAIN", "FAILED", "CONFLICT")
+}
 data class GoalSnapshot(val goal: SavingsGoal? = null, val entries: List<SavingsEntry>? = null,
     val known: Boolean = false, val fromCache: Boolean = true, val attempts: List<GoalAttempt> = emptyList(),
     val error: String? = null, val recoveryError: String? = null, val acknowledgedOperationId: String? = null)
@@ -40,5 +44,13 @@ interface GoalRepository {
 
 interface GoalRemote {
     fun observe(uid: String): Flow<GoalSnapshot>
-    suspend fun apply(uid: String, operation: GoalOperation)
+    suspend fun apply(uid: String, operation: GoalOperation): GoalRemoteOutcome
+}
+
+sealed interface GoalRemoteOutcome {
+    /** The atomic write was acknowledged, or its exact immutable receipt was reconciled. */
+    data object Confirmed : GoalRemoteOutcome
+    /** A successful server transaction verified receipt absence and an invariant preventing this logical operation. */
+    data class Rejected(val reason: String) : GoalRemoteOutcome
+    data class Uncertain(val reason: String) : GoalRemoteOutcome
 }

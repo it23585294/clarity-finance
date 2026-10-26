@@ -2,6 +2,7 @@ package com.clarity.finance.data.repository
 
 import com.clarity.finance.data.model.*
 import com.google.android.gms.tasks.Task
+import com.google.android.gms.tasks.TaskCompletionSource
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.*
 import kotlinx.coroutines.*
@@ -38,10 +39,10 @@ class FirestoreGoalRemoteTest {
         `when`(parent.collection("entries")).thenReturn(entries); `when`(entries.document("entry")).thenReturn(entryRef)
         `when`(tx.get(parent)).thenReturn(goalDoc); `when`(tx.get(receiptRef)).thenReturn(receiptDoc); `when`(tx.get(entryRef)).thenReturn(entryDoc)
         doAnswer { invocation ->
-            invocation.getArgument<Transaction.Function<Unit>>(0).apply(tx)
-            val task = mock(Task::class.java) as Task<Unit>
-            `when`(task.isComplete).thenReturn(true); `when`(task.isSuccessful).thenReturn(true); `when`(task.result).thenReturn(Unit); task
-        }.`when`(firestore).runTransaction(any<Transaction.Function<Unit>>())
+            val result = invocation.getArgument<Transaction.Function<GoalRemoteOutcome>>(0).apply(tx)
+            val task = mock(Task::class.java) as Task<GoalRemoteOutcome>
+            `when`(task.isComplete).thenReturn(true); `when`(task.isSuccessful).thenReturn(true); `when`(task.result).thenReturn(result); task
+        }.`when`(firestore).runTransaction(any<Transaction.Function<GoalRemoteOutcome>>())
     }
     private fun existing() {
         `when`(goalDoc.exists()).thenReturn(true)
@@ -83,6 +84,40 @@ class FirestoreGoalRemoteTest {
         `when`(tx.get(parent)).thenAnswer { owner = "b"; goalDoc }
         try { remote.apply("a", GoalOperation("edit", "EDIT", 0, goal = config)); fail() } catch (_: IllegalStateException) {}
         verify(tx, never()).update(eq(parent), any<Map<String, Any>>())
+    }
+    @Test fun `verified immutable contradiction returns rejection only as successful read transaction outcome`() = runTest {
+        setup(); existing()
+        val result = remote.apply("a", GoalOperation("different-create", "CREATE", goal = config))
+        assertTrue(result is GoalRemoteOutcome.Rejected)
+        `when`(goalDoc.get("version")).thenReturn(1L)
+        val stale = remote.apply("a", GoalOperation("old-edit", "EDIT", 0, goal = config))
+        assertTrue(stale is GoalRemoteOutcome.Rejected)
+        `when`(goalDoc.get("version")).thenReturn(0L)
+        val impossibleWithdrawal = remote.apply("a", GoalOperation("negative", "ENTRY_CREATE", 0,
+            entry = SavingsEntry("entry", "withdrawal", 1120001, "2025-01-01")))
+        assertTrue(impossibleWithdrawal is GoalRemoteOutcome.Rejected)
+        verify(tx, never()).set(any<DocumentReference>(), any<Map<String, Any>>())
+        verify(tx, never()).update(any<DocumentReference>(), any<Map<String, Any>>())
+    }
+    @Test fun `cancelled Task await and account error retain original outstanding transaction without overlapping submission`() = runTest {
+        setup()
+        val source = TaskCompletionSource<GoalRemoteOutcome>()
+        doReturn(source.task).`when`(firestore).runTransaction(any<Transaction.Function<GoalRemoteOutcome>>())
+        val op = GoalOperation("pending-task", "CREATE", goal = config)
+        var timedOut = false
+        val first = backgroundScope.launch { timedOut = withTimeoutOrNull(10000) { remote.apply("a", op) } == null }
+        runCurrent(); advanceTimeBy(10001); runCurrent(); first.join()
+        assertTrue(timedOut); assertFalse(source.task.isComplete)
+        try { remote.apply("a", op.copy(goal = config.copy(openingMinor = 1))); fail() } catch (_: IllegalStateException) {}
+        owner = "b"
+        try { remote.apply("a", op); fail() } catch (_: IllegalStateException) {}
+        owner = "a"
+        var result: GoalRemoteOutcome? = null
+        val later = backgroundScope.launch { result = remote.apply("a", op) }; runCurrent()
+        verify(firestore, times(1)).runTransaction(any<Transaction.Function<GoalRemoteOutcome>>())
+        source.setResult(GoalRemoteOutcome.Confirmed); runCurrent(); later.join()
+        assertEquals(GoalRemoteOutcome.Confirmed, result)
+        verify(firestore, times(1)).runTransaction(any<Transaction.Function<GoalRemoteOutcome>>())
     }
     @Test fun `parent and untruncated ledger listeners include metadata and are removed on cancellation`() = runTest {
         setup()

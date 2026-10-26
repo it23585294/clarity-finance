@@ -69,7 +69,7 @@ class GoalViewModelTest {
         assertEquals(1120000L, vm.state.value.progress!!.savedMinor)
         assertEquals("PENDING", vm.state.value.snapshot.attempts.single().status)
         val op = repo.submissions.single().second
-        repo.source("a").value = confirmed.copy(attempts = listOf(GoalAttempt(op, "FAILED", "Conflict"))); runCurrent()
+        repo.source("a").value = confirmed.copy(attempts = listOf(GoalAttempt(op, "REJECTED", "Conflict"))); runCurrent()
         assertEquals(1120000L, vm.state.value.progress!!.savedMinor); assertTrue(vm.state.value.blocked)
         vm.dismiss(vm.state.value.snapshot.attempts.single()); runCurrent()
         assertFalse(vm.state.value.blocked)
@@ -157,5 +157,17 @@ class GoalViewModelTest {
         // A fast accepted operation may disappear from recovery before its pending emission is observed.
         repo.source("a").value = confirmed.copy(acknowledgedOperationId = op.operationId); runCurrent()
         assertNull(vm.state.value.localPending); assertNull(vm.state.value.unknown); assertFalse(vm.state.value.blocked)
+    }
+    @Test fun `uncertain and legacy failed proposals cannot be dismissed through the ViewModel`() = runGoalTest {
+        runCurrent()
+        val op = GoalOperation("uncertain", "EDIT", 0, goal = config)
+        for (status in listOf("UNCERTAIN", "FAILED")) {
+            repo.source("a").value = confirmed.copy(attempts = listOf(GoalAttempt(op, status, "Access unavailable"))); runCurrent()
+            val attempt = vm.state.value.snapshot.attempts.single()
+            assertTrue(attempt.isUncertain); assertFalse(attempt.isRejected)
+            vm.dismiss(attempt); runCurrent()
+            assertEquals(1, vm.state.value.snapshot.attempts.size)
+            assertEquals(1120000L, vm.state.value.progress!!.savedMinor)
+        }
     }
 }

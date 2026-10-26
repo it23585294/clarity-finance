@@ -3,6 +3,7 @@ package com.clarity.finance.data.repository
 import com.clarity.finance.data.model.*
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.*
+import com.google.android.gms.tasks.Task
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
@@ -12,6 +13,8 @@ private data class GoalDocument(val goal: SavingsGoal?, val cached: Boolean, val
 private data class GoalEntries(val entries: List<SavingsEntry>, val cached: Boolean, val pending: Boolean)
 
 class FirestoreGoalRemote(private val firestore: FirebaseFirestore, private val activeUid: () -> String?) : GoalRemote {
+    private data class Running(val operation: GoalOperation, val task: Task<GoalRemoteOutcome>)
+    private val running = mutableMapOf<Pair<String, String>, Running>()
     private fun parent(uid: String) = firestore.collection("users").document(uid).collection("savingsGoals").document("active")
     private fun goalFlow(uid: String): Flow<GoalDocument> = callbackFlow {
         val listener = parent(uid).addSnapshotListener(MetadataChanges.INCLUDE) { doc, error ->
@@ -60,12 +63,25 @@ class FirestoreGoalRemote(private val firestore: FirebaseFirestore, private val 
         }
     }
 
-    override suspend fun apply(uid: String, operation: GoalOperation) {
+    override suspend fun apply(uid: String, operation: GoalOperation): GoalRemoteOutcome {
         operation.validate(temporal = false)
         check(activeUid() == uid) { "Account changed. Saved goal operation belongs to the original account." }
+        val key = uid to operation.operationId
+        val task = synchronized(running) {
+            running[key]?.also { check(it.operation == operation) { "Running operation payload cannot change." } }?.task
+                ?: transaction(uid, operation).also { running[key] = Running(operation, it) }
+        }
+        try { return task.await() }
+        finally {
+            // Await cancellation does not cancel Firebase. Keep an outstanding Task for the next waiter.
+            if (task.isComplete) synchronized(running) { if (running[key]?.task === task) running.remove(key) }
+        }
+    }
+
+    private fun transaction(uid: String, operation: GoalOperation): Task<GoalRemoteOutcome> {
         val goalRef = parent(uid)
         val receiptRef = goalRef.collection("operations").document(operation.operationId)
-        firestore.runTransaction { tx ->
+        return firestore.runTransaction<GoalRemoteOutcome> { tx ->
             check(activeUid() == uid) { "Account changed. Reopen Savings Goal." }
             val receipt = tx.get(receiptRef)
             if (receipt.exists()) {
@@ -73,15 +89,29 @@ class FirestoreGoalRemote(private val firestore: FirebaseFirestore, private val 
                     receipt.getLong("version") == operation.nextVersion && receipt.get("payload") == operation.payload() &&
                     receipt.getTimestamp("createdAt") != null) { "Operation identity conflict. Keep the saved payload for inspection." }
                 check(activeUid() == uid) { "Account changed." }
-                return@runTransaction
+                return@runTransaction GoalRemoteOutcome.Confirmed
             }
             val goalDoc = tx.get(goalRef)
             val before = if (goalDoc.exists()) goalDoc.goal() else null
+            // These contradictions are permanent under the existing no-delete/monotonic-version rules.
+            // Returning (rather than throwing) verifies the read set at commit. If an older attempt wins
+            // first, verification retries this callback, which then reconciles its matching receipt.
+            if (operation.kind == "CREATE" && before != null)
+                return@runTransaction GoalRemoteOutcome.Rejected("A goal already exists. Reopen its latest details.")
+            if (operation.kind != "CREATE" && before != null && before.version > operation.expectedVersion!!)
+                return@runTransaction GoalRemoteOutcome.Rejected("Goal changed elsewhere. Reopen the latest version before making this change.")
             checkGoalVersion(operation, before)
             val entryRef = operation.entry?.let { goalRef.collection("entries").document(it.id) }
             val entryDoc = entryRef?.let { tx.get(it) }
             val oldEntry = if (entryDoc?.exists() == true) entryDoc.entry() else null
-            val saved = goalMutationBalance(operation, before, oldEntry)
+            // Only this pure balance/identity calculation is classified here. With the expected
+            // parent version fixed and these ledger reads verified, its violations cannot be
+            // repaired by an older outstanding attempt. Decode/access/SDK failures are not proofs.
+            val saved = try { goalMutationBalance(operation, before, oldEntry) }
+            catch (e: IllegalArgumentException) { return@runTransaction GoalRemoteOutcome.Rejected(e.message ?: "Invalid resulting allocation balance.") }
+            catch (e: IllegalStateException) { return@runTransaction GoalRemoteOutcome.Rejected(e.message ?: "Entry conflicts with the confirmed ledger.") }
+            if (operation.goal != null && before != null && operation.goal.startDate != before.config.startDate)
+                return@runTransaction GoalRemoteOutcome.Rejected("Goal start date cannot change.")
             // Reconcile first: an acknowledged create remains acknowledged even after its deadline passes.
             operation.validate()
             if (operation.goal != null && before != null) {
@@ -107,7 +137,8 @@ class FirestoreGoalRemote(private val firestore: FirebaseFirestore, private val 
             }
             tx.set(receiptRef, mapOf("kind" to operation.kind, "entryId" to (operation.entry?.id ?: ""), "version" to operation.nextVersion,
                 "payload" to operation.payload(), "createdAt" to FieldValue.serverTimestamp()))
-        }.await()
+            GoalRemoteOutcome.Confirmed
+        }
     }
     private fun DocumentSnapshot.string(field: String) = get(field) as? String ?: error("Missing or invalid $field.")
     private fun DocumentSnapshot.long(field: String) = get(field) as? Long ?: error("Missing or invalid integer $field.")

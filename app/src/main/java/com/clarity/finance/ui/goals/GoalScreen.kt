@@ -49,8 +49,12 @@ private fun GoalStatus(state: GoalUiState) {
     if (state.localPending != null) Text("Saved proposal awaiting server confirmation. Confirmed savings are retained.")
     if (state.unknown != null) Text("Local save outcome unknown. Keep the original proposal; retry checks the same identity.")
     state.snapshot.attempts.forEach {
-        Text(if (it.status == "FAILED") "Rejected proposal: ${it.error ?: "Conflict or validation failure"}. Confirmed savings are retained."
-            else "Saved proposal awaiting server confirmation. Confirmed savings are retained.")
+        Text(when {
+            state.snapshot.acknowledgedOperationId == it.operation.operationId -> "Server confirmed proposal; completing local recovery cleanup."
+            it.isRejected -> "Rejected proposal: ${it.error ?: "Conflict or validation failure"}. Confirmed savings are retained."
+            it.isUncertain -> "Proposal outcome uncertain: ${it.error ?: "Reconciliation required"}. Retained until server reconciliation; it cannot be dismissed."
+            else -> "Saved proposal awaiting server confirmation. Confirmed savings are retained."
+        })
     }
 }
 
@@ -78,7 +82,7 @@ fun GoalScreen(viewModel: GoalViewModel, onBack: () -> Unit) {
                         Text("Proposed ${if (it.deleted) "deletion of " else ""}${it.kind}: LKR ${SavingsMath.money(it.amountMinor)} on ${it.entryDate}.")
                         if (it.note.isNotBlank()) Text("Proposed note: ${it.note}")
                     }
-                    if (attempt.status == "FAILED") {
+                    if (attempt.isRejected) {
                         Text("Dismiss a rejected proposal to reopen the latest details and correct them. Retrying keeps the original payload and version.")
                         OutlinedButton(onClick = { viewModel.retry(attempt) }, enabled = !state.busy) { Text("Retry original proposal") }
                         OutlinedButton(onClick = { viewModel.dismiss(attempt) }, enabled = !state.busy) { Text("Dismiss rejected proposal") }

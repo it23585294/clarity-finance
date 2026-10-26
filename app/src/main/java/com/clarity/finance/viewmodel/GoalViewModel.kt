@@ -149,7 +149,7 @@ open class GoalViewModel(private val auth: AuthRepository, private val repositor
     }
     fun retryUnknown() { state.value.unknown?.let { submit(it) } }
     fun retry(attempt: GoalAttempt) { if (state.value.snapshot.attempts.contains(attempt)) action { repository.retry(it, attempt.operation) } }
-    fun dismiss(attempt: GoalAttempt) { if (attempt.status == "FAILED" && state.value.snapshot.attempts.contains(attempt)) action { repository.dismissRejected(it, attempt.operation) } }
+    fun dismiss(attempt: GoalAttempt) { if (attempt.isRejected && state.value.snapshot.attempts.contains(attempt)) action { repository.dismissRejected(it, attempt.operation) } }
     private fun action(block: suspend (String) -> Unit) {
         if (state.value.busy) return
         val owner = uid ?: return

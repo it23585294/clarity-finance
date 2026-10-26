@@ -130,7 +130,14 @@ class GoalNavigationTest {
         text("Saved: LKR 21200.00"); text("Saved proposal awaiting server confirmation. Confirmed savings are retained.")
         compose.runOnIdle {
             val attempt = data.snapshots.value.attempts.single()
-            data.snapshots.value = data.snapshots.value.copy(attempts = listOf(attempt.copy(status = "FAILED", error = "Isolated conflict")))
+            data.snapshots.value = data.snapshots.value.copy(attempts = listOf(attempt.copy(status = "FAILED", error = "Earlier outcome unknown")))
+        }
+        text("Proposal outcome uncertain: Earlier outcome unknown. Retained until server reconciliation; it cannot be dismissed.")
+        compose.onNodeWithText("Dismiss rejected proposal").assertDoesNotExist()
+        text("Saved: LKR 21200.00")
+        compose.runOnIdle {
+            val attempt = data.snapshots.value.attempts.single()
+            data.snapshots.value = data.snapshots.value.copy(attempts = listOf(attempt.copy(status = "REJECTED", error = "Isolated conflict")))
         }
         text("Saved: LKR 21200.00"); text("Rejected proposal: Isolated conflict. Confirmed savings are retained.")
         click("Dismiss rejected proposal")
