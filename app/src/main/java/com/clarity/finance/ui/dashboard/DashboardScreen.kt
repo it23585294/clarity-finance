@@ -26,7 +26,8 @@ fun DashboardScreen(
     onIncome: (String) -> Unit,
     onProject: (String) -> Unit,
     onCrypto: () -> Unit,
-    onPayments: () -> Unit
+    onPayments: () -> Unit,
+    goalCard: @Composable () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var page by rememberSaveable { mutableStateOf("dashboard") }
@@ -62,6 +63,7 @@ fun DashboardScreen(
                     OutlinedButton(onClick = { page = "insights" }) { Text("Spending insights") }
                 }
                 if (page == "dashboard") {
+                    goalCard()
                     ReportCard("Ordinary received income", state.incomeText, state.income)
                     ReportCard("Recorded expenses", state.expensesText, state.expenses)
                     OutlinedCard(Modifier.fillMaxWidth()) {

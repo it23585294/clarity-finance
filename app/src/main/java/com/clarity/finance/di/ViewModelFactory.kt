@@ -28,10 +28,16 @@ class ViewModelFactory(
     private val incomeRepository: IncomeRepository,
     private val paymentRepository: PaymentRepository,
     private val cryptoRepository: CryptoRepository,
-    private val reportingRepository: ReportingRepository? = null
+    private val reportingRepository: ReportingRepository? = null,
+    private val goalRepository: com.clarity.finance.data.repository.GoalRepository? = null
 ) : ViewModelProvider.Factory {
+    val hasGoals get() = goalRepository != null
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass == com.clarity.finance.viewmodel.GoalCardViewModel::class.java)
+            return com.clarity.finance.viewmodel.GoalCardViewModel(authRepository, requireNotNull(goalRepository)) as T
+        if (modelClass == com.clarity.finance.viewmodel.GoalViewModel::class.java)
+            return com.clarity.finance.viewmodel.GoalViewModel(authRepository, requireNotNull(goalRepository)) as T
         if (modelClass.isAssignableFrom(DashboardViewModel::class.java)) {
             return DashboardViewModel(authRepository, requireNotNull(reportingRepository)) as T
         }

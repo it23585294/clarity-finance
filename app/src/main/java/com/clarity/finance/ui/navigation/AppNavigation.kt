@@ -82,7 +82,8 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
                     onNavigateToIncome = { navController.navigate("income") },
                     onNavigateToPendingPayments = { navController.navigate("pendingPayments") },
                     onNavigateToCrypto = { navController.navigate("cryptoResults") },
-                    onNavigateToDashboard = { navController.navigate("financialDashboard") }
+                    onNavigateToDashboard = { navController.navigate("financialDashboard") },
+                    onNavigateToGoal = { navController.navigate("savingsGoal") }
                 )
             }
         }
@@ -96,8 +97,18 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
                 onIncome = { navController.navigate("addEditIncome/${android.net.Uri.encode(it)}") },
                 onProject = { navController.navigate("projectDetail/${android.net.Uri.encode(it)}") },
                 onCrypto = { navController.navigate("cryptoResults") },
-                onPayments = { navController.navigate("pendingPayments") }
+                onPayments = { navController.navigate("pendingPayments") },
+                goalCard = {
+                    if (viewModelFactory.hasGoals) {
+                        val goalCardViewModel: com.clarity.finance.viewmodel.GoalCardViewModel = viewModel(factory = viewModelFactory)
+                        com.clarity.finance.ui.goals.GoalCard(goalCardViewModel) { navController.navigate("savingsGoal") }
+                    }
+                }
             )
+        }
+        composable("savingsGoal") {
+            val goalViewModel: com.clarity.finance.viewmodel.GoalViewModel = viewModel(factory = viewModelFactory)
+            com.clarity.finance.ui.goals.GoalScreen(goalViewModel) { navController.popBackStack() }
         }
         composable("cryptoResults") {
             val cryptoViewModel: com.clarity.finance.viewmodel.CryptoViewModel = viewModel(factory = viewModelFactory)
