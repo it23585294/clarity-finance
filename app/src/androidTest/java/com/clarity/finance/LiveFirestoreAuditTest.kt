@@ -45,18 +45,31 @@ class LiveFirestoreAuditTest {
                 }
                 error("Server read did not complete")
             }
-            val uid = checkNotNull(FirebaseAuth.getInstance().currentUser) { "User must already be signed in" }.uid
+            val signedInUser = checkNotNull(FirebaseAuth.getInstance().currentUser) { "User must already be signed in" }
+            val uid = signedInUser.uid
+            val foreignOwner = InstrumentationRegistry.getArguments().getString("denySavingsOwner")
+            if (!foreignOwner.isNullOrBlank()) {
+                check(foreignOwner != uid) { "Cross-owner probe requires another signed-in account" }
+                val foreignGoal = firestore.collection("users").document(foreignOwner).collection("savingsGoals").document("active")
+                suspend fun denied(read: suspend () -> Unit) {
+                    try { read(); fail("Foreign savings read unexpectedly succeeded") }
+                    catch (e: FirebaseFirestoreException) { assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, e.code) }
+                }
+                denied { foreignGoal.get(Source.SERVER).await() }
+                for (name in listOf("entries", "operations", "rejections")) denied { foreignGoal.collection(name).get(Source.SERVER).await() }
+            }
             val root = firestore.collection("users").document(uid)
             val projects = serverQuery(root.collection("expectedPayments"))
             assertFalse(projects.metadata.isFromCache)
             assertFalse(projects.metadata.hasPendingWrites())
-            val output = JSONObject().put("projectId", "clarity-1c83e").put("uid", uid)
+            // Account/document identifiers stay only in the explicitly requested private cache report.
+            val output = JSONObject().put("projectId", "clarity-1c83e").put("uid", uid).put("email", signedInUser.email)
                 .put("auditedAtUtc", java.time.Instant.now().toString())
             fun document(doc: DocumentSnapshot, fields: List<String>): JSONObject {
                 assertFalse(doc.metadata.isFromCache)
                 assertFalse(doc.metadata.hasPendingWrites())
                 val data = JSONObject().put("id", doc.id).put("exists", doc.exists())
-                fields.forEach { field -> data.put(field, doc.get(field) ?: JSONObject.NULL) }
+                fields.forEach { field -> data.put(field, doc.get(field)?.let { JSONObject.wrap(it) } ?: JSONObject.NULL) }
                 listOf("createdAt", "updatedAt").forEach { field ->
                     val timestamp = doc.getTimestamp(field)
                     data.put(field, timestamp?.let { java.time.Instant.ofEpochSecond(it.seconds, it.nanoseconds.toLong()).toString() } ?: JSONObject.NULL)
@@ -115,10 +128,24 @@ class LiveFirestoreAuditTest {
                 cryptoArray.put(document(result, listOf("direction", "amountMinor", "resultDate", "note", "lastOperationId")))
             }
             output.put("cryptoResults", cryptoArray)
+            val goalRef = root.collection("savingsGoals").document("active")
+            output.put("savingsGoal", document(goalRef.get(Source.SERVER).await(), listOf("name", "targetMinor", "openingMinor",
+                "startDate", "deadline", "savedMinor", "version", "lastOperationId", "lastEntryId")))
+            for ((name, fields) in listOf(
+                "entries" to listOf("kind", "amountMinor", "entryDate", "note", "deleted", "version", "lastOperationId"),
+                "operations" to listOf("kind", "entryId", "version", "payload"),
+                "rejections" to listOf("kind", "version", "payload"))) {
+                val rows = serverQuery(goalRef.collection(name))
+                assertFalse(rows.metadata.isFromCache); assertFalse(rows.metadata.hasPendingWrites())
+                output.put("savings" + name.replaceFirstChar { it.uppercase() }, JSONArray().apply {
+                    rows.documents.forEach { put(document(it, fields)) }
+                })
+            }
             val recovery = SubmissionRecoveryStore(context.dataStore)
             val attempts = JSONArray()
             for (type in listOf("CREATE_PROJECT", "CREATE_MILESTONE", "PAYMENT_DIRECT", "PAYMENT_MILESTONE",
-                "CANCEL_MILESTONE", "INCOME", "EXPENSE", "CRYPTO_CREATE", "CRYPTO_UPDATE", "CRYPTO_DELETE")) {
+                "CANCEL_MILESTONE", "INCOME", "EXPENSE", "CRYPTO_CREATE", "CRYPTO_UPDATE", "CRYPTO_DELETE",
+                "GOAL_CREATE", "GOAL_EDIT", "GOAL_ENTRY_CREATE", "GOAL_ENTRY_UPDATE", "GOAL_ENTRY_DELETE")) {
                 recovery.getRecords(uid, type).forEach { record ->
                     attempts.put(JSONObject().put("type", type).put("recordId", record.recordId)
                         .put("status", record.status).put("errorReason", record.errorReason ?: JSONObject.NULL)
