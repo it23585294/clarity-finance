@@ -96,6 +96,24 @@ class SubmissionRecoveryStore(private val dataStore: DataStore<Preferences>) {
         }
     }
 
+    /** Atomically replace a server-fenced expired proposal; ordinary retry payloads remain immutable. */
+    suspend fun replaceExpiredOperation(expected: SubmissionRecord, replacement: SubmissionRecord) {
+        require(expected.status == "EXPIRED" && replacement.status == "PENDING")
+        require(expected.resolvedType in setOf("GOAL_CREATE", "GOAL_EDIT"))
+        require(expected.uid == replacement.uid && expected.recordId == replacement.recordId && expected.resolvedType == replacement.resolvedType)
+        require(expected.payloadJson != replacement.payloadJson)
+        dataStore.edit { preferences ->
+            val current: MutableList<SubmissionRecord> = gson.fromJson(preferences[recordsKey] ?: "[]", typeToken) ?: mutableListOf()
+            val index = current.indexOfFirst { it.uid == expected.uid && it.recordId == expected.recordId && it.resolvedType == expected.resolvedType }
+            check(index >= 0) { "Expired proposal no longer exists." }
+            if (current[index].payloadJson != replacement.payloadJson) {
+                check(current[index].status == "EXPIRED" && current[index].payloadJson == expected.payloadJson) { "Expired proposal changed; reopen recovery." }
+                current[index] = replacement
+                preferences[recordsKey] = gson.toJson(current)
+            } // Idempotent if persistence succeeded before its await timed out.
+        }
+    }
+
     suspend fun removeRecord(uid: String, recordId: String, type: String) {
         dataStore.edit { preferences ->
             val json = preferences[recordsKey] ?: "[]"

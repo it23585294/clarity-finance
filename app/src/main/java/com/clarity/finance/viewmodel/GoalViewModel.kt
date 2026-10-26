@@ -11,12 +11,17 @@ import java.util.UUID
 
 data class GoalForm(val name: String = "", val target: String = "", val opening: String = "0.00", val deadline: String = "",
     val entryId: String? = null, val kind: String = "contribution", val amount: String = "", val date: String = "", val note: String = "",
-    val baseVersion: Long? = null)
+    val baseVersion: Long? = null, val startDate: String? = null, val revising: GoalOperation? = null)
 data class GoalUiState(val signedIn: Boolean = false, val snapshot: GoalSnapshot = GoalSnapshot(), val progress: GoalProgress? = null,
     val form: GoalForm? = null, val formKind: String? = null, val deleteEntry: SavingsEntry? = null, val deleteVersion: Long? = null,
-    val busy: Boolean = false, val error: String? = null, val unknown: GoalOperation? = null, val localPending: GoalOperation? = null) {
+    val busy: Boolean = false, val error: String? = null, val unknown: GoalOperation? = null, val localPending: GoalOperation? = null,
+    val replacementSource: GoalOperation? = null) {
     val blocked get() = busy || unknown != null || localPending != null || snapshot.attempts.isNotEmpty() || snapshot.recoveryError != null
     val canChange get() = signedIn && snapshot.known && snapshot.error == null && snapshot.entries != null && !blocked
+    val canSaveForm get() = canChange || (form?.revising != null && signedIn && snapshot.known && snapshot.error == null && snapshot.entries != null &&
+        !busy && unknown == null && localPending == null && snapshot.recoveryError == null && snapshot.attempts.singleOrNull()?.let {
+            it.canReviseDeadline && it.operation == form.revising
+        } == true)
 }
 
 /** Dashboard observes only. Synchronization is deliberately started only by the allocation screen. */
@@ -41,7 +46,8 @@ open class GoalViewModel(private val auth: AuthRepository, private val repositor
                                 if (valid(owner, token)) {
                                     mutable.value = mutable.value.copy(snapshot = snapshot,
                                         unknown = mutable.value.unknown?.takeUnless { observed(snapshot, it) },
-                                        localPending = mutable.value.localPending?.takeUnless { observed(snapshot, it) })
+                                        localPending = mutable.value.localPending?.takeUnless { observed(snapshot, it) },
+                                        replacementSource = mutable.value.replacementSource?.takeUnless { mutable.value.unknown?.let { observed(snapshot, it) } == true })
                                     refreshDate()
                                 }
                             } } catch (e: CancellationException) { throw e }
@@ -92,6 +98,18 @@ open class GoalViewModel(private val auth: AuthRepository, private val repositor
             kind = entry?.kind ?: "contribution", amount = entry?.let { SavingsMath.money(it.amountMinor) } ?: "",
             date = entry?.entryDate ?: SavingsMath.today(clock).toString(), note = entry?.note ?: "", baseVersion = state.value.snapshot.goal?.version), error = null)
     }
+    fun reviseDeadline(attempt: GoalAttempt) {
+        val current = state.value
+        if (!attempt.canReviseDeadline || current.snapshot.attempts.singleOrNull() != attempt || current.busy || current.unknown != null ||
+            current.localPending != null || current.snapshot.recoveryError != null || !current.snapshot.known || current.snapshot.error != null) return
+        val original = attempt.operation
+        val config = original.goal ?: return
+        if (current.snapshot.goal?.version != original.expectedVersion) {
+            mutable.value = current.copy(error = "Goal changed. Dismiss the rejected proposal and edit the latest goal instead."); return
+        }
+        mutable.value = current.copy(formKind = "goal", form = GoalForm(config.name, SavingsMath.money(config.targetMinor), SavingsMath.money(config.openingMinor),
+            config.deadline, baseVersion = original.expectedVersion, startDate = config.startDate, revising = original), error = null)
+    }
     fun update(form: GoalForm) { if (!state.value.busy && state.value.unknown == null) mutable.value = state.value.copy(form = form, error = null) }
     fun closeForm() { if (!state.value.busy) mutable.value = state.value.copy(form = null, formKind = null, error = null) }
     fun requestDelete(entry: SavingsEntry) {
@@ -100,12 +118,16 @@ open class GoalViewModel(private val auth: AuthRepository, private val repositor
     }
     fun cancelDelete() { if (!state.value.busy) mutable.value = state.value.copy(deleteEntry = null) }
     fun save() {
-        if (!state.value.canChange) return
+        if (!state.value.canSaveForm) return
         val form = state.value.form ?: return
         try {
             val goal = state.value.snapshot.goal
             check(goal?.version == form.baseVersion) { "Goal changed while this form was open. Close it and reopen the latest version." }
-            val op = if (state.value.formKind == "goal") {
+            val op = if (form.revising != null) {
+                val config = form.revising.goal!!.copy(deadline = form.deadline)
+                SavingsMath.validate(config, SavingsMath.today(clock))
+                form.revising.copy(operationId = UUID.randomUUID().toString(), goal = config)
+            } else if (state.value.formKind == "goal") {
                 val config = GoalConfig(form.name.trim(), SavingsMath.amount(form.target), SavingsMath.amount(form.opening, true),
                     goal?.config?.startDate ?: SavingsMath.today(clock).toString(), form.deadline)
                 SavingsMath.validate(config, SavingsMath.today(clock), goal?.config?.deadline)
@@ -120,7 +142,7 @@ open class GoalViewModel(private val auth: AuthRepository, private val repositor
                 SavingsMath.balance(goal.savedMinor, before, entry)
                 GoalOperation(UUID.randomUUID().toString(), if (before == null) "ENTRY_CREATE" else "ENTRY_UPDATE", goal.version, entry = entry)
             }
-            submit(op)
+            submit(op, form.revising)
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { mutable.value = state.value.copy(error = e.message ?: "Check the entered values.") }
     }
@@ -135,19 +157,23 @@ open class GoalViewModel(private val auth: AuthRepository, private val repositor
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { mutable.value = state.value.copy(error = e.message) }
     }
-    private fun submit(operation: GoalOperation) = action {
+    private fun submit(operation: GoalOperation, replaces: GoalOperation? = null) = action {
         val token = generation
         // Retain identity even if the local persistence await times out or is cancelled.
-        mutable.value = state.value.copy(unknown = operation)
-        val persisted = withTimeoutOrNull(10000) { repository.submit(it, operation); true } ?: false
+        mutable.value = state.value.copy(unknown = operation, replacementSource = replaces)
+        val persisted = withTimeoutOrNull(10000) {
+            if (replaces == null) repository.submit(it, operation) else repository.reviseExpired(it, replaces, operation)
+            true
+        } ?: false
         if (!valid(it, token)) return@action
         val seen = observed(state.value.snapshot, operation)
         mutable.value = state.value.copy(unknown = if (persisted || seen) null else operation,
             localPending = if (persisted && !seen) operation else null,
+            replacementSource = if (persisted || seen) null else replaces,
             form = if (persisted) null else state.value.form, formKind = if (persisted) null else state.value.formKind,
             deleteEntry = if (persisted) null else state.value.deleteEntry)
     }
-    fun retryUnknown() { state.value.unknown?.let { submit(it) } }
+    fun retryUnknown() { state.value.unknown?.let { submit(it, state.value.replacementSource) } }
     fun retry(attempt: GoalAttempt) { if (state.value.snapshot.attempts.contains(attempt)) action { repository.retry(it, attempt.operation) } }
     fun dismiss(attempt: GoalAttempt) { if (attempt.isRejected && state.value.snapshot.attempts.contains(attempt)) action { repository.dismissRejected(it, attempt.operation) } }
     private fun action(block: suspend (String) -> Unit) {

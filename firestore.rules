@@ -51,6 +51,7 @@ service cloud.firestore {
     function gNewReceipt(uid, data) {
       let op = gReceipt(uid, data.lastOperationId);
       return !exists(/databases/$(database)/documents/users/$(uid)/savingsGoals/active/operations/$(data.lastOperationId))
+        && !existsAfter(/databases/$(database)/documents/users/$(uid)/savingsGoals/active/rejections/$(data.lastOperationId))
         && op.version == data.version && op.entryId == data.lastEntryId;
     }
     function gEffect(entry) { return entry.deleted ? 0 : (entry.kind == 'contribution' ? entry.amountMinor : -entry.amountMinor); }
@@ -120,6 +121,7 @@ service cloud.firestore {
     match /users/{uid}/savingsGoals/active/operations/{operationId} {
       allow read: if gOwner(uid);
       allow create: if gOwner(uid) && gId(operationId)
+        && !existsAfter(/databases/$(database)/documents/users/$(uid)/savingsGoals/active/rejections/$(operationId))
         && request.resource.data.keys().hasAll(['kind','entryId','version','payload','createdAt'])
         && request.resource.data.keys().hasOnly(['kind','entryId','version','payload','createdAt'])
         && request.resource.data.kind in ['CREATE','EDIT','ENTRY_CREATE','ENTRY_UPDATE','ENTRY_DELETE']
@@ -131,6 +133,34 @@ service cloud.firestore {
             && request.resource.data.payload == gGoalValues(getAfter(/databases/$(database)/documents/users/$(uid)/savingsGoals/active).data))
           || (request.resource.data.kind in ['ENTRY_CREATE','ENTRY_UPDATE','ENTRY_DELETE'] && gId(request.resource.data.entryId)
             && request.resource.data.payload == gEntryValues(getAfter(/databases/$(database)/documents/users/$(uid)/savingsGoals/active/entries/$(request.resource.data.entryId)).data)));
+      allow update, delete: if false;
+    }
+
+    // Expiry fences never alter savings. Their acknowledgement safely permits deadline-only replacement.
+    match /users/{uid}/savingsGoals/active/rejections/{operationId} {
+      function expiredPayload(data) {
+        let p = data.payload;
+        return p is map && p.keys().hasAll(['name','targetMinor','openingMinor','startDate','deadline'])
+          && p.keys().hasOnly(['name','targetMinor','openingMinor','startDate','deadline'])
+          && p.name is string && p.name.size() > 0 && p.name.size() <= 100 && p.name.matches('.*[^ \\t\\r\\n].*')
+          && p.targetMinor is int && p.targetMinor > 0 && p.openingMinor is int && p.openingMinor >= 0
+          && gDate(p.startDate) && gDay(p.startDate) <= gToday()
+          && gDate(p.deadline) && p.deadline > p.startDate && gDay(p.deadline) <= gToday();
+      }
+      function unchangedParent(data) {
+        let path = /databases/$(database)/documents/users/$(uid)/savingsGoals/active;
+        return data.kind == 'CREATE' ? (data.version == 0 && !exists(path) && !existsAfter(path))
+          : (data.version > 0 && exists(path) && get(path).data.version == data.version - 1
+            && get(path).data.deadline != data.payload.deadline && getAfter(path).data == get(path).data);
+      }
+      allow read: if gOwner(uid);
+      allow create: if gOwner(uid) && gId(operationId)
+        && request.resource.data.keys().hasAll(['kind','version','payload','createdAt'])
+        && request.resource.data.keys().hasOnly(['kind','version','payload','createdAt'])
+        && request.resource.data.kind in ['CREATE','EDIT'] && request.resource.data.version is int
+        && request.resource.data.createdAt == request.time && expiredPayload(request.resource.data)
+        && unchangedParent(request.resource.data)
+        && !existsAfter(/databases/$(database)/documents/users/$(uid)/savingsGoals/active/operations/$(operationId));
       allow update, delete: if false;
     }
 

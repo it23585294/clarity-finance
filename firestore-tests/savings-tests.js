@@ -11,11 +11,11 @@ module.exports = (environment) => describe('Savings allocation integrity', funct
     const entry = (d, id = 'entry', uid = 'alice') => doc(d, 'users', uid, 'savingsGoals', 'active', 'entries', id);
     const ev = (e) => ({ kind: e.kind, amountMinor: e.amountMinor, entryDate: e.entryDate, note: e.note, deleted: e.deleted });
     const gv = (g) => Object.fromEntries(['name', 'targetMinor', 'openingMinor', 'startDate', 'deadline'].map(k => [k, g[k]]));
-    function create(d, changes = {}, extras = () => {}) {
+    function create(d, changes = {}, extras = () => {}, operationId = 'create') {
         const g = { ...config(), ...changes };
-        const parent = { ...g, savedMinor: g.openingMinor, version: 0, lastOperationId: 'create', lastEntryId: '', createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
+        const parent = { ...g, savedMinor: g.openingMinor, version: 0, lastOperationId: operationId, lastEntryId: '', createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
         const b = writeBatch(d); b.set(goal(d), parent);
-        b.set(receipt(d, 'create'), { kind: 'CREATE', entryId: '', version: 0, payload: gv(g), createdAt: serverTimestamp() });
+        b.set(receipt(d, operationId), { kind: 'CREATE', entryId: '', version: 0, payload: gv(g), createdAt: serverTimestamp() });
         extras(b, parent); return b.commit();
     }
     async function ledger(d, id, changes, kind = 'ENTRY_CREATE', overrides = {}, extra = () => {}) {
@@ -33,15 +33,88 @@ module.exports = (environment) => describe('Savings allocation integrity', funct
         b.set(receipt(d, op), { kind, entryId: id, version, payload: ev(e), createdAt: serverTimestamp() });
         extra(b, e); return b.commit();
     }
-    async function edit(d, changes = {}, overrides = {}) {
+    async function edit(d, changes = {}, overrides = {}, operationId = null) {
         const before = (await getDoc(goal(d))).data();
-        const c = { ...gv(before), ...changes }, version = before.version + 1, op = `edit-${version}`;
+        const c = { ...gv(before), ...changes }, version = before.version + 1, op = operationId || `edit-${version}`;
         const b = writeBatch(d);
         b.update(goal(d), { ...c, savedMinor: before.savedMinor - before.openingMinor + c.openingMinor, version, lastOperationId: op,
             lastEntryId: '', updatedAt: serverTimestamp(), ...overrides });
         b.set(receipt(d, op), { kind: 'EDIT', entryId: '', version, payload: gv(c), createdAt: serverTimestamp() });
         return b.commit();
     }
+    const dayOffset = days => new Date(Date.now() + 330 * 60000 + days * 86400000).toISOString().slice(0, 10);
+    const expiredConfig = () => ({ ...config(), startDate: dayOffset(-40), deadline: dayOffset(-1) });
+    const fence = (d, id) => doc(d, 'users/alice/savingsGoals/active/rejections', id);
+    const fenceData = (kind = 'CREATE', version = 0, payload = expiredConfig()) => ({ kind, version, payload, createdAt: serverTimestamp() });
+    it('expiry fence permits CREATE deadline revision once and prevents replay even with a future deadline', async () => {
+        const d = db(), original = expiredConfig();
+        await assertSucceeds(setDoc(fence(d, 'create'), fenceData('CREATE', 0, original)));
+        assert.equal((await getDoc(goal(d))).exists(), false);
+        await assertFails(create(d, { ...original, deadline: config().deadline }));
+        await assertSucceeds(create(d, { ...original, deadline: config().deadline }, () => {}, 'revised-create'));
+        assert.equal((await getDoc(goal(d))).data().savedMinor, 1120000);
+        assert.equal((await getDocs(collection(goal(d), 'operations'))).size, 1);
+        await assertFails(updateDoc(fence(d, 'create'), { payload: config() }));
+        await assertFails(deleteDoc(fence(d, 'create')));
+    });
+    it('expiry fence permits changed EDIT deadline revision without losing allocations or duplicating opening delta', async () => {
+        const d = db(); await create(d, { startDate: dayOffset(-40) }); await ledger(d, 'c', {});
+        const baseline = (await getDoc(goal(d))).data();
+        const proposal = { ...gv(baseline), openingMinor: 1200000, deadline: dayOffset(-1) };
+        await assertSucceeds(setDoc(fence(d, 'edit-2'), fenceData('EDIT', 2, proposal)));
+        assert.deepEqual((await getDoc(goal(d))).data(), baseline);
+        await assertFails(edit(d, { ...proposal, deadline: dayOffset(400) }));
+        await assertSucceeds(edit(d, { ...proposal, deadline: dayOffset(400) }, {}, 'revised-edit'));
+        assert.equal((await getDoc(goal(d))).data().savedMinor, 2200000);
+        assert.equal((await getDocs(collection(goal(d), 'entries'))).size, 1);
+        assert.equal((await getDoc(entry(d, 'c'))).data().amountMinor, 1000000);
+    });
+    it('expiry fences enforce server Colombo date strict schema owner isolation and cannot reject unchanged overdue edits', async () => {
+        const d = db();
+        for (const bad of [{ payload: { ...expiredConfig(), deadline: dayOffset(1) } }, { payload: { ...expiredConfig(), deadline: '2025-02-29' } },
+            { payload: { ...expiredConfig(), openingMinor: -1 } }, { payload: { ...expiredConfig(), extra: true } },
+            { kind: 'ENTRY_CREATE' }, { version: 1 }, { version: 1.5 }, { extra: true }, { createdAt: new Date(0) }])
+            await assertFails(setDoc(fence(d, 'bad'), { ...fenceData(), ...bad }));
+        for (const foreign of [db('bob'), environment().unauthenticatedContext().firestore()]) {
+            await assertFails(setDoc(fence(foreign, 'foreign'), fenceData()));
+            await assertFails(getDoc(fence(foreign, 'foreign')));
+        }
+        await environment().withSecurityRulesDisabled(async context => {
+            await setDoc(goal(context.firestore()), { ...expiredConfig(), savedMinor: 1120000, version: 0, lastOperationId: 'seed', lastEntryId: '',
+                createdAt: new Date(0), updatedAt: new Date(0) });
+        });
+        await assertFails(setDoc(fence(d, 'unchanged'), fenceData('EDIT', 1, expiredConfig())));
+        await assertSucceeds(edit(d, { name: 'Unchanged overdue deadline remains editable' }));
+    });
+    it('accepted receipt wins expiry fencing and receipt plus fence cannot be created together', async () => {
+        const d = db();
+        await assertFails(create(d, {}, b => b.set(fence(d, 'create'), fenceData())));
+        const historical = expiredConfig();
+        await environment().withSecurityRulesDisabled(async context => {
+            const admin = context.firestore();
+            await setDoc(goal(admin), { ...historical, savedMinor: 1120000, version: 0, lastOperationId: 'create', lastEntryId: '', createdAt: new Date(0), updatedAt: new Date(0) });
+            await setDoc(receipt(admin, 'create'), { kind: 'CREATE', entryId: '', version: 0, payload: historical, createdAt: new Date(0) });
+        });
+        await assertFails(setDoc(fence(d, 'create'), fenceData('CREATE', 0, historical)));
+        assert.equal((await getDoc(receipt(d, 'create'))).exists(), true);
+        assert.equal((await getDoc(goal(d))).data().savedMinor, 1120000);
+    });
+    it('expiry fence blocks an outstanding legacy transaction that never read the fence', async () => {
+        const d = db(); let release, didRead;
+        const gate = new Promise(resolve => { release = resolve; });
+        const read = new Promise(resolve => { didRead = resolve; });
+        const old = runTransaction(d, async tx => {
+            await tx.get(goal(d)); await tx.get(receipt(d, 'create')); didRead(); await gate;
+            const p = config();
+            tx.set(goal(d), { ...p, savedMinor: p.openingMinor, version: 0, lastOperationId: 'create', lastEntryId: '', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+            tx.set(receipt(d, 'create'), { kind: 'CREATE', entryId: '', version: 0, payload: p, createdAt: serverTimestamp() });
+        });
+        try { await read; await setDoc(fence(d, 'create'), fenceData()); } finally { release(); }
+        await assertFails(old);
+        assert.equal((await getDoc(goal(d))).exists(), false);
+        await assertSucceeds(create(d, {}, () => {}, 'replacement'));
+        assert.equal((await getDoc(goal(d))).data().savedMinor, 1120000);
+    });
     it('AT07 AT08 owner creation allocation corrections deletion and edits preserve separate finances', async () => {
         const d = db(); await assertSucceeds(create(d));
         await assertSucceeds(ledger(d, 'c', {})); assert.equal((await getDoc(goal(d))).data().savedMinor, 2120000);

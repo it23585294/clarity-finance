@@ -2,13 +2,15 @@ package com.clarity.finance.data.repository
 
 import com.clarity.finance.data.local.SubmissionRecord
 import com.clarity.finance.data.local.SubmissionRecoveryStore
+import com.clarity.finance.data.model.SavingsMath
+import java.time.Clock
 import com.google.gson.Gson
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-class FirestoreGoalRepository(private val remote: GoalRemote, private val store: SubmissionRecoveryStore) : GoalRepository {
+class FirestoreGoalRepository(private val remote: GoalRemote, private val store: SubmissionRecoveryStore, private val clock: Clock = Clock.systemUTC()) : GoalRepository {
     private val gson = Gson()
     private val mutex = Mutex()
     private val synchronization = Mutex()
@@ -28,12 +30,24 @@ class FirestoreGoalRepository(private val remote: GoalRemote, private val store:
     override suspend fun retry(uid: String, operation: GoalOperation) = mutex.withLock {
         val saved = store.getRecords(uid, operation.type).singleOrNull { it.recordId == operation.recordId } ?: error("Saved operation no longer exists.")
         check(saved.payloadJson == record(uid, operation).payloadJson) { "Retry must use the immutable saved payload." }
-        store.updateOperationStatus(saved.copy(status = if (saved.status in setOf("PENDING", "REJECTED")) "PENDING" else "UNCERTAIN", errorReason = null))
+        store.updateOperationStatus(saved.copy(status = if (saved.status in setOf("PENDING", "REJECTED", "EXPIRED")) "PENDING" else "UNCERTAIN", errorReason = null))
     }
     override suspend fun dismissRejected(uid: String, operation: GoalOperation) = mutex.withLock {
         val saved = store.getRecords(uid, operation.type).singleOrNull { it.recordId == operation.recordId } ?: error("Saved operation no longer exists.")
-        check(saved.status == "REJECTED" && saved.payloadJson == record(uid, operation).payloadJson) { "Only a server-established rejection can be dismissed; uncertain and legacy failed operations must be reconciled." }
+        check(saved.status in setOf("REJECTED", "EXPIRED") && saved.payloadJson == record(uid, operation).payloadJson) { "Only a server-established rejection can be dismissed; uncertain and legacy failed operations must be reconciled." }
         store.removeRecord(uid, saved.recordId, saved.resolvedType)
+    }
+    override suspend fun reviseExpired(uid: String, original: GoalOperation, replacement: GoalOperation) = mutex.withLock {
+        original.validate(false); replacement.validate(today = SavingsMath.today(clock))
+        require(original.goal != null && replacement.goal != null && original.kind in setOf("CREATE", "EDIT"))
+        require(replacement.operationId != original.operationId && replacement.kind == original.kind && replacement.expectedVersion == original.expectedVersion &&
+            replacement.previousDeadline == original.previousDeadline && replacement.goalId == original.goalId && replacement.entry == null &&
+            replacement.goal.copy(deadline = original.goal.deadline) == original.goal) { "Deadline revision must preserve every other original proposal value." }
+        require(SavingsMath.date(replacement.goal.deadline) > SavingsMath.today(clock)) { "Choose a future deadline." }
+        val saved = types.flatMap { store.getRecords(uid, it) }
+        check(saved.size == 1 && saved.single().recordId == original.recordId && saved.single().resolvedType == original.type) { "Resolve the saved proposal before revising it." }
+        val old = record(uid, original).copy(status = "EXPIRED")
+        store.replaceExpiredOperation(old, record(uid, replacement))
     }
     override fun observe(uid: String): Flow<GoalSnapshot> = flow {
         var last = GoalSnapshot()
@@ -63,7 +77,7 @@ class FirestoreGoalRepository(private val remote: GoalRemote, private val store:
             try {
                 synchronization.withLock {
                     // Multiple savings ViewModels may be alive; only one recovery sweep submits at a time.
-                    val pending = types.flatMap { store.getRecords(uid, it) }.filter { it.status != "REJECTED" }
+                    val pending = types.flatMap { store.getRecords(uid, it) }.filter { it.status !in setOf("REJECTED", "EXPIRED") }
                     for (saved in pending) synchronizeRecord(uid, saved)
                 }
                 if (bookkeepingError.value?.first == uid) bookkeepingError.value = null
@@ -80,7 +94,7 @@ class FirestoreGoalRepository(private val remote: GoalRemote, private val store:
         val current = mutex.withLock {
             val row = store.getRecords(uid, saved.resolvedType).singleOrNull { it.recordId == saved.recordId } ?: return
             check(row.payloadJson == saved.payloadJson) { "Saved operation changed. Reopen recovery." }
-            if (row.status == "REJECTED") return
+            if (row.status in setOf("REJECTED", "EXPIRED")) return
             // Persist uncertainty BEFORE starting a Firebase Task, including across process death/cancelled awaits.
             row.copy(status = "UNCERTAIN", errorReason = "Awaiting server reconciliation; an earlier transaction may still complete.")
                 .also { store.updateOperationStatus(it) }
@@ -100,7 +114,7 @@ class FirestoreGoalRepository(private val remote: GoalRemote, private val store:
                     acknowledged.value = uid to operation.operationId
                     store.removeRecord(uid, saved.recordId, saved.resolvedType)
                 }
-                is GoalRemoteOutcome.Rejected -> store.updateOperationStatus(current.copy(status = "REJECTED", errorReason = result.reason))
+                is GoalRemoteOutcome.Rejected -> store.updateOperationStatus(current.copy(status = if (result.deadlineExpired) "EXPIRED" else "REJECTED", errorReason = result.reason))
                 is GoalRemoteOutcome.Uncertain -> store.updateOperationStatus(current.copy(errorReason = result.reason))
             }
         }

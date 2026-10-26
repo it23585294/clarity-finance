@@ -52,6 +52,10 @@ class GoalViewModelTest {
         override suspend fun synchronize(uid: String) { synchronization++; awaitCancellation() }
         override suspend fun retry(uid: String, operation: GoalOperation) { source(uid).value = source(uid).value.copy(attempts = listOf(GoalAttempt(operation, "PENDING"))) }
         override suspend fun dismissRejected(uid: String, operation: GoalOperation) { source(uid).value = source(uid).value.copy(attempts = emptyList()) }
+        override suspend fun reviseExpired(uid: String, original: GoalOperation, replacement: GoalOperation) {
+            check(source(uid).value.attempts.single().operation == original)
+            submit(uid, replacement)
+        }
     }
     private fun runGoalTest(block: suspend TestScope.() -> Unit) = runTest(dispatcher) {
         try { block() } finally { repo.gate?.complete(Unit); repo.staleGate?.complete(Unit); store.clear() }
@@ -169,5 +173,30 @@ class GoalViewModelTest {
             assertEquals(1, vm.state.value.snapshot.attempts.size)
             assertEquals(1120000L, vm.state.value.progress!!.savedMinor)
         }
+    }
+    @Test fun `server expired proposal opens deadline only revision preserving its values and start date`() = runGoalTest {
+        val original = GoalOperation("expired", "CREATE", goal = config.copy(startDate = "2026-01-01", deadline = "2026-01-15"))
+        repo.source("a").value = GoalSnapshot(known = true, entries = emptyList(), fromCache = false, attempts = listOf(GoalAttempt(original, "EXPIRED")))
+        runCurrent(); vm.reviseDeadline(vm.state.value.snapshot.attempts.single())
+        assertFalse(vm.state.value.canChange); assertTrue(vm.state.value.canSaveForm)
+        assertEquals("11200.00", vm.state.value.form!!.opening); assertEquals(original.goal!!.startDate, vm.state.value.form!!.startDate)
+        vm.save(); runCurrent(); assertTrue(repo.submissions.isEmpty()); assertEquals("EXPIRED", vm.state.value.snapshot.attempts.single().status)
+        vm.update(vm.state.value.form!!.copy(deadline = "2026-12-31")); vm.save(); vm.save(); runCurrent()
+        val replacement = repo.submissions.single().second
+        assertNotEquals(original.operationId, replacement.operationId)
+        assertEquals(original.goal, replacement.goal!!.copy(deadline = original.goal.deadline))
+        assertEquals(original.expectedVersion, replacement.expectedVersion)
+        assertEquals("PENDING", vm.state.value.snapshot.attempts.single().status)
+    }
+    @Test fun `cancelled local deadline revision retains its source and stable replacement identity for retry`() = runGoalTest {
+        val original = GoalOperation("expired", "CREATE", goal = config.copy(startDate = "2026-01-01", deadline = "2026-01-15"))
+        repo.source("a").value = GoalSnapshot(known = true, entries = emptyList(), fromCache = false, attempts = listOf(GoalAttempt(original, "EXPIRED")))
+        runCurrent(); vm.reviseDeadline(vm.state.value.snapshot.attempts.single()); vm.update(vm.state.value.form!!.copy(deadline = "2026-12-31"))
+        repo.gate = CompletableDeferred(); vm.save(); runCurrent(); advanceTimeBy(10001); runCurrent()
+        val uncertain = vm.state.value.unknown!!
+        assertEquals(original, vm.state.value.replacementSource); assertEquals("EXPIRED", vm.state.value.snapshot.attempts.single().status)
+        vm.closeForm(); repo.gate!!.complete(Unit); vm.retryUnknown(); runCurrent()
+        assertTrue(repo.submissions.all { it.second == uncertain }); assertNull(vm.state.value.unknown); assertNull(vm.state.value.replacementSource)
+        assertEquals(uncertain, vm.state.value.snapshot.attempts.single().operation)
     }
 }

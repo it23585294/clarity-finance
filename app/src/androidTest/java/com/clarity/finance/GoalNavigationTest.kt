@@ -56,6 +56,10 @@ class GoalNavigationTest {
         }
         override suspend fun retry(uid: String, operation: GoalOperation) { error("No retry in isolated UI check") }
         override suspend fun dismissRejected(uid: String, operation: GoalOperation) { snapshots.value = snapshots.value.copy(attempts = emptyList()) }
+        override suspend fun reviseExpired(uid: String, original: GoalOperation, replacement: GoalOperation) {
+            check(snapshots.value.attempts.single().operation == original && snapshots.value.attempts.single().canReviseDeadline)
+            submit(uid, replacement)
+        }
     }
     private val reporting = object : ReportingRepository {
         override fun expenses(uid: String, month: ReportingMonth) = MutableStateFlow(ReportingBatch<Expense>(emptyList(), false))
@@ -160,6 +164,29 @@ class GoalNavigationTest {
         click("Edit goal")
         compose.onNodeWithText("Deadline (YYYY-MM-DD)").performTextReplacement(SavingsMath.today().plusMonths(1).toString())
         click("Save proposal"); text("Next scheduled date: ${SavingsMath.today()}")
+    }
+    @Test fun serverExpiredCreateCanReviseDeadlineWithoutDiscardingItsSavedValues() {
+        val data = Data()
+        val today = SavingsMath.today()
+        val original = GoalOperation("expired-ui", "CREATE", goal = GoalConfig("Expired fixture", 49000000, 1120000,
+            today.minusMonths(2).toString(), today.minusDays(1).toString()))
+        data.snapshots.value = GoalSnapshot(known = true, entries = emptyList(), fromCache = false,
+            attempts = listOf(GoalAttempt(original, "EXPIRED", "Server expiry marker confirmed")))
+        show(data); click("Savings Goal"); click("Revise deadline")
+        compose.onNodeWithText("Goal name").assertIsNotEnabled()
+        compose.onNodeWithText("Target (LKR)").assertIsNotEnabled()
+        compose.onNodeWithText("Opening allocation (LKR)").assertIsNotEnabled()
+        click("Close form")
+        compose.runOnIdle { assertEquals(original, data.snapshots.value.attempts.single().operation); assertTrue(data.operations.isEmpty()) }
+        click("Revise deadline")
+        compose.onNodeWithText("Deadline (YYYY-MM-DD)").performTextReplacement(today.plusYears(1).toString())
+        click("Save proposal"); text("Saved: LKR 11200.00")
+        compose.runOnIdle {
+            val saved = data.snapshots.value.goal!!
+            assertEquals(original.goal!!.startDate, saved.config.startDate)
+            assertEquals(1, data.operations.size); assertNotEquals(original.operationId, saved.lastOperationId)
+            assertTrue(data.snapshots.value.attempts.isEmpty())
+        }
     }
     @Suppress("UNCHECKED_CAST") private fun <T> unused(type: Class<T>): T = Proxy.newProxyInstance(type.classLoader, arrayOf(type)) { _, method, _ ->
         error("Unexpected ordinary repository access: ${method.name}")

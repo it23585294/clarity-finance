@@ -83,6 +83,7 @@ fun GoalScreen(viewModel: GoalViewModel, onBack: () -> Unit) {
                         if (it.note.isNotBlank()) Text("Proposed note: ${it.note}")
                     }
                     if (attempt.isRejected) {
+                        if (attempt.canReviseDeadline) OutlinedButton(onClick = { viewModel.reviseDeadline(attempt) }, enabled = !state.busy) { Text("Revise deadline") }
                         Text("Dismiss a rejected proposal to reopen the latest details and correct them. Retrying keeps the original payload and version.")
                         OutlinedButton(onClick = { viewModel.retry(attempt) }, enabled = !state.busy) { Text("Retry original proposal") }
                         OutlinedButton(onClick = { viewModel.dismiss(attempt) }, enabled = !state.busy) { Text("Dismiss rejected proposal") }
@@ -152,17 +153,18 @@ fun GoalScreen(viewModel: GoalViewModel, onBack: () -> Unit) {
                     val isGoal = state.formKind == "goal"
                     Text(if (isGoal) "Goal details" else "Allocation details", style = MaterialTheme.typography.titleLarge)
                     fun change(next: GoalForm) = viewModel.update(next)
-                    @Composable fun field(label: String, value: String, decimal: Boolean = false, set: (String) -> Unit) {
+                    @Composable fun field(label: String, value: String, decimal: Boolean = false, editable: Boolean = true, set: (String) -> Unit) {
                         OutlinedTextField(value, set, label = { Text(label) }, modifier = Modifier.fillMaxWidth(),
-                            enabled = !state.busy && state.unknown == null, singleLine = true,
+                            enabled = !state.busy && state.unknown == null && editable, singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = if (decimal) KeyboardType.Decimal else KeyboardType.Text))
                     }
                     if (isGoal) {
-                        Text("Start date: ${state.snapshot.goal?.config?.startDate ?: SavingsMath.today()} (Asia/Colombo)")
+                        Text("Start date: ${form.startDate ?: state.snapshot.goal?.config?.startDate ?: SavingsMath.today()} (Asia/Colombo)")
+                        if (form.revising != null) Text("Only the deadline changes. Your name, target, opening allocation and original start date are retained. The expired proposal remains saved until its replacement is durably queued.")
                         Text("Confirm only money you have already allocated as the opening allocation.")
-                        field("Goal name", form.name) { change(form.copy(name = it)) }
-                        field("Target (LKR)", form.target, true) { change(form.copy(target = it)) }
-                        field("Opening allocation (LKR)", form.opening, true) { change(form.copy(opening = it)) }
+                        field("Goal name", form.name, editable = form.revising == null) { change(form.copy(name = it)) }
+                        field("Target (LKR)", form.target, true, editable = form.revising == null) { change(form.copy(target = it)) }
+                        field("Opening allocation (LKR)", form.opening, true, editable = form.revising == null) { change(form.copy(opening = it)) }
                         field("Deadline (YYYY-MM-DD)", form.deadline) { change(form.copy(deadline = it)) }
                     } else {
                         OutlinedButton(onClick = { change(form.copy(kind = if (form.kind == "contribution") "withdrawal" else "contribution")) },
@@ -173,7 +175,7 @@ fun GoalScreen(viewModel: GoalViewModel, onBack: () -> Unit) {
                             modifier = Modifier.fillMaxWidth(), enabled = !state.busy && state.unknown == null)
                     }
                     state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                    Button(onClick = viewModel::save, enabled = state.canChange) { Text("Save proposal") }
+                    Button(onClick = viewModel::save, enabled = state.canSaveForm) { Text("Save proposal") }
                     OutlinedButton(onClick = viewModel::closeForm, enabled = !state.busy) { Text("Close form") }
                 }
             }

@@ -14,6 +14,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.IOException
 import com.google.firebase.firestore.FirebaseFirestoreException
+import java.time.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FirestoreGoalRepositoryTest {
@@ -21,6 +22,39 @@ class FirestoreGoalRepositoryTest {
     private val operation = GoalOperation("create", "CREATE", goal = GoalConfig("Fixture", 49000000, 1120000, "2025-01-01", "2027-01-01"))
     private fun accessError(message: String): FirebaseFirestoreException = org.mockito.Mockito.mock(FirebaseFirestoreException::class.java).also {
         org.mockito.Mockito.`when`(it.message).thenReturn(message)
+    }
+    private class TestClock(var day: LocalDate) : Clock() {
+        override fun getZone() = ZoneOffset.UTC
+        override fun instant() = day.atStartOfDay(ZoneOffset.UTC).toInstant()
+        override fun withZone(zone: ZoneId): Clock = Clock.fixed(instant(), zone)
+    }
+    private class ExpiryServer(private val clock: TestClock) : GoalRemote {
+        val snapshot = MutableStateFlow(GoalSnapshot(known = true, entries = emptyList(), fromCache = false))
+        val receipts = mutableMapOf<String, GoalOperation>()
+        val fences = mutableMapOf<String, GoalOperation>()
+        var online = false
+        var loseAcknowledgement = false
+        var mutations = 0
+        override fun observe(uid: String) = snapshot
+        override suspend fun apply(uid: String, operation: GoalOperation): GoalRemoteOutcome {
+            if (!online) throw IOException("Offline")
+            receipts[operation.operationId]?.let { check(it == operation); return GoalRemoteOutcome.Confirmed }
+            fences[operation.operationId]?.let { check(it == operation); return GoalRemoteOutcome.Rejected("Server-fenced expired deadline", true) }
+            val before = snapshot.value.goal
+            checkGoalVersion(operation, before)
+            if (operation.goal != null && SavingsMath.date(operation.goal.deadline) <= clock.day &&
+                (operation.kind == "CREATE" || operation.goal.deadline != before!!.config.deadline)) {
+                fences[operation.operationId] = operation
+                return GoalRemoteOutcome.Rejected("Server-fenced expired deadline", true)
+            }
+            operation.validate(today = clock.day)
+            val saved = goalMutationBalance(operation, before, snapshot.value.entries.orEmpty().find { it.id == operation.entry?.id })
+            receipts[operation.operationId] = operation; mutations++
+            snapshot.value = snapshot.value.copy(goal = SavingsGoal(operation.goal ?: before!!.config, saved, operation.nextVersion, operation.operationId),
+                entries = if (operation.entry == null) snapshot.value.entries else snapshot.value.entries.orEmpty().filterNot { it.id == operation.entry.id } + operation.entry)
+            if (loseAcknowledgement) throw IOException("Acknowledgement lost")
+            return GoalRemoteOutcome.Confirmed
+        }
     }
     private class Remote : GoalRemote {
         val snapshots = MutableStateFlow(GoalSnapshot(known = true, entries = emptyList(), fromCache = false))
@@ -212,5 +246,99 @@ class FirestoreGoalRepositoryTest {
         failUpdates = false; advanceTimeBy(5000); runCurrent()
         assertEquals(1, remoteCalls); assertTrue(store.getRecords("a", operation.type).isEmpty())
         assertNull(repo.observe("a").first().recoveryError); sync.cancelAndJoin()
+    }
+    @Test fun `offline CREATE expires before any commit then durable deadline revision creates savings once`() = runTest {
+        val clock = TestClock(LocalDate.parse("2026-01-31"))
+        val store = SubmissionRecoveryStore(PreferenceDataStoreFactory.create(scope = backgroundScope, produceFile = { temp.newFile("expired-create.preferences_pb") }))
+        val server = ExpiryServer(clock)
+        var repo = FirestoreGoalRepository(server, store, clock)
+        val original = operation.copy(goal = operation.goal!!.copy(startDate = "2026-01-31", deadline = "2026-02-28"))
+        original.validate(today = clock.day); repo.submit("a", original)
+        var sync = backgroundScope.launch { repo.synchronize("a") }; runCurrent()
+        assertEquals(0, server.mutations)
+        clock.day = LocalDate.parse("2026-03-01"); server.online = true
+        advanceTimeBy(5000); runCurrent()
+        assertEquals("EXPIRED", store.getRecords("a", original.type).single().status)
+        assertNull(server.snapshot.value.goal); assertEquals(0, server.mutations)
+        sync.cancelAndJoin()
+        val replacement = original.copy(operationId = "revised-create", goal = original.goal!!.copy(deadline = "2026-05-31"))
+        repo.reviseExpired("a", original, replacement); repo.reviseExpired("a", original, replacement)
+        // New repository reads the exact replacement from durable storage before submission.
+        repo = FirestoreGoalRepository(server, store, clock)
+        assertEquals(replacement, repo.observe("a").first { it.attempts.isNotEmpty() }.attempts.single().operation)
+        sync = backgroundScope.launch { repo.synchronize("a") }; runCurrent()
+        assertEquals(1, server.mutations); assertEquals(1120000L, server.snapshot.value.goal!!.savedMinor)
+        assertEquals(original.goal.startDate, server.snapshot.value.goal!!.config.startDate)
+        assertTrue(store.getRecords("a", original.type).isEmpty()); assertEquals(setOf(replacement.operationId), server.receipts.keys)
+        assertTrue((server.apply("a", original) as GoalRemoteOutcome.Rejected).deadlineExpired)
+        assertEquals(1, server.mutations); sync.cancelAndJoin()
+    }
+    @Test fun `expired deadline changing EDIT revises without resetting contributions or opening delta`() = runTest {
+        val clock = TestClock(LocalDate.parse("2026-01-31")); val server = ExpiryServer(clock)
+        val config = operation.goal!!.copy(startDate = "2025-12-31", deadline = "2026-06-30")
+        val contribution = SavingsEntry("c", "contribution", 1000000, "2026-01-01")
+        server.snapshot.value = GoalSnapshot(SavingsGoal(config, 2120000, 1, "previous"), listOf(contribution), true, false)
+        val original = GoalOperation("expired-edit", "EDIT", 1, goal = config.copy(openingMinor = 1200000, deadline = "2026-02-28"), previousDeadline = config.deadline)
+        val store = SubmissionRecoveryStore(PreferenceDataStoreFactory.create(scope = backgroundScope, produceFile = { temp.newFile("expired-edit.preferences_pb") }))
+        val repo = FirestoreGoalRepository(server, store, clock)
+        original.validate(today = clock.day); repo.submit("a", original)
+        val sync = backgroundScope.launch { repo.synchronize("a") }; runCurrent()
+        clock.day = LocalDate.parse("2026-03-01"); server.online = true; advanceTimeBy(5000); runCurrent()
+        assertEquals("EXPIRED", store.getRecords("a", original.type).single().status)
+        assertEquals(2120000L, server.snapshot.value.goal!!.savedMinor); assertEquals(listOf(contribution), server.snapshot.value.entries)
+        val replacement = original.copy(operationId = "revised-edit", goal = original.goal!!.copy(deadline = "2026-07-31"))
+        try { repo.reviseExpired("a", original, replacement.copy(goal = replacement.goal!!.copy(openingMinor = 0))); fail() } catch (_: IllegalArgumentException) {}
+        repo.reviseExpired("a", original, replacement); advanceTimeBy(5000); runCurrent()
+        assertEquals(2200000L, server.snapshot.value.goal!!.savedMinor); assertEquals(listOf(contribution), server.snapshot.value.entries)
+        assertEquals(1, server.mutations); assertTrue(store.getRecords("a", original.type).isEmpty()); sync.cancelAndJoin()
+    }
+    @Test fun `earlier committed CREATE and EDIT reconcile after expiry instead of permitting replacement`() = runTest {
+        for (kind in listOf("CREATE", "EDIT")) {
+            val clock = TestClock(LocalDate.parse("2026-01-31")); val server = ExpiryServer(clock)
+            val config = operation.goal!!.copy(startDate = "2025-12-31", deadline = "2026-06-30")
+            if (kind == "EDIT") server.snapshot.value = GoalSnapshot(SavingsGoal(config, 2120000, 1, "previous"),
+                listOf(SavingsEntry("c", "contribution", 1000000, "2026-01-01")), true, false)
+            val original = GoalOperation("accepted-$kind", kind, if (kind == "EDIT") 1 else null,
+                goal = config.copy(deadline = "2026-02-28"), previousDeadline = if (kind == "EDIT") config.deadline else null)
+            val store = SubmissionRecoveryStore(PreferenceDataStoreFactory.create(scope = backgroundScope, produceFile = { temp.newFile("accepted-$kind.preferences_pb") }))
+            val repo = FirestoreGoalRepository(server, store, clock); repo.submit("a", original)
+            server.online = true; server.loseAcknowledgement = true
+            val sync = backgroundScope.launch { repo.synchronize("a") }; runCurrent()
+            assertEquals(1, server.mutations)
+            clock.day = LocalDate.parse("2026-03-01")
+            try { repo.reviseExpired("a", original, original.copy(operationId = "forbidden", goal = original.goal!!.copy(deadline = "2026-08-31"))); fail() } catch (_: IllegalStateException) {}
+            advanceTimeBy(5000); runCurrent()
+            assertEquals(1, server.mutations); assertTrue(server.fences.isEmpty()); assertTrue(store.getRecords("a", original.type).isEmpty())
+            assertEquals(if (kind == "CREATE") 1120000L else 2120000L, server.snapshot.value.goal!!.savedMinor)
+            sync.cancelAndJoin()
+        }
+    }
+    @Test fun `failed atomic deadline replacement retains original and a cancelled post persistence await retries idempotently`() = runTest {
+        val clock = TestClock(LocalDate.parse("2026-03-01"))
+        val actual = PreferenceDataStoreFactory.create(scope = backgroundScope, produceFile = { temp.newFile("replace.preferences_pb") })
+        var failReplacement = false; var waitAfterPersist: CompletableDeferred<Unit>? = null
+        val wrapped = object : DataStore<Preferences> {
+            override val data = actual.data
+            override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+                if (failReplacement) throw IOException("Local write failed")
+                val result = actual.updateData(transform); waitAfterPersist?.await(); return result
+            }
+        }
+        val store = SubmissionRecoveryStore(wrapped)
+        val original = operation.copy(goal = operation.goal!!.copy(deadline = "2026-02-28"))
+        store.saveOperation(SubmissionRecord.create("a", original.recordId, original, "EXPIRED", original.type))
+        val replacement = original.copy(operationId = "revised", goal = original.goal!!.copy(deadline = "2026-05-31"))
+        val repo = FirestoreGoalRepository(Remote(), store, clock)
+        failReplacement = true
+        try { repo.reviseExpired("a", original, replacement); fail() } catch (_: IOException) {}
+        assertEquals("EXPIRED", store.getRecords("a", original.type).single().status)
+        failReplacement = false; waitAfterPersist = CompletableDeferred()
+        val job = backgroundScope.launch { withTimeoutOrNull(10000) { repo.reviseExpired("a", original, replacement) } }
+        runCurrent(); advanceTimeBy(10001); runCurrent(); job.join()
+        val saved = store.getRecords("a", original.type).single()
+        assertEquals(SubmissionRecord.create("a", replacement.recordId, replacement, "PENDING", replacement.type).payloadJson, saved.payloadJson)
+        waitAfterPersist!!.complete(Unit); waitAfterPersist = null
+        repo.reviseExpired("a", original, replacement)
+        assertEquals(saved, store.getRecords("a", original.type).single())
     }
 }

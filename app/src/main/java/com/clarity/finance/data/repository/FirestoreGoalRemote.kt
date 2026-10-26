@@ -8,13 +8,15 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.tasks.await
+import java.time.Clock
 
 private data class GoalDocument(val goal: SavingsGoal?, val cached: Boolean, val pending: Boolean)
 private data class GoalEntries(val entries: List<SavingsEntry>, val cached: Boolean, val pending: Boolean)
 
-class FirestoreGoalRemote(private val firestore: FirebaseFirestore, private val activeUid: () -> String?) : GoalRemote {
+class FirestoreGoalRemote(private val firestore: FirebaseFirestore, private val clock: Clock = Clock.systemUTC(), private val activeUid: () -> String?) : GoalRemote {
     private data class Running(val operation: GoalOperation, val task: Task<GoalRemoteOutcome>)
     private val running = mutableMapOf<Pair<String, String>, Running>()
+    private val expiryChecks = mutableMapOf<Pair<String, String>, Running>()
     private fun parent(uid: String) = firestore.collection("users").document(uid).collection("savingsGoals").document("active")
     private fun goalFlow(uid: String): Flow<GoalDocument> = callbackFlow {
         val listener = parent(uid).addSnapshotListener(MetadataChanges.INCLUDE) { doc, error ->
@@ -67,18 +69,26 @@ class FirestoreGoalRemote(private val firestore: FirebaseFirestore, private val 
         operation.validate(temporal = false)
         check(activeUid() == uid) { "Account changed. Saved goal operation belongs to the original account." }
         val key = uid to operation.operationId
-        val task = synchronized(running) {
-            running[key]?.also { check(it.operation == operation) { "Running operation payload cannot change." } }?.task
-                ?: transaction(uid, operation).also { running[key] = Running(operation, it) }
+        val (attempts, task) = synchronized(running) {
+            val old = running[key]?.also { check(it.operation == operation) { "Running operation payload cannot change." } }
+            // A financial retry shares the old Task. A finance-free expiry check may fence it safely.
+            val fenceOnly = old != null && !old.task.isComplete && operation.goal?.let { SavingsMath.date(it.deadline) <= SavingsMath.today(clock) } == true
+            val tasks = if (fenceOnly || expiryChecks.containsKey(key)) expiryChecks else running
+            val current = tasks[key]?.also { check(it.operation == operation) { "Running operation payload cannot change." } }?.task
+                ?: transaction(uid, operation, tasks === expiryChecks).also { tasks[key] = Running(operation, it) }
+            tasks to current
+        }
+        task.addOnCompleteListener(java.util.concurrent.Executor { it.run() }) {
+            synchronized(running) { if (attempts[key]?.task === task) attempts.remove(key) }
         }
         try { return task.await() }
         finally {
             // Await cancellation does not cancel Firebase. Keep an outstanding Task for the next waiter.
-            if (task.isComplete) synchronized(running) { if (running[key]?.task === task) running.remove(key) }
+            if (task.isComplete) synchronized(running) { if (attempts[key]?.task === task) attempts.remove(key) }
         }
     }
 
-    private fun transaction(uid: String, operation: GoalOperation): Task<GoalRemoteOutcome> {
+    private fun transaction(uid: String, operation: GoalOperation, fenceOnly: Boolean = false): Task<GoalRemoteOutcome> {
         val goalRef = parent(uid)
         val receiptRef = goalRef.collection("operations").document(operation.operationId)
         return firestore.runTransaction<GoalRemoteOutcome> { tx ->
@@ -90,6 +100,13 @@ class FirestoreGoalRemote(private val firestore: FirebaseFirestore, private val 
                     receipt.getTimestamp("createdAt") != null) { "Operation identity conflict. Keep the saved payload for inspection." }
                 check(activeUid() == uid) { "Account changed." }
                 return@runTransaction GoalRemoteOutcome.Confirmed
+            }
+            val expiryRef = operation.goal?.let { goalRef.collection("rejections").document(operation.operationId) }
+            val expiry = expiryRef?.let { tx.get(it) }
+            if (expiry?.exists() == true) {
+                check(expiry.getString("kind") == operation.kind && expiry.getLong("version") == operation.nextVersion &&
+                    expiry.get("payload") == operation.payload() && expiry.getTimestamp("createdAt") != null) { "Expiry marker identity conflict. Keep the original proposal." }
+                return@runTransaction expiredDeadline()
             }
             val goalDoc = tx.get(goalRef)
             val before = if (goalDoc.exists()) goalDoc.goal() else null
@@ -112,11 +129,21 @@ class FirestoreGoalRemote(private val firestore: FirebaseFirestore, private val 
             catch (e: IllegalStateException) { return@runTransaction GoalRemoteOutcome.Rejected(e.message ?: "Entry conflicts with the confirmed ledger.") }
             if (operation.goal != null && before != null && operation.goal.startDate != before.config.startDate)
                 return@runTransaction GoalRemoteOutcome.Rejected("Goal start date cannot change.")
+            if (operation.goal != null && SavingsMath.date(operation.goal.deadline) <= SavingsMath.today(clock) &&
+                (operation.kind == "CREATE" || operation.goal.deadline != before?.config?.deadline)) {
+                check(activeUid() == uid) { "Account changed. Reopen Savings Goal." }
+                // The clock only proposes this fence. Rules must establish expiry using request.time,
+                // exclude an accepted receipt, and permanently block this operation before we return EXPIRED.
+                tx.set(expiryRef!!, mapOf("kind" to operation.kind, "version" to operation.nextVersion,
+                    "payload" to operation.payload(), "createdAt" to FieldValue.serverTimestamp()))
+                return@runTransaction expiredDeadline()
+            }
+            if (fenceOnly) return@runTransaction GoalRemoteOutcome.Uncertain("An earlier transaction is outstanding; no expired deadline was established.")
             // Reconcile first: an acknowledged create remains acknowledged even after its deadline passes.
-            operation.validate()
+            operation.validate(today = SavingsMath.today(clock))
             if (operation.goal != null && before != null) {
                 check(operation.goal.startDate == before.config.startDate) { "Goal start date cannot change." }
-                SavingsMath.validate(operation.goal, SavingsMath.today(), before.config.deadline)
+                SavingsMath.validate(operation.goal, SavingsMath.today(clock), before.config.deadline)
             }
             check(activeUid() == uid) { "Account changed. Reopen Savings Goal." }
             val configuration = operation.goal ?: before!!.config
@@ -140,18 +167,19 @@ class FirestoreGoalRemote(private val firestore: FirebaseFirestore, private val 
             GoalRemoteOutcome.Confirmed
         }
     }
+    private fun expiredDeadline() = GoalRemoteOutcome.Rejected("The proposed deadline expired. Revise the deadline; the original operation is blocked by its server expiry marker.", deadlineExpired = true)
     private fun DocumentSnapshot.string(field: String) = get(field) as? String ?: error("Missing or invalid $field.")
     private fun DocumentSnapshot.long(field: String) = get(field) as? Long ?: error("Missing or invalid integer $field.")
     private fun DocumentSnapshot.timestamp(field: String) = get(field) as? Timestamp ?: error("Missing resolved $field.")
     private fun DocumentSnapshot.goal(): SavingsGoal {
         val config = GoalConfig(string("name"), long("targetMinor"), long("openingMinor"), string("startDate"), string("deadline"))
-        SavingsMath.validate(config, SavingsMath.today(), config.deadline)
+        SavingsMath.validate(config, SavingsMath.today(clock), config.deadline)
         return SavingsGoal(config, long("savedMinor"), long("version"), string("lastOperationId"), string("lastEntryId"),
             timestamp("createdAt"), timestamp("updatedAt")).also { check(it.savedMinor >= 0 && it.version >= 0) { "Invalid saved goal balance/version." } }
     }
     private fun DocumentSnapshot.entry(): SavingsEntry = SavingsEntry(id, string("kind"), long("amountMinor"), string("entryDate"),
         string("note"), get("deleted") as? Boolean ?: error("Invalid deletion state."), long("version"), string("lastOperationId"),
-        timestamp("createdAt"), timestamp("updatedAt")).also { SavingsMath.validate(it, SavingsMath.today()); check(it.version > 0) }
+        timestamp("createdAt"), timestamp("updatedAt")).also { SavingsMath.validate(it, SavingsMath.today(clock)); check(it.version > 0) }
 }
 
 internal fun checkGoalVersion(operation: GoalOperation, before: SavingsGoal?) {
