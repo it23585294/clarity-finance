@@ -40,3 +40,7 @@ Pending payments support standalone agreements, project milestones, direct recei
 - [Sanitized live acceptance results and opt-in read-only audit](LIVE_VERIFICATION.md)
 
 The accepted online checklist does not establish live network-interruption or account-switch behavior. Those scenarios have separate coroutine unit coverage. The live audit is skipped unless explicitly opted in and requires an existing signed-in session.
+
+## Realised crypto results
+
+Authenticated Home includes Crypto Results for separate LKR gains/losses, backdated edits/deletion, and labelled monthly/YTD reporting. See [FR07 behavior, recovery, rules, verification and manual checks](CRYPTO_RESULTS.md). The reviewed rules were manually published by the user before the accepted [live checklist](FR07_LIVE_ACCEPTANCE.md) and [sanitized live results](FR07_LIVE_RESULTS.md). The later operation-feedback correction has separate automated verification; no additional live samples were created for it.
