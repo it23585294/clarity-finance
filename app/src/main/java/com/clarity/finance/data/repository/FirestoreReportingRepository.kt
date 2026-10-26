@@ -43,7 +43,7 @@ class FirestoreReportingRepository(
         doc.timestamps()
         Expense(doc.id, doc.requiredLong("amountMinor"), doc.requiredString("currency"),
             doc.requiredString("categoryId"), doc.requiredString("paymentChannelId"), doc.requiredString("spendingType"),
-            doc.requiredString("expenseDate"), doc.requiredString("note"), doc.getTimestamp("updatedAt"))
+            doc.requiredString("expenseDate"), doc.expenseNote(), doc.getTimestamp("updatedAt"))
     }
 
     override fun income(uid: String, month: ReportingMonth) = listen(month(uid, "incomeReceipts", "receiptDate", month)) { doc ->
@@ -78,6 +78,12 @@ class FirestoreReportingRepository(
     }
 
     private fun DocumentSnapshot.requiredString(field: String) = getString(field) ?: error("Missing $field.")
+    private fun DocumentSnapshot.expenseNote(): String {
+        if (!contains("note")) return ""
+        val note = get("note")
+        check(note is String && note.length <= 500) { "Invalid expense note." }
+        return note
+    }
     private fun DocumentSnapshot.requiredLong(field: String): Long {
         // getLong can coerce a floating Firestore number. Reporting must not silently truncate corrupt money.
         return get(field) as? Long ?: error("Invalid integer $field.")

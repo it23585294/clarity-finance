@@ -33,6 +33,7 @@ data class DashboardUiState(
     val pendingAmounts: Map<String, String>? = null,
     val expenseHistory: List<Expense> = emptyList(),
     val incomeHistory: List<Income> = emptyList(),
+    val cryptoHistory: List<CryptoResult> = emptyList(),
     val recovery: ReportingRecovery? = null,
     val recoveryError: String? = null
 )
@@ -139,7 +140,14 @@ class DashboardViewModel(
         }
         val (expenses, spending) = calculate(old.expenses) { MonthlyReporting.expenses(it, period) }
         val (income, received) = calculate(old.income) { MonthlyReporting.income(it, period) }
-        val (crypto, cryptoNet) = calculate(old.crypto) { MonthlyReporting.crypto(it, period) }
+        // Row validity is independent of the aggregate and remains checked after an overflow error.
+        var cryptoHistory = emptyList<CryptoResult>()
+        val cryptoInput = try {
+            cryptoHistory = MonthlyReporting.cryptoHistory(old.crypto.records.orEmpty(), period)
+            old.crypto
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) { old.crypto.copy(error = e.message ?: "Invalid crypto reporting data.") }
+        val (crypto, cryptoNet) = calculate(cryptoInput) { MonthlyReporting.crypto(it, period) }
         val (projects, pending) = calculate(old.projects, MonthlyReporting::pending)
         var surplusError: String? = null
         val surplus = if (received == null || spending == null) null else try {
@@ -152,6 +160,7 @@ class DashboardViewModel(
             cryptoText = cryptoNet?.let(CryptoReporting::money), pendingAmounts = pending?.mapValues { MonthlyReporting.money(it.value) },
             expenseHistory = expenses.records.orEmpty().filter { old.selectedCategory == null || it.categoryId == old.selectedCategory }
                 .sortedWith(compareByDescending<Expense> { it.expenseDate }.thenBy { it.id }),
-            incomeHistory = income.records.orEmpty().sortedWith(compareByDescending<Income> { it.receiptDate }.thenBy { it.id }))
+            incomeHistory = income.records.orEmpty().sortedWith(compareByDescending<Income> { it.receiptDate }.thenBy { it.id }),
+            cryptoHistory = cryptoHistory)
     }
 }

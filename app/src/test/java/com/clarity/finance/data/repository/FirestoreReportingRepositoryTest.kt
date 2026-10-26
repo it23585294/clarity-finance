@@ -60,7 +60,7 @@ class FirestoreReportingRepositoryTest {
         `when`(metadata.hasPendingWrites()).thenReturn(pending)
         return mock(QuerySnapshot::class.java).also { `when`(it.documents).thenReturn(documents); `when`(it.metadata).thenReturn(metadata) }
     }
-    private fun doc(fields: Map<String, Any> = emptyMap()): DocumentSnapshot {
+    private fun doc(fields: Map<String, Any?> = emptyMap()): DocumentSnapshot {
         val result = mock(DocumentSnapshot::class.java)
         `when`(result.id).thenReturn("fixture")
         `when`(result.metadata).thenReturn(mock(SnapshotMetadata::class.java))
@@ -69,6 +69,7 @@ class FirestoreReportingRepositoryTest {
         `when`(result.getTimestamp("createdAt")).thenReturn(Timestamp(1, 0))
         `when`(result.getTimestamp("updatedAt")).thenReturn(Timestamp(2, 0))
         fields.forEach { (field, value) ->
+            `when`(result.contains(field)).thenReturn(true)
             `when`(result.get(field)).thenReturn(value)
             if (value is String) `when`(result.getString(field)).thenReturn(value)
             if (value is Boolean) `when`(result.getBoolean(field)).thenReturn(value)
@@ -77,6 +78,55 @@ class FirestoreReportingRepositoryTest {
     }
     private val expenseFields = mapOf("amountMinor" to 150000L, "currency" to "LKR", "categoryId" to "transport",
         "paymentChannelId" to "cash", "spendingType" to "committed", "expenseDate" to "2026-01-01", "note" to "Fixture")
+
+    @Test fun `omitted optional expense note decodes as empty and contributes to reporting`() = runTest {
+        val listener = setup("expenses", "expenseDate")
+        var latest = ReportingBatch<Expense>()
+        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { repository.expenses("owner", period).collect { latest = it } }
+        runCurrent()
+        listener.onEvent(snapshot(listOf(doc(expenseFields - "note"))), null); runCurrent()
+        assertEquals("", latest.records!!.single().note)
+        val spending = MonthlyReporting.expenses(latest.records!!, period)
+        assertEquals(150000L, spending.totalMinor)
+        assertEquals(150000L, spending.committedMinor)
+        assertEquals("Transport", spending.categories.single().label)
+        for (note in listOf("", "x".repeat(500))) {
+            listener.onEvent(snapshot(listOf(doc(expenseFields + ("note" to note)))), null); runCurrent()
+            assertEquals(note, latest.records!!.single().note)
+        }
+        job.cancelAndJoin()
+    }
+
+    @Test fun `present null nonstring and overlength expense notes remain invalid`() = runTest {
+        for (note in listOf(null, 42L, true, listOf("note"), "x".repeat(501))) {
+            val listener = setup("expenses", "expenseDate")
+            var failure: Throwable? = null
+            var latest = ReportingBatch<Expense>()
+            val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                repository.expenses("owner", period).catch { failure = it }.collect { latest = it }
+            }
+            runCurrent()
+            listener.onEvent(snapshot(listOf(doc(expenseFields + ("note" to note)))), null); runCurrent()
+            assertNull(latest.records)
+            assertTrue(failure!!.message!!.contains("Invalid expense note"))
+            job.cancelAndJoin()
+            clearInvocations(query, registration)
+        }
+    }
+
+    @Test fun `optional expense note does not relax required expense fields`() = runTest {
+        val listener = setup("expenses", "expenseDate")
+        var failure: Throwable? = null
+        var latest = ReportingBatch<Expense>()
+        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            repository.expenses("owner", period).catch { failure = it }.collect { latest = it }
+        }
+        runCurrent()
+        listener.onEvent(snapshot(listOf(doc(expenseFields - "note" - "currency"))), null); runCurrent()
+        assertNull(latest.records)
+        assertTrue(failure!!.message!!.contains("Missing currency"))
+        job.cancelAndJoin()
+    }
 
     @Test fun `reporting recovery reads only the owner and supports legacy types without changing saved payloads`() = runTest {
         val store = SubmissionRecoveryStore(PreferenceDataStoreFactory.create(scope = backgroundScope,

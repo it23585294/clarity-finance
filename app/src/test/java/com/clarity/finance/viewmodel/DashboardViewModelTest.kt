@@ -144,6 +144,36 @@ class DashboardViewModelTest {
         assertEquals("1000.00", vm.state.value.surplusText)
     }
 
+    @Test fun `crypto overflow retains valid inspectable rows across renders with an unavailable aggregate`() = runTest(dispatcher) {
+        runCurrent()
+        val rows = listOf(CryptoResult("large", "gain", Long.MAX_VALUE, "2026-01-01"),
+            CryptoResult("small", "gain", 1, "2026-01-01"))
+        repo.cryptos.value = rows; runCurrent()
+        assertNull(vm.state.value.cryptoText)
+        assertTrue(vm.state.value.crypto.error!!.contains("integer range"))
+        assertEquals(rows, vm.state.value.cryptoHistory)
+        vm.selectCategory(null) // Switching to history renders again while the aggregate error remains.
+        assertEquals(rows, vm.state.value.cryptoHistory)
+        assertNull(vm.state.value.cryptoText)
+        assertEquals("0.00", vm.state.value.surplusText)
+        repo.cryptos.value = listOf(rows.last()); runCurrent()
+        assertEquals("+0.01", vm.state.value.cryptoText)
+        assertNull(vm.state.value.crypto.error)
+    }
+
+    @Test fun `malformed crypto after otherwise overflowing rows remains an explicit validation error`() = runTest(dispatcher) {
+        runCurrent()
+        val large = CryptoResult("large", "gain", Long.MAX_VALUE, "2026-01-01")
+        repo.cryptos.value = listOf(large, large.copy(id = "small", amountMinor = 1), large.copy(id = "bad", direction = "invalid"))
+        runCurrent()
+        assertNull(vm.state.value.cryptoText)
+        assertEquals("Invalid result direction", vm.state.value.crypto.error)
+        assertTrue(vm.state.value.cryptoHistory.isEmpty())
+        vm.selectCategory(null)
+        assertEquals("Invalid result direction", vm.state.value.crypto.error)
+        assertTrue(vm.state.value.cryptoHistory.isEmpty())
+    }
+
     @Test fun `account switch clears category history recovery and rejects delayed old listener results`() = runTest(dispatcher) {
         repo.gate = CompletableDeferred()
         repo.late = ReportingBatch(listOf(expense), false)

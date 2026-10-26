@@ -142,7 +142,7 @@ fun DashboardScreen(
                         Text("Realised crypto results (separate from cash transactions)", style = MaterialTheme.typography.titleLarge)
                         BatchStatus(state.crypto)
                         if (state.crypto.records != null && state.crypto.records!!.isEmpty()) Text("No realised crypto results recorded for this month.")
-                        if (state.cryptoText != null) state.crypto.records.orEmpty().forEach { row ->
+                        state.cryptoHistory.forEach { row ->
                             HistoryCard("${row.direction} • ${row.resultDate}", "LKR ${CryptoReporting.money(row.signedMinor)}", row.note,
                                 "Inspect crypto result", { cryptoDetailId = row.id })
                         }
@@ -158,7 +158,7 @@ fun DashboardScreen(
             }
         }
     }
-    state.crypto.records.orEmpty().firstOrNull { it.id == cryptoDetailId }?.let { result ->
+    state.cryptoHistory.firstOrNull { it.id == cryptoDetailId }?.let { result ->
         AlertDialog(onDismissRequest = { cryptoDetailId = null }, title = { Text("Realised crypto result") }, text = {
             Text("${result.resultDate}\n${result.direction}: LKR ${CryptoReporting.money(result.signedMinor)}\n${result.note}\nManage changes in Crypto Results.")
         }, confirmButton = { TextButton(onClick = { cryptoDetailId = null }) { Text("Close") } })

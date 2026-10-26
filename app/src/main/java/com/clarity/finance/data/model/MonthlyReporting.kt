@@ -70,10 +70,15 @@ object MonthlyReporting {
         Math.addExact(sum, row.lkrAmountMinor)
     }
 
-    fun crypto(rows: List<CryptoResult>, period: ReportingMonth): Long = rows.fold(0L) { sum, row ->
+    /** Validate every row before summing, so overflow cannot mask a later malformed record. */
+    fun cryptoHistory(rows: List<CryptoResult>, period: ReportingMonth): List<CryptoResult> = rows.onEach { row ->
         require(row.sync in setOf(CryptoSync.CONFIRMED, CryptoSync.CACHED)) { "Unconfirmed crypto proposal in reporting data." }
         date(row.resultDate)
         require(period.contains(row.resultDate) && row.amountMinor > 0)
+        require(row.direction in setOf("gain", "loss")) { "Invalid result direction" }
+    }
+
+    fun crypto(rows: List<CryptoResult>, period: ReportingMonth): Long = cryptoHistory(rows, period).fold(0L) { sum, row ->
         Math.addExact(sum, row.signedMinor)
     }
 

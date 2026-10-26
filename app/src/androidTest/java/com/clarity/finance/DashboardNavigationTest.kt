@@ -141,6 +141,41 @@ class DashboardNavigationTest {
         compose.onNodeWithText("No received income recorded for this month.").performScrollTo().assertIsDisplayed()
     }
 
+    @Test fun cryptoAggregateOverflowKeepsBothValidRowsInspectableWithUnavailableTotal() {
+        val data = Data()
+        data.crypto.value = listOf(
+            CryptoResult("large", "gain", Long.MAX_VALUE, today.toString(), "Overflow fixture large"),
+            CryptoResult("small", "gain", 1, today.toString(), "Overflow fixture small"))
+        show(data)
+        val error = "Total exceeds the supported integer range; inspect individual records."
+        compose.onNodeWithText(error).performScrollTo().assertIsDisplayed()
+        compose.onAllNodesWithText("Unavailable").assertCountEquals(1)
+        click("Monthly history")
+        compose.onNodeWithText(error).performScrollTo().assertIsDisplayed()
+        for ((note, amount) in listOf("Overflow fixture large" to "+92233720368547758.07", "Overflow fixture small" to "+0.01")) {
+            compose.onNodeWithText(note).performScrollTo().performClick()
+            compose.onNodeWithText("Realised crypto result").assertIsDisplayed()
+            compose.onNodeWithText("gain: LKR $amount", substring = true).assertIsDisplayed()
+            compose.onNode(hasText("Close") and hasClickAction()).performClick()
+        }
+        click("Overview")
+        compose.onNodeWithText(error).performScrollTo().assertIsDisplayed()
+        compose.onAllNodesWithText("Unavailable").assertCountEquals(1)
+    }
+
+    @Test fun malformedCryptoAfterOverflowStillShowsValidationErrorAndNoUnsafeInspection() {
+        val data = Data()
+        data.crypto.value = listOf(
+            CryptoResult("large", "gain", Long.MAX_VALUE, today.toString()),
+            CryptoResult("small", "gain", 1, today.toString()),
+            CryptoResult("malformed", "invalid", 1, today.toString(), "Malformed fixture"))
+        show(data)
+        click("Monthly history")
+        compose.onNodeWithText("Invalid result direction").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Inspect crypto result").assertDoesNotExist()
+        compose.onNodeWithText("Malformed fixture").assertDoesNotExist()
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun <T> unused(type: Class<T>): T = Proxy.newProxyInstance(type.classLoader, arrayOf(type)) { _, method, _ ->
         error("Unexpected repository access: ${method.name}")
