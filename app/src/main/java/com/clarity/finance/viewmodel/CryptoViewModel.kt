@@ -51,13 +51,25 @@ data class CryptoUiState(
     val unsettled: List<CryptoResult> = emptyList(),
     val cached: Boolean = true,
     val error: String? = null,
-    val message: String? = null,
+    val unknownOperationCount: Int = 0,
+    val confirmedPendingIds: Set<String> = emptySet(),
     val form: CryptoForm? = null,
     val selected: CryptoResult? = null,
     val selectedHasAttempt: Boolean = false,
     val deleteTarget: CryptoResult? = null,
     val busy: Boolean = false
-)
+) {
+    /** Feedback follows all unresolved operations, rather than the last Save callback. */
+    val message: String? get() {
+        val pending = unsettled.count { it.sync == CryptoSync.PENDING && it.id !in confirmedPendingIds }
+        val rejected = unsettled.count { it.sync == CryptoSync.FAILED }
+        return listOfNotNull(
+            if (pending > 0) "$pending pending change${if (pending == 1) "" else "s"} awaiting server confirmation." else null,
+            if (rejected > 0) "$rejected rejected change${if (rejected == 1) "" else "s"}. Review saved proposals." else null,
+            if (unknownOperationCount > 0) "$unknownOperationCount operation${if (unknownOperationCount == 1) "" else "s"} with an unknown save outcome. Retry the same saved details." else null
+        ).takeIf { it.isNotEmpty() }?.joinToString(" ")
+    }
+}
 
 class CryptoViewModel(
     private val auth: AuthRepository,
@@ -75,6 +87,8 @@ class CryptoViewModel(
     private var snapshot = CryptoSnapshot()
     private var deleteOperation: CryptoOperation? = null
     private var reportingDate = today()
+    private val unknownOperations = mutableMapOf<String, CryptoOperation>()
+    private val confirmedOperations = mutableSetOf<String>()
 
     private fun initial() = CryptoUiState(month = month.toString(), cutoff = CryptoReporting.cutoff(month.year, today()).toString(),
         canNextMonth = month < YearMonth.from(today()), canPreviousMonth = month > YearMonth.of(1, 1),
@@ -87,6 +101,8 @@ class CryptoViewModel(
                 observation?.cancel()
                 action?.cancel()
                 deleteOperation = null
+                unknownOperations.clear()
+                confirmedOperations.clear()
                 uid = user?.uid
                 month = YearMonth.from(today())
                 reportingDate = today()
@@ -112,7 +128,17 @@ class CryptoViewModel(
             }
             try {
                 repository.observe(owner, year, cutoff).collect {
-                    if (valid(owner, token) && month.year == year) { snapshot = it; render() }
+                    if (valid(owner, token) && month.year == year) {
+                        snapshot = it
+                        confirmedOperations.retainAll(it.attempts.map { attempt -> attempt.operationId }.toSet())
+                        it.attempts.filter(::hasConfirmedOutcome).forEach { attempt -> confirmedOperations.add(attempt.operationId) }
+                        val resolved = unknownOperations.filterValues(::hasRecordedOutcome).keys.toSet()
+                        resolved.forEach { id -> unknownOperations.remove(id) }
+                        val form = _state.value.form
+                        if (form?.savedOperation?.operationId in resolved)
+                            _state.value = _state.value.copy(form = form?.copy(error = null))
+                        render()
+                    }
                 }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
@@ -122,6 +148,17 @@ class CryptoViewModel(
     }
 
     private fun valid(owner: String, token: Long) = uid == owner && generation == token
+
+    private fun hasRecordedOutcome(operation: CryptoOperation): Boolean =
+        snapshot.attempts.any { it.operationId == operation.operationId && it.result.id == operation.result.id && it.kind == operation.kind } ||
+            hasConfirmedOutcome(operation)
+
+    private fun hasConfirmedOutcome(operation: CryptoOperation): Boolean = operation.operationId in confirmedOperations ||
+        (snapshot.confirmedResults ?: snapshot.results).any {
+                it.sync == CryptoSync.CONFIRMED && it.id == operation.result.id && it.lastOperationId == operation.operationId &&
+                    it.direction == operation.result.direction && it.amountMinor == operation.result.amountMinor &&
+                    it.resultDate == operation.result.resultDate && it.note == operation.result.note
+            }
 
     private fun render() {
         val current = _state.value
@@ -141,6 +178,8 @@ class CryptoViewModel(
             selectedHasAttempt = snapshot.attempts.any { it.result.id == selected?.id },
             history = confirmed.filter { it.resultDate.startsWith(month.toString()) },
             unsettled = snapshot.results.filter { it.sync in listOf(CryptoSync.PENDING, CryptoSync.FAILED) },
+            unknownOperationCount = unknownOperations.size,
+            confirmedPendingIds = snapshot.attempts.filter { it.operationId in confirmedOperations }.map { it.result.id }.toSet(),
             cached = snapshot.fromCache, error = if (totals == null)
                 "Totals exceed the supported integer range. Inspect individual results." else snapshot.error)
     }
@@ -155,7 +194,8 @@ class CryptoViewModel(
         if (yearChanged) {
             generation++
             snapshot = CryptoSnapshot()
-            _state.value = initial().copy(signedIn = uid != null)
+            _state.value = initial().copy(signedIn = uid != null, unknownOperationCount = unknownOperations.size,
+                unsettled = _state.value.unsettled, confirmedPendingIds = _state.value.confirmedPendingIds)
             observe()
         } else render()
     }
@@ -172,7 +212,8 @@ class CryptoViewModel(
         generation++
         month = month.coerceAtMost(YearMonth.from(today()))
         snapshot = CryptoSnapshot()
-        _state.value = initial().copy(signedIn = true)
+        _state.value = initial().copy(signedIn = true, unknownOperationCount = unknownOperations.size,
+            unsettled = _state.value.unsettled, confirmedPendingIds = _state.value.confirmedPendingIds)
         observe()
     }
     fun retryLoad() { if (uid != null) { _state.value = _state.value.copy(error = null, loading = true); observe() } }
@@ -182,7 +223,7 @@ class CryptoViewModel(
 
     fun add() {
         refreshReportingDate()
-        if (uid != null && !_state.value.busy) _state.value = _state.value.copy(form = CryptoForm(date = today().toString()), selected = null, message = null)
+        if (uid != null && !_state.value.busy) _state.value = _state.value.copy(form = CryptoForm(date = today().toString()), selected = null)
     }
 
     fun edit(result: CryptoResult) {
@@ -190,7 +231,7 @@ class CryptoViewModel(
             snapshot.attempts.any { it.result.id == result.id }) return
         _state.value = _state.value.copy(form = CryptoForm(id = result.id, direction = result.direction,
             amount = BigDecimal.valueOf(result.amountMinor, 2).toPlainString(), date = result.resultDate,
-            note = result.note, original = result), selected = null, message = null)
+            note = result.note, original = result), selected = null)
     }
 
     fun updateForm(direction: String? = null, amount: String? = null, date: String? = null, note: String? = null) {
@@ -260,13 +301,19 @@ class CryptoViewModel(
                     true
                 } ?: false
                 if (!valid(owner, token)) return@launch
-                if (accepted) _state.value = _state.value.copy(busy = false, form = if (formSubmission) null else _state.value.form,
-                    selected = null, deleteTarget = null,
-                    message = if (dismiss) "Rejected proposal dismissed. Server records were not changed."
-                        else "Saved on this device. Awaiting server confirmation; do not re-enter this result.")
-                else _state.value = _state.value.copy(busy = false,
-                    form = _state.value.form?.copy(busy = false, error = "Local save outcome is unknown. Retry these same details."),
-                    error = "Save outcome unknown. Reopen recovery before making another change.")
+                if (accepted) {
+                    unknownOperations.remove(operation.operationId)
+                    _state.value = _state.value.copy(busy = false, form = if (formSubmission) null else _state.value.form,
+                        selected = null, deleteTarget = null, unknownOperationCount = unknownOperations.size)
+                } else {
+                    // An empty query is not evidence that a timed-out write failed or was cancelled.
+                    val unknown = !hasRecordedOutcome(operation)
+                    if (unknown) unknownOperations[operation.operationId] = operation
+                    else unknownOperations.remove(operation.operationId)
+                    _state.value = _state.value.copy(busy = false, unknownOperationCount = unknownOperations.size,
+                        form = _state.value.form?.copy(busy = false, error = if (unknown) "Local save outcome is unknown. Retry these same details." else null),
+                        error = if (unknown) "Save outcome unknown. Reopen recovery before making another change." else snapshot.error)
+                }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
                 if (valid(owner, token)) _state.value = _state.value.copy(busy = false,

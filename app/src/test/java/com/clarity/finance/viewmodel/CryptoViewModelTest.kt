@@ -113,7 +113,8 @@ class CryptoViewModelTest {
         vm.save(); runCurrent()
         assertEquals(original, repository.submissions.last().second)
         assertNull(vm.state.value.form)
-        assertTrue(vm.state.value.message!!.contains("Awaiting server confirmation"))
+        // This fake emits no recovery snapshot: local acceptance alone must not fabricate a pending banner.
+        assertNull(vm.state.value.message)
     }
 
     @Test fun `switching account clears records form and ignores an old suspended completion`() = runTest(dispatcher) {
