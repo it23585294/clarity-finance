@@ -2262,4 +2262,111 @@ describe('Clarity Expense Firestore Rules', function() {
             await assertFails(deleteDoc(secondReceipt));
         });
     });
+
+    describe('FR07 realised crypto results', () => {
+        const payload = (overrides = {}) => ({
+            direction: 'gain', amountMinor: 6000000, resultDate: '2024-02-29', note: '',
+            lastOperationId: 'crypto-op-1', createdAt: serverTimestamp(), updatedAt: serverTimestamp(), ...overrides
+        });
+        const crypto = (db, owner = 'alice', id = 'crypto-1') => doc(db, 'users', owner, 'cryptoResults', id);
+
+        it('accepts owner create read update and delete while preserving createdAt', async () => {
+            const db = testEnv.authenticatedContext('alice').firestore();
+            const ref = crypto(db);
+            await assertSucceeds(setDoc(ref, payload()));
+            const created = (await assertSucceeds(getDoc(ref))).data().createdAt;
+            await assertSucceeds(updateDoc(ref, { direction: 'loss', amountMinor: 2500000,
+                resultDate: '2023-12-31', note: 'Backdated result', lastOperationId: 'crypto-op-2', updatedAt: serverTimestamp() }));
+            const updated = (await getDoc(ref)).data();
+            if (!updated.createdAt.isEqual(created) || updated.direction !== 'loss') throw new Error('Crypto update changed creation time or sign');
+            await assertSucceeds(deleteDoc(ref));
+            await assertSucceeds(deleteDoc(ref));
+        });
+
+        it('accepts AT03 and keeps ordinary receipts expenses and project counters unchanged', async () => {
+            const db = testEnv.authenticatedContext('alice').firestore();
+            const expense = doc(db, 'users', 'alice', 'expenses', 'ordinary-expense');
+            const income = doc(db, 'users', 'alice', 'incomeReceipts', 'ordinary-income');
+            await testEnv.withSecurityRulesDisabled(async context => {
+                await setDoc(doc(context.firestore(), expense.path), { amountMinor: 85000 });
+                await setDoc(doc(context.firestore(), income.path), { lkrAmountMinor: 14030000 });
+                await setDoc(doc(context.firestore(), 'users', 'alice', 'expectedPayments', 'existing'), { directReceivedAmountMinor: 20000 });
+            });
+            await assertSucceeds(setDoc(crypto(db), payload()));
+            await assertSucceeds(setDoc(crypto(db, 'alice', 'loss'), payload({ direction: 'loss', amountMinor: 2500000 })));
+            const rows = (await getDocs(collection(db, 'users', 'alice', 'cryptoResults'))).docs.map(s => s.data());
+            const net = rows.reduce((sum, r) => sum + (r.direction === 'gain' ? r.amountMinor : -r.amountMinor), 0);
+            if (net !== 3500000) throw new Error('AT03 net must equal +35000 LKR');
+            await assertSucceeds(updateDoc(crypto(db), { amountMinor: 5000000, updatedAt: serverTimestamp(), lastOperationId: 'edited' }));
+            await assertSucceeds(deleteDoc(crypto(db, 'alice', 'loss')));
+            if ((await getDoc(expense)).data().amountMinor !== 85000 || (await getDoc(income)).data().lkrAmountMinor !== 14030000 ||
+                (await getDoc(doc(db, 'users', 'alice', 'expectedPayments', 'existing'))).data().directReceivedAmountMinor !== 20000) {
+                throw new Error('Crypto changed ordinary financial collections');
+            }
+        });
+
+        it('denies all unauthenticated and cross-user CRUD including collection queries', async () => {
+            const owner = testEnv.authenticatedContext('alice').firestore();
+            await setDoc(crypto(owner), payload());
+            for (const db of [testEnv.unauthenticatedContext().firestore(), testEnv.authenticatedContext('bob').firestore()]) {
+                await assertFails(getDoc(crypto(db)));
+                await assertFails(getDocs(collection(db, 'users', 'alice', 'cryptoResults')));
+                await assertFails(setDoc(crypto(db, 'alice', 'forbidden'), payload()));
+                await assertFails(updateDoc(crypto(db), { note: 'intrusion', updatedAt: serverTimestamp() }));
+                await assertFails(deleteDoc(crypto(db)));
+            }
+        });
+
+        it('denies zero negative fractional string and contradictory sign amounts', async () => {
+            const db = testEnv.authenticatedContext('alice').firestore();
+            for (const amountMinor of [0, -1, 1.5, '100', null]) await assertFails(setDoc(crypto(db), payload({ amountMinor })));
+            for (const direction of ['profit', '', 1, null]) await assertFails(setDoc(crypto(db), payload({ direction })));
+            await assertFails(setDoc(crypto(db), payload({ signedAmountMinor: -6000000 })));
+            await assertSucceeds(setDoc(crypto(db), payload({ amountMinor: 1 })));
+        });
+
+        it('has no arbitrary money ceiling below the supported integer representation', async () => {
+            const db = testEnv.authenticatedContext('alice').firestore();
+            await assertSucceeds(setDoc(crypto(db), payload({ amountMinor: Number.MAX_SAFE_INTEGER })));
+        });
+
+        it('checks real calendar dates century leap rules formatting and future dates', async () => {
+            const db = testEnv.authenticatedContext('alice').firestore();
+            for (const resultDate of ['2023-02-29', '1900-02-29', '2024-04-31', '2024-00-01', '2024-13-01',
+                '2024-01-00', '0000-01-01', '2024-1-01', '2024-01-1', '9999-12-31', '', 20240101, null]) {
+                await assertFails(setDoc(crypto(db), payload({ resultDate })));
+            }
+            for (const resultDate of ['2000-02-29', '2024-02-29', '0001-01-01']) {
+                await assertSucceeds(setDoc(crypto(db, 'alice', resultDate), payload({ resultDate })));
+            }
+            const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Colombo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+            await assertSucceeds(setDoc(crypto(db, 'alice', 'today'), payload({ resultDate: today })));
+            const tomorrow = new Date(`${today}T00:00:00Z`);
+            tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+            await assertFails(setDoc(crypto(db), payload({ resultDate: tomorrow.toISOString().slice(0, 10) })));
+        });
+
+        it('requires exact schema bounded typed notes operation IDs and timestamps', async () => {
+            const db = testEnv.authenticatedContext('alice').firestore();
+            for (const field of ['direction', 'amountMinor', 'resultDate', 'note', 'lastOperationId', 'createdAt', 'updatedAt']) {
+                const missing = payload(); delete missing[field]; await assertFails(setDoc(crypto(db), missing));
+            }
+            for (const overrides of [{ note: 'x'.repeat(501) }, { note: null }, { note: 1 }, { lastOperationId: '' },
+                { lastOperationId: 'x'.repeat(129) }, { lastOperationId: 1 }, { currency: 'USD' }, { netTotal: 6000000 },
+                { createdAt: new Date('2020-01-01') }, { updatedAt: new Date('2020-01-01') }]) {
+                await assertFails(setDoc(crypto(db), payload(overrides)));
+            }
+            await assertSucceeds(setDoc(crypto(db), payload({ note: 'x'.repeat(500) })));
+        });
+
+        it('rejects invalid updates creation-time changes and extra link fields', async () => {
+            const db = testEnv.authenticatedContext('alice').firestore();
+            await setDoc(crypto(db), payload());
+            for (const changes of [{ createdAt: new Date('2020-01-01') }, { amountMinor: 0 }, { amountMinor: -1 },
+                { resultDate: '2025-02-29' }, { resultDate: '9999-01-01' }, { direction: 'other' },
+                { linkedPaymentId: 'project' }, { note: 'x'.repeat(501) }, { updatedAt: new Date('2020-01-01') }]) {
+                await assertFails(updateDoc(crypto(db), { updatedAt: serverTimestamp(), ...changes }));
+            }
+        });
+    });
 });
