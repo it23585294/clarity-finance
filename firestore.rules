@@ -2,6 +2,138 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Savings is a separate, owner-scoped allocation ledger. Existing financial policies below are unchanged.
+    function gOwner(uid) { return request.auth != null && request.auth.uid == uid; }
+    function gId(id) { return id is string && id.matches('^[A-Za-z0-9_-]{1,128}$'); }
+    function gCalendar(date) {
+      let y = int(date[0:4]); let m = int(date[5:7]); let d = int(date[8:10]);
+      let leap = y % 400 == 0 || (y % 4 == 0 && y % 100 != 0);
+      let last = m == 2 ? (leap ? 29 : 28) : (m in [4,6,9,11] ? 30 : 31);
+      return y >= 1 && m >= 1 && m <= 12 && d >= 1 && d <= last;
+    }
+    function gDate(date) {
+      return date is string && date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') && gCalendar(date);
+    }
+    function gDay(date) { return int(date[0:4]) * 10000 + int(date[5:7]) * 100 + int(date[8:10]); }
+    function gToday() {
+      let now = request.time + duration.value(330, 'm');
+      return now.year() * 10000 + now.month() * 100 + now.day();
+    }
+    function gGoal(data) {
+      let fields = ['name','targetMinor','openingMinor','startDate','deadline','savedMinor','version','lastOperationId','lastEntryId','createdAt','updatedAt'];
+      return data.keys().hasAll(fields) && data.keys().hasOnly(fields)
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100 && data.name.matches('.*[^ \\t\\r\\n].*')
+        && data.targetMinor is int && data.targetMinor > 0 && data.openingMinor is int && data.openingMinor >= 0
+        && data.savedMinor is int && data.savedMinor >= 0 && data.version is int && data.version >= 0
+        && gDate(data.startDate) && gDay(data.startDate) <= gToday()
+        && gDate(data.deadline) && data.deadline > data.startDate
+        && gId(data.lastOperationId) && data.lastEntryId is string && (data.lastEntryId == '' || gId(data.lastEntryId))
+        && data.createdAt is timestamp && data.updatedAt == request.time;
+    }
+    function gGoalValues(data) {
+      return {'name':data.name,'targetMinor':data.targetMinor,'openingMinor':data.openingMinor,'startDate':data.startDate,'deadline':data.deadline};
+    }
+    function gEntryValues(data) {
+      return {'kind':data.kind,'amountMinor':data.amountMinor,'entryDate':data.entryDate,'note':data.note,'deleted':data.deleted};
+    }
+    function gEntry(data) {
+      let fields = ['kind','amountMinor','entryDate','note','deleted','version','lastOperationId','createdAt','updatedAt'];
+      return data.keys().hasAll(fields) && data.keys().hasOnly(fields)
+        && data.kind in ['contribution','withdrawal'] && data.amountMinor is int && data.amountMinor > 0
+        && gDate(data.entryDate) && gDay(data.entryDate) <= gToday()
+        && data.note is string && data.note.size() <= 500 && data.deleted is bool
+        && data.version is int && data.version > 0 && gId(data.lastOperationId)
+        && data.createdAt is timestamp && data.updatedAt == request.time;
+    }
+    function gReceipt(uid, op) {
+      return getAfter(/databases/$(database)/documents/users/$(uid)/savingsGoals/active/operations/$(op)).data;
+    }
+    function gNewReceipt(uid, data) {
+      let op = gReceipt(uid, data.lastOperationId);
+      return !exists(/databases/$(database)/documents/users/$(uid)/savingsGoals/active/operations/$(data.lastOperationId))
+        && op.version == data.version && op.entryId == data.lastEntryId;
+    }
+    function gEffect(entry) { return entry.deleted ? 0 : (entry.kind == 'contribution' ? entry.amountMinor : -entry.amountMinor); }
+    function gOldEffect(uid, id) {
+      let path = /databases/$(database)/documents/users/$(uid)/savingsGoals/active/entries/$(id);
+      return exists(path) ? gEffect(get(path).data) : 0;
+    }
+    function gDelta(before, after, oldValue, newValue) {
+      // Both balances are nonnegative: their difference is representable. Guard opposite-sign entry deltas too.
+      return (oldValue >= 0 || newValue <= 0 || newValue <= 9223372036854775807 + oldValue)
+        && (oldValue <= 0 || newValue >= 0 || oldValue <= 9223372036854775807 + newValue)
+        && after.savedMinor - before.savedMinor == newValue - oldValue;
+    }
+    function gLedgerChange(uid, before, after) {
+      let entry = getAfter(/databases/$(database)/documents/users/$(uid)/savingsGoals/active/entries/$(after.lastEntryId)).data;
+      let op = gReceipt(uid, after.lastOperationId);
+      let existsBefore = exists(/databases/$(database)/documents/users/$(uid)/savingsGoals/active/entries/$(after.lastEntryId));
+      return gId(after.lastEntryId)
+        && after.diff(before).affectedKeys().hasOnly(['savedMinor','version','lastOperationId','lastEntryId','updatedAt'])
+        && entry.lastOperationId == after.lastOperationId && entry.version == after.version && entry.updatedAt == request.time
+        && op.payload == gEntryValues(entry)
+        && ((op.kind == 'ENTRY_CREATE' && !existsBefore && !entry.deleted)
+          || (op.kind == 'ENTRY_UPDATE' && existsBefore && !entry.deleted)
+          || (op.kind == 'ENTRY_DELETE' && existsBefore && entry.deleted))
+        && gDelta(before, after, gOldEffect(uid, after.lastEntryId), gEffect(entry));
+    }
+    function gEntryParent(uid, id, data) {
+      let before = get(/databases/$(database)/documents/users/$(uid)/savingsGoals/active).data;
+      let after = getAfter(/databases/$(database)/documents/users/$(uid)/savingsGoals/active).data;
+      return exists(/databases/$(database)/documents/users/$(uid)/savingsGoals/active)
+        && after.version > before.version && after.version == before.version + 1
+        && after.lastEntryId == id && after.lastOperationId == data.lastOperationId && after.version == data.version
+        && gNewReceipt(uid, after);
+    }
+    match /users/{uid}/savingsGoals/{goalId} {
+      allow read: if gOwner(uid) && goalId == 'active';
+      allow create: if gOwner(uid) && goalId == 'active' && gGoal(request.resource.data)
+        && request.resource.data.version == 0 && request.resource.data.savedMinor == request.resource.data.openingMinor
+        && request.resource.data.lastEntryId == '' && request.resource.data.createdAt == request.time
+        && gDay(request.resource.data.deadline) > gToday() && gNewReceipt(uid, request.resource.data)
+        && gReceipt(uid, request.resource.data.lastOperationId).kind == 'CREATE'
+        && gReceipt(uid, request.resource.data.lastOperationId).payload == gGoalValues(request.resource.data);
+      allow update: if gOwner(uid) && goalId == 'active' && gGoal(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt && request.resource.data.startDate == resource.data.startDate
+        && request.resource.data.version > resource.data.version && request.resource.data.version == resource.data.version + 1
+        && gNewReceipt(uid, request.resource.data)
+        && ((gReceipt(uid, request.resource.data.lastOperationId).kind == 'EDIT' && request.resource.data.lastEntryId == ''
+            && gReceipt(uid, request.resource.data.lastOperationId).payload == gGoalValues(request.resource.data)
+            && request.resource.data.savedMinor - resource.data.savedMinor == request.resource.data.openingMinor - resource.data.openingMinor
+            && (request.resource.data.deadline == resource.data.deadline || gDay(request.resource.data.deadline) > gToday()))
+          || gLedgerChange(uid, resource.data, request.resource.data));
+      allow delete: if false;
+    }
+    match /users/{uid}/savingsGoals/active/entries/{entryId} {
+      allow read: if gOwner(uid);
+      allow create: if gOwner(uid) && gId(entryId) && gEntry(request.resource.data) && !request.resource.data.deleted
+        && request.resource.data.createdAt == request.time && gEntryParent(uid, entryId, request.resource.data)
+        && gReceipt(uid, request.resource.data.lastOperationId).kind == 'ENTRY_CREATE';
+      allow update: if gOwner(uid) && gEntry(request.resource.data) && !resource.data.deleted
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.lastOperationId != resource.data.lastOperationId && gEntryParent(uid, entryId, request.resource.data)
+        && ((!request.resource.data.deleted && gReceipt(uid, request.resource.data.lastOperationId).kind == 'ENTRY_UPDATE')
+          || (request.resource.data.deleted && gReceipt(uid, request.resource.data.lastOperationId).kind == 'ENTRY_DELETE'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted','version','lastOperationId','updatedAt'])));
+      allow delete: if false;
+    }
+    match /users/{uid}/savingsGoals/active/operations/{operationId} {
+      allow read: if gOwner(uid);
+      allow create: if gOwner(uid) && gId(operationId)
+        && request.resource.data.keys().hasAll(['kind','entryId','version','payload','createdAt'])
+        && request.resource.data.keys().hasOnly(['kind','entryId','version','payload','createdAt'])
+        && request.resource.data.kind in ['CREATE','EDIT','ENTRY_CREATE','ENTRY_UPDATE','ENTRY_DELETE']
+        && request.resource.data.version is int && request.resource.data.version >= 0 && request.resource.data.payload is map
+        && request.resource.data.entryId is string && request.resource.data.createdAt == request.time
+        && getAfter(/databases/$(database)/documents/users/$(uid)/savingsGoals/active).data.lastOperationId == operationId
+        && getAfter(/databases/$(database)/documents/users/$(uid)/savingsGoals/active).data.version == request.resource.data.version
+        && ((request.resource.data.kind in ['CREATE','EDIT'] && request.resource.data.entryId == ''
+            && request.resource.data.payload == gGoalValues(getAfter(/databases/$(database)/documents/users/$(uid)/savingsGoals/active).data))
+          || (request.resource.data.kind in ['ENTRY_CREATE','ENTRY_UPDATE','ENTRY_DELETE'] && gId(request.resource.data.entryId)
+            && request.resource.data.payload == gEntryValues(getAfter(/databases/$(database)/documents/users/$(uid)/savingsGoals/active/entries/$(request.resource.data.entryId)).data)));
+      allow update, delete: if false;
+    }
+
     function isValidExpense(data, isCreate) {
       let baseKeys = ['amountMinor', 'currency', 'categoryId', 'paymentChannelId', 'spendingType', 'expenseDate', 'updatedAt'];
       let requiredKeys = baseKeys.concat(['createdAt']);

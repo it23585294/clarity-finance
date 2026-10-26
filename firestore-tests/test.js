@@ -2416,4 +2416,5 @@ describe('Clarity Expense Firestore Rules', function() {
             }
         });
     });
+    require('./savings-tests')(() => testEnv);
 });
