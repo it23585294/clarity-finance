@@ -80,9 +80,14 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
                     viewModel = homeViewModel,
                     onNavigateToExpenses = { navController.navigate("dashboard") },
                     onNavigateToIncome = { navController.navigate("income") },
-                    onNavigateToPendingPayments = { navController.navigate("pendingPayments") }
+                    onNavigateToPendingPayments = { navController.navigate("pendingPayments") },
+                    onNavigateToCrypto = { navController.navigate("cryptoResults") }
                 )
             }
+        }
+        composable("cryptoResults") {
+            val cryptoViewModel: com.clarity.finance.viewmodel.CryptoViewModel = viewModel(factory = viewModelFactory)
+            com.clarity.finance.ui.crypto.CryptoScreen(cryptoViewModel, onBack = { navController.popBackStack() })
         }
         composable("pendingPayments") {
             val paymentListViewModel: com.clarity.finance.viewmodel.PaymentListViewModel = viewModel(factory = viewModelFactory)

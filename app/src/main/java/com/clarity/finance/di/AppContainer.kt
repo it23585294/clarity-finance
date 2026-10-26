@@ -13,6 +13,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import android.content.Context
 import com.clarity.finance.data.local.SubmissionRecoveryStore
 import com.clarity.finance.data.local.dataStore
+import com.clarity.finance.data.repository.CryptoRepository
+import com.clarity.finance.data.repository.FirestoreCryptoRepository
+import com.clarity.finance.data.repository.FirestoreCryptoRemote
 
 class AppContainer(private val context: Context) {
     val authRepository: AuthRepository by lazy {
@@ -31,5 +34,11 @@ class AppContainer(private val context: Context) {
 
     val paymentRepository: PaymentRepository by lazy {
         FirestorePaymentRepository(FirebaseFirestore.getInstance(), recoveryStore)
+    }
+
+    val cryptoRepository: CryptoRepository by lazy {
+        FirestoreCryptoRepository(FirestoreCryptoRemote(FirebaseFirestore.getInstance()) {
+            FirebaseAuth.getInstance().currentUser?.uid
+        }, recoveryStore)
     }
 }

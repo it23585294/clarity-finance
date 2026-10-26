@@ -7,8 +7,12 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
@@ -29,9 +33,21 @@ class LiveFirestoreAuditTest {
             assertEquals("clarity-1c83e", FirebaseApp.getInstance().options.projectId)
             assertEquals("firestore.googleapis.com", firestore.firestoreSettings.host)
             assertTrue(firestore.firestoreSettings.isSslEnabled)
+            suspend fun serverQuery(query: Query): QuerySnapshot {
+                repeat(3) { attempt ->
+                    try { return query.get(Source.SERVER).await() }
+                    catch (e: FirebaseFirestoreException) {
+                        if (attempt == 2 || e.code !in setOf(FirebaseFirestoreException.Code.UNAVAILABLE,
+                                FirebaseFirestoreException.Code.DEADLINE_EXCEEDED)) throw e
+                        println("LIVE_AUDIT_RETRY transient_server_read attempt=" + (attempt + 1))
+                        delay(2000L)
+                    }
+                }
+                error("Server read did not complete")
+            }
             val uid = checkNotNull(FirebaseAuth.getInstance().currentUser) { "User must already be signed in" }.uid
             val root = firestore.collection("users").document(uid)
-            val projects = root.collection("expectedPayments").get(Source.SERVER).await()
+            val projects = serverQuery(root.collection("expectedPayments"))
             assertFalse(projects.metadata.isFromCache)
             assertFalse(projects.metadata.hasPendingWrites())
             val output = JSONObject().put("projectId", "clarity-1c83e").put("uid", uid)
@@ -53,7 +69,7 @@ class LiveFirestoreAuditTest {
             val projectArray = JSONArray()
             for (project in projects.documents) {
                 val data = document(project, projectFields)
-                val milestones = project.reference.collection("milestones").get(Source.SERVER).await()
+                val milestones = serverQuery(project.reference.collection("milestones"))
                 assertFalse(milestones.metadata.isFromCache)
                 assertFalse(milestones.metadata.hasPendingWrites())
                 val children = JSONArray()
@@ -72,7 +88,7 @@ class LiveFirestoreAuditTest {
                 old.put(document(root.collection("expectedPayments").document(id).get(Source.SERVER).await(), emptyList()))
             }
             output.put("previouslyRejectedProjectIds", old)
-            val receipts = root.collection("incomeReceipts").get(Source.SERVER).await()
+            val receipts = serverQuery(root.collection("incomeReceipts"))
             assertFalse(receipts.metadata.isFromCache)
             assertFalse(receipts.metadata.hasPendingWrites())
             val receiptArray = JSONArray()
@@ -82,10 +98,27 @@ class LiveFirestoreAuditTest {
                     "conversionRateStr", "linkedPaymentId", "linkedMilestoneId", "note")))
             }
             output.put("receipts", receiptArray)
+            val expenses = serverQuery(root.collection("expenses"))
+            assertFalse(expenses.metadata.isFromCache)
+            assertFalse(expenses.metadata.hasPendingWrites())
+            val expenseArray = JSONArray()
+            expenses.documents.forEach { expense ->
+                expenseArray.put(document(expense, listOf("amountMinor", "currency", "expenseDate",
+                    "categoryId", "paymentChannelId", "spendingType", "note")))
+            }
+            output.put("expenses", expenseArray)
+            val crypto = serverQuery(root.collection("cryptoResults"))
+            assertFalse(crypto.metadata.isFromCache)
+            assertFalse(crypto.metadata.hasPendingWrites())
+            val cryptoArray = JSONArray()
+            crypto.documents.forEach { result ->
+                cryptoArray.put(document(result, listOf("direction", "amountMinor", "resultDate", "note", "lastOperationId")))
+            }
+            output.put("cryptoResults", cryptoArray)
             val recovery = SubmissionRecoveryStore(context.dataStore)
             val attempts = JSONArray()
             for (type in listOf("CREATE_PROJECT", "CREATE_MILESTONE", "PAYMENT_DIRECT", "PAYMENT_MILESTONE",
-                "CANCEL_MILESTONE", "INCOME", "EXPENSE")) {
+                "CANCEL_MILESTONE", "INCOME", "EXPENSE", "CRYPTO_CREATE", "CRYPTO_UPDATE", "CRYPTO_DELETE")) {
                 recovery.getRecords(uid, type).forEach { record ->
                     attempts.put(JSONObject().put("type", type).put("recordId", record.recordId)
                         .put("status", record.status).put("errorReason", record.errorReason ?: JSONObject.NULL)
@@ -98,7 +131,7 @@ class LiveFirestoreAuditTest {
             val file = File(context.cacheDir, "live-firestore-$label.json")
             file.writeText(output.toString(2))
             println("LIVE_AUDIT projects=" + projects.size() + " receipts=" + receipts.size() +
-                " recovery=" + attempts.length() + " file=" + file.name)
+                " expenses=" + expenses.size() + " crypto=" + crypto.size() + " recovery=" + attempts.length() + " file=" + file.name)
         }
     }
 }

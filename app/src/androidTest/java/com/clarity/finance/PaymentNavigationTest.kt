@@ -35,7 +35,8 @@ class PaymentNavigationTest {
             override suspend fun logout() { authState.value = null }
         }
         val payments = NavigationPayments()
-        val factory = ViewModelFactory(auth, unused(ExpenseRepository::class.java), unused(IncomeRepository::class.java), payments)
+        val factory = ViewModelFactory(auth, unused(ExpenseRepository::class.java), unused(IncomeRepository::class.java), payments,
+            unused(CryptoRepository::class.java))
         compose.setContent { ClarityTheme { Box(Modifier.width(320.dp)) { AppNavigation(factory) } } }
         compose.onNodeWithText("Pending Payments").performClick()
         compose.onNodeWithText("Navigation Project").performClick()
