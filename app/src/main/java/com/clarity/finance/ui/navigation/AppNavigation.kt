@@ -81,9 +81,23 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
                     onNavigateToExpenses = { navController.navigate("dashboard") },
                     onNavigateToIncome = { navController.navigate("income") },
                     onNavigateToPendingPayments = { navController.navigate("pendingPayments") },
-                    onNavigateToCrypto = { navController.navigate("cryptoResults") }
+                    onNavigateToCrypto = { navController.navigate("cryptoResults") },
+                    onNavigateToDashboard = { navController.navigate("financialDashboard") }
                 )
             }
+        }
+        composable("financialDashboard") {
+            val dashboardViewModel: com.clarity.finance.viewmodel.DashboardViewModel = viewModel(factory = viewModelFactory)
+            com.clarity.finance.ui.dashboard.DashboardScreen(
+                viewModel = dashboardViewModel,
+                onBack = { navController.popBackStack() },
+                onAddExpense = { navController.navigate("addExpense") },
+                onExpense = { navController.navigate("editExpense/${android.net.Uri.encode(it)}") },
+                onIncome = { navController.navigate("addEditIncome/${android.net.Uri.encode(it)}") },
+                onProject = { navController.navigate("projectDetail/${android.net.Uri.encode(it)}") },
+                onCrypto = { navController.navigate("cryptoResults") },
+                onPayments = { navController.navigate("pendingPayments") }
+            )
         }
         composable("cryptoResults") {
             val cryptoViewModel: com.clarity.finance.viewmodel.CryptoViewModel = viewModel(factory = viewModelFactory)

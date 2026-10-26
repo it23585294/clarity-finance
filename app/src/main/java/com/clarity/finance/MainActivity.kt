@@ -23,7 +23,8 @@ class MainActivity : ComponentActivity() {
             appContainer.expenseRepository,
             appContainer.incomeRepository,
             appContainer.paymentRepository,
-            appContainer.cryptoRepository
+            appContainer.cryptoRepository,
+            appContainer.reportingRepository
         )
 
         setContent {

@@ -8,6 +8,8 @@ import com.clarity.finance.data.repository.IncomeRepository
 import com.clarity.finance.data.repository.PaymentRepository
 import com.clarity.finance.data.repository.CryptoRepository
 import com.clarity.finance.viewmodel.CryptoViewModel
+import com.clarity.finance.data.repository.ReportingRepository
+import com.clarity.finance.viewmodel.DashboardViewModel
 import com.clarity.finance.viewmodel.AddExpenseViewModel
 import com.clarity.finance.viewmodel.AuthViewModel
 import com.clarity.finance.viewmodel.EditExpenseViewModel
@@ -25,10 +27,14 @@ class ViewModelFactory(
     private val expenseRepository: ExpenseRepository,
     private val incomeRepository: IncomeRepository,
     private val paymentRepository: PaymentRepository,
-    private val cryptoRepository: CryptoRepository
+    private val cryptoRepository: CryptoRepository,
+    private val reportingRepository: ReportingRepository? = null
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(DashboardViewModel::class.java)) {
+            return DashboardViewModel(authRepository, requireNotNull(reportingRepository)) as T
+        }
         if (modelClass.isAssignableFrom(CryptoViewModel::class.java)) {
             return CryptoViewModel(authRepository, cryptoRepository) as T
         }

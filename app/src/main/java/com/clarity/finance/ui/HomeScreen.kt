@@ -19,7 +19,8 @@ fun HomeScreen(
     onNavigateToExpenses: () -> Unit,
     onNavigateToIncome: () -> Unit,
     onNavigateToPendingPayments: () -> Unit,
-    onNavigateToCrypto: () -> Unit
+    onNavigateToCrypto: () -> Unit,
+    onNavigateToDashboard: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -52,6 +53,10 @@ fun HomeScreen(
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(bottom = 48.dp)
                 )
+
+                Button(onClick = onNavigateToDashboard, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                    Text("Dashboard")
+                }
 
                 Button(
                     onClick = onNavigateToExpenses,
