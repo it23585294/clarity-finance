@@ -1,6 +1,8 @@
 package com.clarity.finance.ui.expenses
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -8,17 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
-val categoryUiMap = mapOf(
-    "food_dining" to "Food & Dining",
-    "transport" to "Transport",
-    "housing" to "Housing",
-    "utilities" to "Utilities",
-    "shopping" to "Shopping",
-    "health" to "Health",
-    "entertainment" to "Entertainment",
-    "education" to "Education",
-    "other" to "Other"
-)
+val categoryUiMap = com.clarity.finance.data.model.ExpenseCategories.labels
 
 val channelUiMap = mapOf(
     "cash" to "Cash",
@@ -27,7 +19,7 @@ val channelUiMap = mapOf(
     "other" to "Other"
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ExpenseFormContent(
     amountStr: String,
@@ -54,6 +46,8 @@ fun ExpenseFormContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
         OutlinedTextField(
@@ -128,7 +122,7 @@ fun ExpenseFormContent(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 RadioButton(selected = spendingType == "committed", onClick = { onSpendingTypeChange("committed") })
                 Text("Committed")

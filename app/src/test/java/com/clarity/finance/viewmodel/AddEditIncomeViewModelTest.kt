@@ -1,12 +1,14 @@
 package com.clarity.finance.viewmodel
 
 import com.clarity.finance.data.model.User
+import com.clarity.finance.data.model.Income
 import com.clarity.finance.data.repository.AuthRepository
 import com.clarity.finance.data.repository.IncomeRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -36,6 +38,15 @@ class AddEditIncomeViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `history edit preserves exact large confirmed foreign credit`() = runTest(testDispatcher) {
+        val income = Income("large", "adsense", "2023-10-23", "USD", "1", Long.MAX_VALUE, "actual_credit", null, "")
+        `when`(incomeRepository.getIncome("test-uid", "large")).thenReturn(Result.success(income))
+        viewModel.loadIncome("large")
+        advanceUntilIdle()
+        assertEquals("92233720368547758.07", viewModel.formState.value.actualLkrCreditStr)
     }
 
     @Test

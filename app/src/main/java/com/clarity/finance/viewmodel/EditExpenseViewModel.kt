@@ -58,7 +58,7 @@ class EditExpenseViewModel(
             if (result.isSuccess) {
                 val expense = result.getOrThrow()
                 originalUpdatedAt = expense.updatedAt
-                val amountStr = String.format(java.util.Locale.US, "%.2f", expense.amountMinor / 100.0)
+                val amountStr = BigDecimal.valueOf(expense.amountMinor, 2).toPlainString()
                 
                 _formState.value = _formState.value.copy(
                     isLoading = false,

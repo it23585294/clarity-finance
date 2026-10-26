@@ -71,6 +71,17 @@ class EditExpenseViewModelTest {
     }
 
     @Test
+    fun `history edit preserves every minor unit when loading a large amount`() = runTest(testDispatcher) {
+        mockAuthState.value = User("uid1", "test@example.com")
+        val expense = Expense("large", Long.MAX_VALUE, categoryId = "other", paymentChannelId = "cash",
+            spendingType = "committed", expenseDate = "2023-10-23", updatedAt = Timestamp(1, 0))
+        `when`(expenseRepository.getExpense("uid1", "large")).thenReturn(Result.success(expense))
+        viewModel.loadExpense("large")
+        advanceUntilIdle()
+        assertEquals("92233720368547758.07", viewModel.formState.value.amountStr)
+    }
+
+    @Test
     fun `saveChanges aborted resolves to stale conflict state`() = runTest(testDispatcher) {
         mockAuthState.value = User("uid1", "test@test.com")
         val timestamp = Timestamp.now()

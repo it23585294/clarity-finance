@@ -70,7 +70,7 @@ class AddEditIncomeViewModel(
                 if (income.conversionBasis == "confirmed_rate") {
                     rateStr = income.conversionRateStr ?: ""
                 } else if (income.conversionBasis == "actual_credit") {
-                    actualCreditStr = String.format(java.util.Locale.US, "%.2f", income.lkrAmountMinor / 100.0)
+                    actualCreditStr = BigDecimal.valueOf(income.lkrAmountMinor, 2).toPlainString()
                 }
 
                 _formState.value = _formState.value.copy(
