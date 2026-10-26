@@ -1,5 +1,5 @@
 ﻿const { assertFails, assertSucceeds, initializeTestEnvironment } = require('@firebase/rules-unit-testing');
-const { doc, setDoc, getDoc, getDocs, collection, updateDoc, deleteDoc, serverTimestamp, writeBatch, runTransaction } = require('firebase/firestore');
+const { doc, setDoc, getDoc, getDocs, collection, query, where, orderBy, updateDoc, deleteDoc, serverTimestamp, writeBatch, runTransaction } = require('firebase/firestore');
 const fs = require('fs');
 
 describe('Clarity Expense Firestore Rules', function() {
@@ -2260,6 +2260,53 @@ describe('Clarity Expense Firestore Rules', function() {
             }
             await assertFails(updateDoc(secondReceipt, { note: 'Edited', updatedAt: serverTimestamp() }));
             await assertFails(deleteDoc(secondReceipt));
+        });
+    });
+
+    describe('FR11-13 monthly reporting queries', () => {
+        const bounded = (db, owner, name, field, start = '2025-12-01', end = '2026-01-01') =>
+            query(collection(db, 'users', owner, name), where(field, '>=', start), where(field, '<', end), orderBy(field));
+
+        it('permits complete owner month queries across the year boundary for each transaction collection', async () => {
+            const db = testEnv.authenticatedContext('alice').firestore();
+            const fixtures = [
+                ['expenses', 'expenseDate', { ...mockValidExpense }],
+                ['incomeReceipts', 'receiptDate', { ...mockValidLkrIncome }],
+                ['cryptoResults', 'resultDate', { direction: 'gain', amountMinor: 10000, note: '', lastOperationId: 'reporting-fixture' }]
+            ];
+            for (const [name, field, base] of fixtures) {
+                for (const [id, date] of [['before', '2025-11-30'], ['first', '2025-12-01'], ['last', '2025-12-31'], ['next', '2026-01-01']]) {
+                    await assertSucceeds(setDoc(doc(db, 'users', 'alice', name, id), {
+                        ...base, [field]: date, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+                    }));
+                }
+                const rows = await assertSucceeds(getDocs(bounded(db, 'alice', name, field)));
+                if (rows.docs.map(row => row.id).join(',') !== 'first,last') throw new Error(`Incorrect ${name} month boundary`);
+            }
+            await assertSucceeds(getDocs(collection(db, 'users', 'alice', 'expectedPayments')));
+        });
+
+        it('backdating category correction and deletion change the actual bounded expense query', async () => {
+            const db = testEnv.authenticatedContext('alice').firestore();
+            const ref = doc(db, 'users', 'alice', 'expenses', 'reporting-edit');
+            await setDoc(ref, { ...mockValidExpense, expenseDate: '2026-01-01', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+            const december = bounded(db, 'alice', 'expenses', 'expenseDate');
+            const january = bounded(db, 'alice', 'expenses', 'expenseDate', '2026-01-01', '2026-02-01');
+            if (!(await getDocs(december)).empty || (await getDocs(january)).size !== 1) throw new Error('Initial reporting month incorrect');
+            await assertSucceeds(updateDoc(ref, { expenseDate: '2025-12-31', categoryId: 'transport', updatedAt: serverTimestamp() }));
+            const moved = await getDocs(december);
+            if (moved.size !== 1 || moved.docs[0].data().categoryId !== 'transport' || !(await getDocs(january)).empty) throw new Error('Backdating/correction not reflected');
+            await assertSucceeds(deleteDoc(ref));
+            if (!(await getDocs(december)).empty) throw new Error('Deleted expense remains in reporting query');
+        });
+
+        it('denies unauthenticated and cross-user bounded queries and current parent queries', async () => {
+            for (const db of [testEnv.unauthenticatedContext().firestore(), testEnv.authenticatedContext('bob').firestore()]) {
+                for (const [name, field] of [['expenses', 'expenseDate'], ['incomeReceipts', 'receiptDate'], ['cryptoResults', 'resultDate']]) {
+                    await assertFails(getDocs(bounded(db, 'alice', name, field)));
+                }
+                await assertFails(getDocs(collection(db, 'users', 'alice', 'expectedPayments')));
+            }
         });
     });
 
