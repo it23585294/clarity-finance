@@ -77,6 +77,25 @@ class SubmissionRecoveryStore(private val dataStore: DataStore<Preferences>) {
         }
     }
 
+    /** Strict reads/status changes for durable operations; legacy record handling is unchanged. */
+    fun getOperationRecordsFlow(uid: String, types: Set<String>): Flow<List<SubmissionRecord>> =
+        dataStore.data.map { preferences ->
+            val records: List<SubmissionRecord> = gson.fromJson(preferences[recordsKey] ?: "[]", typeToken) ?: emptyList()
+            records.filter { it.uid == uid && it.resolvedType in types }
+        }
+
+    suspend fun updateOperationStatus(record: SubmissionRecord) {
+        dataStore.edit { preferences ->
+            val current: MutableList<SubmissionRecord> = gson.fromJson(preferences[recordsKey] ?: "[]", typeToken) ?: mutableListOf()
+            val index = current.indexOfFirst {
+                it.uid == record.uid && it.recordId == record.recordId && it.resolvedType == record.resolvedType
+            }
+            check(index >= 0 && current[index].payloadJson == record.payloadJson) { "Saved operation changed. Reopen recovery." }
+            current[index] = record
+            preferences[recordsKey] = gson.toJson(current)
+        }
+    }
+
     suspend fun removeRecord(uid: String, recordId: String, type: String) {
         dataStore.edit { preferences ->
             val json = preferences[recordsKey] ?: "[]"
