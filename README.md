@@ -44,3 +44,9 @@ The accepted online checklist does not establish live network-interruption or ac
 ## Realised crypto results
 
 Authenticated Home includes Crypto Results for separate LKR gains/losses, backdated edits/deletion, and labelled monthly/YTD reporting. See [FR07 behavior, recovery, rules, verification and manual checks](CRYPTO_RESULTS.md). The reviewed rules were manually published by the user before the accepted [live checklist](FR07_LIVE_ACCEPTANCE.md) and [sanitized live results](FR07_LIVE_RESULTS.md). The later operation-feedback correction has separate automated verification; no additional live samples were created for it.
+
+## Monthly dashboard, history and spending insights
+
+Home → Dashboard shows monthly recorded income, expenses and cash surplus, separate realised crypto, and current pending balances by currency. Monthly history reuses existing editors; category drill-down and spending insights update through Firestore listeners. See [FR11–13/FR18 behavior, queries, verification and manual checks](MONTHLY_REPORTING.md). Cached/unavailable data and unsynchronised proposals are labelled explicitly. Goals and recurring expenses remain outside this milestone.
+
+The [sanitized read-only live results](MONTHLY_REPORTING_LIVE_RESULTS.md) record server/UI comparisons and cached restart/reconnection separately from the later optional-note/crypto-overflow corrections and their 142 unit/four isolated dashboard Android checks.
