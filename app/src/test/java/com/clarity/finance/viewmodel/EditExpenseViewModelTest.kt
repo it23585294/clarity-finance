@@ -23,6 +23,23 @@ import org.mockito.Mockito.`when`
 @OptIn(ExperimentalCoroutinesApi::class)
 class EditExpenseViewModelTest {
 
+    @Test fun `recurring actual correction rejects future date scientific notation and overlength note before repository writes`() = runTest(testDispatcher) {
+        mockAuthState.value = User("uid1", "fixture@example.com")
+        val clock = java.time.Clock.fixed(java.time.Instant.parse("2026-01-31T00:00:00Z"), java.time.ZoneOffset.UTC)
+        val vm = EditExpenseViewModel(authRepository, expenseRepository, clock)
+        val expense = Expense("rec_rent_2026-01", 3400000, categoryId = "housing", paymentChannelId = "cash", spendingType = "committed",
+            expenseDate = "2026-01-31", updatedAt = Timestamp(1, 0), recurringOccurrenceId = "rent_2026-01")
+        `when`(expenseRepository.getExpense("uid1", expense.id)).thenReturn(Result.success(expense))
+        vm.loadExpense(expense.id); advanceUntilIdle()
+        vm.updateForm(expenseDate = "2026-02-01"); vm.saveChanges(); advanceUntilIdle()
+        assertTrue(vm.formState.value.error!!.contains("nonfuture"))
+        vm.updateForm(expenseDate = "2025-12-31", amountStr = "1e3"); vm.saveChanges(); advanceUntilIdle()
+        assertNotNull(vm.formState.value.error)
+        vm.updateForm(amountStr = "1", note = "x".repeat(501)); vm.saveChanges(); advanceUntilIdle()
+        assertTrue(vm.formState.value.error!!.contains("500"))
+        org.mockito.Mockito.verify(expenseRepository, org.mockito.Mockito.never()).updateExpense(org.mockito.kotlin.any(), org.mockito.kotlin.any(), org.mockito.kotlin.any())
+    }
+
     private lateinit var viewModel: EditExpenseViewModel
     private val authRepository = mock(AuthRepository::class.java)
     private val expenseRepository = mock(ExpenseRepository::class.java)

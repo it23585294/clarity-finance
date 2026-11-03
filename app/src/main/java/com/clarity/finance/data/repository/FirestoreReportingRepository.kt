@@ -43,7 +43,8 @@ class FirestoreReportingRepository(
         doc.timestamps()
         Expense(doc.id, doc.requiredLong("amountMinor"), doc.requiredString("currency"),
             doc.requiredString("categoryId"), doc.requiredString("paymentChannelId"), doc.requiredString("spendingType"),
-            doc.requiredString("expenseDate"), doc.expenseNote(), doc.getTimestamp("updatedAt"))
+            doc.requiredString("expenseDate"), doc.expenseNote(), doc.getTimestamp("updatedAt"),
+            recurringOccurrenceId = doc.recurringOrigin())
     }
 
     override fun income(uid: String, month: ReportingMonth) = listen(month(uid, "incomeReceipts", "receiptDate", month)) { doc ->
@@ -72,12 +73,18 @@ class FirestoreReportingRepository(
 
     override fun recovery(uid: String) = recoveryStore.getOperationRecordsFlow(uid, setOf(
         "EXPENSE", "INCOME", "CREATE_PROJECT", "CREATE_MILESTONE", "PAYMENT_DIRECT", "PAYMENT_MILESTONE", "CANCEL_MILESTONE",
-        "CRYPTO_CREATE", "CRYPTO_UPDATE", "CRYPTO_DELETE"
+        "CRYPTO_CREATE", "CRYPTO_UPDATE", "CRYPTO_DELETE", "RECURRING_CONFIRM"
     )).map { records ->
-        ReportingRecovery(records.count { it.status == "PENDING" }, records.count { it.status in setOf("FAILED", "CONFLICT") })
+        ReportingRecovery(records.count { it.status in setOf("PENDING", "UNCERTAIN") }, records.count { it.status in setOf("FAILED", "CONFLICT", "REJECTED") })
     }
 
     private fun DocumentSnapshot.requiredString(field: String) = getString(field) ?: error("Missing $field.")
+    private fun DocumentSnapshot.recurringOrigin(): String? {
+        if (!contains("recurringOccurrenceId")) return null
+        val origin = get("recurringOccurrenceId")
+        check(origin is String && id == "rec_$origin" && origin.matches(Regex("[A-Za-z0-9-]{1,128}_[0-9]{4}-[0-9]{2}"))) { "Invalid recurring expense origin." }
+        return origin
+    }
     private fun DocumentSnapshot.expenseNote(): String {
         if (!contains("note")) return ""
         val note = get("note")

@@ -17,7 +17,7 @@ import com.clarity.finance.data.local.SubmissionRecoveryStore
 import com.clarity.finance.data.local.SubmissionRecord
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 
 class FirestoreExpenseRepository(
     private val firestore: FirebaseFirestore,
@@ -47,7 +47,8 @@ class FirestoreExpenseRepository(
                                     expenseDate = doc.getString("expenseDate") ?: "",
                                     note = doc.getString("note"),
                                     updatedAt = doc.getTimestamp("updatedAt"),
-                                    isPending = doc.metadata.hasPendingWrites()
+                                    isPending = doc.metadata.hasPendingWrites(),
+                                    recurringOccurrenceId = doc.getString("recurringOccurrenceId")
                                 )
                             } catch (e: Exception) {
                                 null
@@ -174,13 +175,15 @@ class FirestoreExpenseRepository(
                     expenseDate = doc.getString("expenseDate") ?: "",
                     note = doc.getString("note"),
                     updatedAt = doc.getTimestamp("updatedAt"),
-                    isPending = doc.metadata.hasPendingWrites()
+                    isPending = doc.metadata.hasPendingWrites(),
+                    recurringOccurrenceId = doc.getString("recurringOccurrenceId")
                 )
                 Result.success(expense)
             } else {
                 Result.failure(Exception("Expense not found"))
             }
-        } catch (e: Exception) {
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) {
             Result.failure(e)
         }
     }
@@ -200,7 +203,8 @@ class FirestoreExpenseRepository(
                 transaction.update(docRef, expense.toFirestoreMap(isRetry = true))
             }.await()
             Result.success(Unit)
-        } catch (e: Exception) {
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) {
             Result.failure(e)
         }
     }
@@ -220,7 +224,8 @@ class FirestoreExpenseRepository(
                 transaction.delete(docRef)
             }.await()
             Result.success(Unit)
-        } catch (e: Exception) {
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) {
             Result.failure(e)
         }
     }
@@ -235,8 +240,8 @@ class FirestoreExpenseRepository(
             "expenseDate" to expenseDate,
             "updatedAt" to FieldValue.serverTimestamp()
         )
-        if (!note.isNullOrBlank()) {
-            map["note"] = note.trim()
+        if (isRetry || !note.isNullOrBlank()) {
+            map["note"] = note?.trim() ?: ""
         }
         if (!isRetry) {
             map["createdAt"] = FieldValue.serverTimestamp()

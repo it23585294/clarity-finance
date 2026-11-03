@@ -79,6 +79,32 @@ class FirestoreReportingRepositoryTest {
     private val expenseFields = mapOf("amountMinor" to 150000L, "currency" to "LKR", "categoryId" to "transport",
         "paymentChannelId" to "cash", "spendingType" to "committed", "expenseDate" to "2026-01-01", "note" to "Fixture")
 
+    @Test fun `linked recurring actual expense retains origin and optional note and contributes exactly once`() = runTest {
+        val listener = setup("expenses", "expenseDate")
+        var latest = ReportingBatch<Expense>()
+        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { repository.expenses("owner", period).collect { latest = it } }
+        val linked = doc(expenseFields - "note" + ("recurringOccurrenceId" to "rent_2026-01"))
+        `when`(linked.id).thenReturn("rec_rent_2026-01")
+        runCurrent(); listener.onEvent(snapshot(listOf(linked)), null); runCurrent()
+        assertEquals("rent_2026-01", latest.records!!.single().recurringOccurrenceId)
+        assertEquals("", latest.records!!.single().note)
+        assertEquals(150000L, MonthlyReporting.expenses(latest.records!!, period).totalMinor)
+        verify(owner, never()).collection("recurringTemplates"); verify(owner, never()).collection("recurringOccurrences")
+        job.cancelAndJoin()
+    }
+
+    @Test fun `recurring uncertain and rejected proposals are feedback only and templates never count as actual expenses`() = runTest {
+        val store = SubmissionRecoveryStore(PreferenceDataStoreFactory.create(scope = backgroundScope,
+            produceFile = { temp.newFile("recurring-report.preferences_pb") }))
+        store.saveOperation(SubmissionRecord("owner", "rent_2026-01", "immutable-confirm", "UNCERTAIN", type = "RECURRING_CONFIRM"))
+        store.saveOperation(SubmissionRecord("owner", "rent_2026-02", "rejected-confirm", "REJECTED", type = "RECURRING_CONFIRM"))
+        store.saveOperation(SubmissionRecord("owner", "rent", "template-proposal", "PENDING", type = "RECURRING_CREATE"))
+        store.saveOperation(SubmissionRecord("other", "rent_2026-03", "other-owner", "PENDING", type = "RECURRING_CONFIRM"))
+        assertEquals(ReportingRecovery(1, 1), FirestoreReportingRepository(firestore, store).recovery("owner").first())
+        assertEquals("immutable-confirm", store.getRecords("owner", "RECURRING_CONFIRM").first().payloadJson)
+        verifyNoInteractions(firestore)
+    }
+
     @Test fun `omitted optional expense note decodes as empty and contributes to reporting`() = runTest {
         val listener = setup("expenses", "expenseDate")
         var latest = ReportingBatch<Expense>()

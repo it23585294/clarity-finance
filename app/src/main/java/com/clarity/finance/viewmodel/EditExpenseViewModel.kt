@@ -11,8 +11,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
-import java.time.LocalDate
-import java.time.format.DateTimeParseException
+import java.time.Clock
+import com.clarity.finance.data.model.SavingsMath
 
 data class EditExpenseFormState(
     val isSubmitting: Boolean = false,
@@ -36,7 +36,8 @@ data class EditExpenseFormState(
 
 class EditExpenseViewModel(
     private val authRepository: AuthRepository,
-    private val expenseRepository: ExpenseRepository
+    private val expenseRepository: ExpenseRepository,
+    private val clock: Clock = Clock.systemUTC()
 ) : ViewModel() {
 
     private val _formState = MutableStateFlow(EditExpenseFormState())
@@ -106,6 +107,10 @@ class EditExpenseViewModel(
         if (_formState.value.isSubmitting || _formState.value.isDeleting) return
 
         val state = _formState.value
+        if (state.note.length > 500) {
+            _formState.value = state.copy(error = "Note must have at most 500 characters")
+            return
+        }
         val amountMinorResult = parseAmount(state.amountStr)
         if (amountMinorResult.isFailure) {
             _formState.value = state.copy(error = amountMinorResult.exceptionOrNull()?.message)
@@ -113,7 +118,7 @@ class EditExpenseViewModel(
         }
 
         if (!isValidDate(state.expenseDate)) {
-            _formState.value = state.copy(error = "Invalid date format. Use real calendar date (yyyy-MM-dd)")
+            _formState.value = state.copy(error = "Use a real nonfuture payment date (yyyy-MM-dd)")
             return
         }
 
@@ -208,11 +213,7 @@ class EditExpenseViewModel(
 
     private fun parseAmount(amount: String): Result<Long> {
         return try {
-            val bd = BigDecimal(amount.trim())
-            if (bd <= BigDecimal.ZERO) return Result.failure(Exception("Amount must be positive"))
-            if (bd.scale() > 2) return Result.failure(Exception("Maximum 2 decimal places allowed"))
-            val cents = bd.multiply(BigDecimal(100)).longValueExact()
-            Result.success(cents)
+            Result.success(SavingsMath.amount(amount))
         } catch (e: ArithmeticException) {
             Result.failure(Exception("Amount is too large"))
         } catch (e: Exception) {
@@ -222,9 +223,8 @@ class EditExpenseViewModel(
 
     private fun isValidDate(dateStr: String): Boolean {
         return try {
-            LocalDate.parse(dateStr)
-            true
-        } catch (e: DateTimeParseException) {
+            SavingsMath.date(dateStr) <= SavingsMath.today(clock)
+        } catch (e: IllegalArgumentException) {
             false
         }
     }
