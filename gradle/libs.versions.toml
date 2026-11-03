@@ -15,6 +15,7 @@ coroutines = "1.11.0"
 mockito = "5.5.0"
 datastore = "1.1.1"
 gson = "2.10.1"
+koin = "4.1.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -42,6 +43,8 @@ firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore
 mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
+koin-core = { group = "io.insert-koin", name = "koin-core", version.ref = "koin" }
+koin-core-viewmodel = { group = "io.insert-koin", name = "koin-core-viewmodel", version.ref = "koin" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

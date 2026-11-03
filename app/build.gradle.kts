@@ -39,6 +39,8 @@ android {
 }
 
 dependencies {
+    implementation(libs.koin.core)
+    implementation(libs.koin.core.viewmodel)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
