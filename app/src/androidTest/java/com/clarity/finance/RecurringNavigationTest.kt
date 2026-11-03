@@ -11,8 +11,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.clarity.finance.data.model.*
 import com.clarity.finance.data.repository.*
-import com.clarity.finance.di.ViewModelFactory
-import com.clarity.finance.ui.navigation.AppNavigation
 import com.clarity.finance.ui.theme.ClarityTheme
 import com.google.firebase.Timestamp
 import kotlinx.coroutines.awaitCancellation
@@ -99,12 +97,12 @@ class RecurringNavigationTest {
             override fun projects(uid: String) = data.projects(uid)
             override fun recovery(uid: String) = MutableStateFlow(ReportingRecovery())
         }
-        val factory = ViewModelFactory(auth, data, unused(IncomeRepository::class.java), unused(PaymentRepository::class.java), unused(CryptoRepository::class.java),
-            reporting, recurringRepository = data)
+        val graph = isolatedAppGraph(auth, data, unused(IncomeRepository::class.java), unused(PaymentRepository::class.java), unused(CryptoRepository::class.java),
+            reporting, recurring = data)
         compose.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, 1.3f)) {
-                ClarityTheme { Box(Modifier.width(320.dp)) { AppNavigation(factory) } }
+                ClarityTheme { Box(Modifier.width(320.dp)) { IsolatedAppNavigation(graph) } }
             }
         }
     }

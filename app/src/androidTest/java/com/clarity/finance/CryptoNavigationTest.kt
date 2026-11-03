@@ -10,8 +10,6 @@ import com.clarity.finance.data.model.CryptoReporting
 import com.clarity.finance.data.model.CryptoResult
 import com.clarity.finance.data.model.User
 import com.clarity.finance.data.repository.*
-import com.clarity.finance.di.ViewModelFactory
-import com.clarity.finance.ui.navigation.AppNavigation
 import com.clarity.finance.ui.theme.ClarityTheme
 import com.google.firebase.Timestamp
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,9 +30,9 @@ class CryptoNavigationTest {
             override suspend fun logout() { authState.value = null }
         }
         val crypto = FakeCrypto()
-        val factory = ViewModelFactory(auth, unused(ExpenseRepository::class.java), unused(IncomeRepository::class.java),
+        val graph = isolatedAppGraph(auth, unused(ExpenseRepository::class.java), unused(IncomeRepository::class.java),
             unused(PaymentRepository::class.java), crypto)
-        compose.setContent { ClarityTheme { Box(Modifier.width(320.dp)) { AppNavigation(factory) } } }
+        compose.setContent { ClarityTheme { Box(Modifier.width(320.dp)) { IsolatedAppNavigation(graph) } } }
         compose.onNodeWithText("Crypto Results").performScrollTo().performClick()
         compose.onNodeWithText("No realised results recorded for this month.").performScrollTo().assertIsDisplayed()
         add("60000", loss = false)

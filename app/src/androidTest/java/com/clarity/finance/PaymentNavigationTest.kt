@@ -13,8 +13,6 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.dp
 import com.clarity.finance.data.model.*
 import com.clarity.finance.data.repository.*
-import com.clarity.finance.di.ViewModelFactory
-import com.clarity.finance.ui.navigation.AppNavigation
 import com.clarity.finance.ui.theme.ClarityTheme
 import com.google.firebase.Timestamp
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,9 +33,9 @@ class PaymentNavigationTest {
             override suspend fun logout() { authState.value = null }
         }
         val payments = NavigationPayments()
-        val factory = ViewModelFactory(auth, unused(ExpenseRepository::class.java), unused(IncomeRepository::class.java), payments,
+        val graph = isolatedAppGraph(auth, unused(ExpenseRepository::class.java), unused(IncomeRepository::class.java), payments,
             unused(CryptoRepository::class.java))
-        compose.setContent { ClarityTheme { Box(Modifier.width(320.dp)) { AppNavigation(factory) } } }
+        compose.setContent { ClarityTheme { Box(Modifier.width(320.dp)) { IsolatedAppNavigation(graph) } } }
         compose.onNodeWithText("Pending Payments").performClick()
         compose.onNodeWithText("Navigation Project").performClick()
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("Record Direct"))

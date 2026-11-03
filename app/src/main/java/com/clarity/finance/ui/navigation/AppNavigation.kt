@@ -9,11 +9,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.clarity.finance.di.ViewModelFactory
+import com.clarity.finance.di.injectedViewModel
+import org.koin.core.Koin
+import org.koin.core.context.GlobalContext
 import com.clarity.finance.ui.auth.LoginScreen
 import com.clarity.finance.ui.auth.RegisterScreen
 import com.clarity.finance.viewmodel.AuthViewModel
@@ -21,9 +22,9 @@ import com.clarity.finance.viewmodel.ExpenseListViewModel
 import com.clarity.finance.viewmodel.SessionState
 
 @Composable
-fun AppNavigation(viewModelFactory: ViewModelFactory) {
+fun AppNavigation(graph: Koin = GlobalContext.get()) {
     val navController = rememberNavController()
-    val authViewModel: AuthViewModel = viewModel(factory = viewModelFactory)
+    val authViewModel: AuthViewModel = injectedViewModel(graph)
     val sessionState by authViewModel.sessionState.collectAsStateWithLifecycle()
 
     if (sessionState is SessionState.Initializing) {
@@ -75,7 +76,7 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
         composable("home") {
             val user = (sessionState as? SessionState.SignedIn)?.user
             if (user != null) {
-                val homeViewModel: com.clarity.finance.viewmodel.HomeViewModel = viewModel(factory = viewModelFactory)
+                val homeViewModel: com.clarity.finance.viewmodel.HomeViewModel = injectedViewModel(graph)
                 com.clarity.finance.ui.HomeScreen(
                     viewModel = homeViewModel,
                     onNavigateToExpenses = { navController.navigate("dashboard") },
@@ -89,7 +90,7 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
             }
         }
         composable("financialDashboard") {
-            val dashboardViewModel: com.clarity.finance.viewmodel.DashboardViewModel = viewModel(factory = viewModelFactory)
+            val dashboardViewModel: com.clarity.finance.viewmodel.DashboardViewModel = injectedViewModel(graph)
             com.clarity.finance.ui.dashboard.DashboardScreen(
                 viewModel = dashboardViewModel,
                 onBack = { navController.popBackStack() },
@@ -100,29 +101,27 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
                 onCrypto = { navController.navigate("cryptoResults") },
                 onPayments = { navController.navigate("pendingPayments") },
                 goalCard = {
-                    if (viewModelFactory.hasGoals) {
-                        val goalCardViewModel: com.clarity.finance.viewmodel.GoalCardViewModel = viewModel(factory = viewModelFactory)
-                        com.clarity.finance.ui.goals.GoalCard(goalCardViewModel) { navController.navigate("savingsGoal") }
-                    }
+                    val goalCardViewModel: com.clarity.finance.viewmodel.GoalCardViewModel = injectedViewModel(graph)
+                    com.clarity.finance.ui.goals.GoalCard(goalCardViewModel) { navController.navigate("savingsGoal") }
                 }
             )
         }
         composable("recurringExpenses") {
-            val recurringViewModel: com.clarity.finance.viewmodel.RecurringViewModel = viewModel(factory = viewModelFactory)
+            val recurringViewModel: com.clarity.finance.viewmodel.RecurringViewModel = injectedViewModel(graph)
             com.clarity.finance.ui.recurring.RecurringScreen(recurringViewModel,
                 onBack = { navController.popBackStack() },
                 onExpense = { navController.navigate("editExpense/${android.net.Uri.encode(it)}") })
         }
         composable("savingsGoal") {
-            val goalViewModel: com.clarity.finance.viewmodel.GoalViewModel = viewModel(factory = viewModelFactory)
+            val goalViewModel: com.clarity.finance.viewmodel.GoalViewModel = injectedViewModel(graph)
             com.clarity.finance.ui.goals.GoalScreen(goalViewModel) { navController.popBackStack() }
         }
         composable("cryptoResults") {
-            val cryptoViewModel: com.clarity.finance.viewmodel.CryptoViewModel = viewModel(factory = viewModelFactory)
+            val cryptoViewModel: com.clarity.finance.viewmodel.CryptoViewModel = injectedViewModel(graph)
             com.clarity.finance.ui.crypto.CryptoScreen(cryptoViewModel, onBack = { navController.popBackStack() })
         }
         composable("pendingPayments") {
-            val paymentListViewModel: com.clarity.finance.viewmodel.PaymentListViewModel = viewModel(factory = viewModelFactory)
+            val paymentListViewModel: com.clarity.finance.viewmodel.PaymentListViewModel = injectedViewModel(graph)
             com.clarity.finance.ui.payments.ExpectedPaymentsScreen(
                 viewModel = paymentListViewModel,
                 onNavigateToProjectDetail = { id -> navController.navigate("projectDetail/$id") },
@@ -131,7 +130,7 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
             )
         }
         composable("addPayment") {
-            val addPaymentViewModel: com.clarity.finance.viewmodel.AddPaymentViewModel = viewModel(factory = viewModelFactory)
+            val addPaymentViewModel: com.clarity.finance.viewmodel.AddPaymentViewModel = injectedViewModel(graph)
             com.clarity.finance.ui.payments.AddPaymentScreen(
                 viewModel = addPaymentViewModel,
                 onNavigateBack = { navController.popBackStack() }
@@ -142,7 +141,7 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
             arguments = listOf(androidx.navigation.navArgument("paymentId") { type = androidx.navigation.NavType.StringType })
         ) { backStackEntry ->
             val paymentId = backStackEntry.arguments?.getString("paymentId") ?: return@composable
-            val paymentDetailViewModel: com.clarity.finance.viewmodel.PaymentDetailViewModel = viewModel(factory = viewModelFactory)
+            val paymentDetailViewModel: com.clarity.finance.viewmodel.PaymentDetailViewModel = injectedViewModel(graph)
             com.clarity.finance.ui.payments.ProjectDetailScreen(
                 viewModel = paymentDetailViewModel,
                 paymentId = paymentId,
@@ -165,7 +164,7 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
         ) { backStackEntry ->
             val paymentId = backStackEntry.arguments?.getString("paymentId") ?: return@composable
             val milestoneId = backStackEntry.arguments?.getString("milestoneId")
-            val confirmationViewModel: com.clarity.finance.viewmodel.PaymentConfirmationViewModel = viewModel(factory = viewModelFactory)
+            val confirmationViewModel: com.clarity.finance.viewmodel.PaymentConfirmationViewModel = injectedViewModel(graph)
             com.clarity.finance.ui.payments.PaymentConfirmationScreen(
                 viewModel = confirmationViewModel,
                 paymentId = paymentId,
@@ -174,7 +173,7 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
             )
         }
         composable("income") {
-            val incomeListViewModel: com.clarity.finance.viewmodel.IncomeListViewModel = viewModel(factory = viewModelFactory)
+            val incomeListViewModel: com.clarity.finance.viewmodel.IncomeListViewModel = injectedViewModel(graph)
             com.clarity.finance.ui.income.IncomeListScreen(
                 viewModel = incomeListViewModel,
                 onNavigateToAddIncome = { navController.navigate("addEditIncome/new") },
@@ -188,7 +187,7 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
         ) { backStackEntry ->
             val incomeId = backStackEntry.arguments?.getString("incomeId")
             val effectiveId = if (incomeId == "new") null else incomeId
-            val addEditIncomeViewModel: com.clarity.finance.viewmodel.AddEditIncomeViewModel = viewModel(factory = viewModelFactory)
+            val addEditIncomeViewModel: com.clarity.finance.viewmodel.AddEditIncomeViewModel = injectedViewModel(graph)
             com.clarity.finance.ui.income.AddEditIncomeScreen(
                 viewModel = addEditIncomeViewModel,
                 incomeId = effectiveId,
@@ -198,7 +197,7 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
         composable("dashboard") {
             val user = (sessionState as? SessionState.SignedIn)?.user
             if (user != null) {
-                val expenseListViewModel: ExpenseListViewModel = viewModel(factory = viewModelFactory)
+                val expenseListViewModel: ExpenseListViewModel = injectedViewModel(graph)
                 com.clarity.finance.ui.expenses.ExpensesScreen(
                     viewModel = expenseListViewModel,
                     onNavigateToAddExpense = {
@@ -212,7 +211,7 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
             }
         }
         composable("addExpense") {
-            val addExpenseViewModel: com.clarity.finance.viewmodel.AddExpenseViewModel = viewModel(factory = viewModelFactory)
+            val addExpenseViewModel: com.clarity.finance.viewmodel.AddExpenseViewModel = injectedViewModel(graph)
             com.clarity.finance.ui.expenses.AddExpenseScreen(
                 viewModel = addExpenseViewModel,
                 onNavigateBack = { navController.popBackStack() }
@@ -223,7 +222,7 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
             arguments = listOf(androidx.navigation.navArgument("expenseId") { type = androidx.navigation.NavType.StringType })
         ) { backStackEntry ->
             val expenseId = backStackEntry.arguments?.getString("expenseId") ?: return@composable
-            val editExpenseViewModel: com.clarity.finance.viewmodel.EditExpenseViewModel = viewModel(factory = viewModelFactory)
+            val editExpenseViewModel: com.clarity.finance.viewmodel.EditExpenseViewModel = injectedViewModel(graph)
             com.clarity.finance.ui.expenses.EditExpenseScreen(
                 viewModel = editExpenseViewModel,
                 expenseId = expenseId,

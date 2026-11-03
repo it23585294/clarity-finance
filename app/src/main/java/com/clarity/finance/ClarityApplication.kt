@@ -1,13 +1,16 @@
 package com.clarity.finance
 
 import android.app.Application
-import com.clarity.finance.di.AppContainer
+import com.clarity.finance.di.platformModule
+import com.clarity.finance.di.repositoryModule
+import com.clarity.finance.di.viewModelModule
+import org.koin.core.context.startKoin
 
 class ClarityApplication : Application() {
-    lateinit var container: AppContainer
-
     override fun onCreate() {
         super.onCreate()
-        container = AppContainer(this)
+        startKoin {
+            modules(platformModule(this@ClarityApplication), repositoryModule, viewModelModule)
+        }
     }
 }

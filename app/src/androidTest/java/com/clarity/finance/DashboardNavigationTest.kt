@@ -11,8 +11,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.clarity.finance.data.model.*
 import com.clarity.finance.data.repository.*
-import com.clarity.finance.di.ViewModelFactory
-import com.clarity.finance.ui.navigation.AppNavigation
 import com.clarity.finance.ui.theme.ClarityTheme
 import com.google.firebase.Timestamp
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -70,12 +68,12 @@ class DashboardNavigationTest {
             override suspend fun enqueueExpense(userId: String, expense: Expense) = error("No creation in this navigation test")
             override fun retryFailedExpense(userId: String, expense: Expense) = error("Unused")
         }
-        val factory = ViewModelFactory(auth, expenseRepository, unused(IncomeRepository::class.java), unused(PaymentRepository::class.java),
+        val graph = isolatedAppGraph(auth, expenseRepository, unused(IncomeRepository::class.java), unused(PaymentRepository::class.java),
             unused(CryptoRepository::class.java), data)
         compose.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, if (enlarged) 1.3f else density.fontScale)) {
-                ClarityTheme { Box(Modifier.width(320.dp)) { AppNavigation(factory) } }
+                ClarityTheme { Box(Modifier.width(320.dp)) { IsolatedAppNavigation(graph) } }
             }
         }
         compose.onNodeWithText("Dashboard").performScrollTo().performClick()

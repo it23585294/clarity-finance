@@ -11,8 +11,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.clarity.finance.data.model.*
 import com.clarity.finance.data.repository.*
-import com.clarity.finance.di.ViewModelFactory
-import com.clarity.finance.ui.navigation.AppNavigation
 import com.clarity.finance.ui.theme.ClarityTheme
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -69,12 +67,12 @@ class GoalNavigationTest {
         override fun recovery(uid: String) = MutableStateFlow(ReportingRecovery())
     }
     private fun show(data: Data) {
-        val factory = ViewModelFactory(auth, unused(ExpenseRepository::class.java), unused(IncomeRepository::class.java),
+        val graph = isolatedAppGraph(auth, unused(ExpenseRepository::class.java), unused(IncomeRepository::class.java),
             unused(PaymentRepository::class.java), unused(CryptoRepository::class.java), reporting, data)
         compose.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, 1.3f)) {
-                ClarityTheme { Box(Modifier.width(320.dp)) { AppNavigation(factory) } }
+                ClarityTheme { Box(Modifier.width(320.dp)) { IsolatedAppNavigation(graph) } }
             }
         }
     }
