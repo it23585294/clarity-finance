@@ -68,7 +68,7 @@ class DashboardViewModel(
         restart()
     }
     fun selectCategory(id: String?) {
-        if (id != null && id !in ExpenseCategories.labels) return
+        if (id != null && !CatalogueDefaults.validId("category", id)) return
         _state.value = _state.value.copy(selectedCategory = id)
         render()
     }

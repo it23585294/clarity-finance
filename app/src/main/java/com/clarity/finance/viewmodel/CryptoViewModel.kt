@@ -227,7 +227,7 @@ class CryptoViewModel(
     }
 
     fun edit(result: CryptoResult) {
-        if (uid == null || result.sync != CryptoSync.CONFIRMED || result.updatedAt == null || _state.value.busy ||
+        if (uid == null || result.sync !in setOf(CryptoSync.CONFIRMED, CryptoSync.CACHED) || result.updatedAt == null || _state.value.busy ||
             snapshot.attempts.any { it.result.id == result.id }) return
         _state.value = _state.value.copy(form = CryptoForm(id = result.id, direction = result.direction,
             amount = BigDecimal.valueOf(result.amountMinor, 2).toPlainString(), date = result.resultDate,
@@ -262,7 +262,7 @@ class CryptoViewModel(
     }
 
     fun requestDelete(result: CryptoResult) {
-        if (result.sync == CryptoSync.CONFIRMED && result.updatedAt != null && !_state.value.busy &&
+        if (result.sync in setOf(CryptoSync.CONFIRMED, CryptoSync.CACHED) && result.updatedAt != null && !_state.value.busy &&
             snapshot.attempts.none { it.result.id == result.id }) {
             deleteOperation = CryptoOperation(UUID.randomUUID().toString(), "DELETE", result, result.updatedAt)
             _state.value = _state.value.copy(deleteTarget = result)
@@ -280,11 +280,14 @@ class CryptoViewModel(
     fun retry(result: CryptoResult) {
         snapshot.attempts.firstOrNull { it.result.id == result.id }?.let { perform(it, retry = true) }
     }
+    fun resolve(result: CryptoResult) {
+        snapshot.attempts.firstOrNull { it.result.id == result.id }?.let { perform(it, resolve = true) }
+    }
     fun dismissRejected(result: CryptoResult) {
         snapshot.attempts.firstOrNull { it.result.id == result.id }?.let { perform(it, dismiss = true) }
     }
 
-    private fun perform(operation: CryptoOperation, formSubmission: Boolean = false, retry: Boolean = false, dismiss: Boolean = false) {
+    private fun perform(operation: CryptoOperation, formSubmission: Boolean = false, retry: Boolean = false, dismiss: Boolean = false, resolve: Boolean = false) {
         if (_state.value.busy) return
         val owner = uid ?: return
         val token = generation
@@ -294,6 +297,7 @@ class CryptoViewModel(
                 val accepted = withTimeoutOrNull(10000L) {
                     check(auth.authState.first()?.uid == owner && valid(owner, token)) { "Account changed. Reopen Crypto Results." }
                     when {
+                        resolve -> repository.resolve(owner, operation)
                         dismiss -> repository.dismissRejected(owner, operation)
                         retry -> repository.retry(owner, operation)
                         else -> repository.submit(owner, operation)

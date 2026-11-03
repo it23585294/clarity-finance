@@ -130,7 +130,7 @@ class PaymentConfirmationViewModel(
                     if (operationToken != token) return@withTimeout
                     val ms = msFlow.find { it.id == milestoneId }
                     if (ms != null) {
-                        check(!ms.isCancelled && !ms.hasPendingWrites && !ms.isFromCache) {
+                        check(!ms.isCancelled && !ms.hasPendingWrites) {
                             ms.confirmationMessage ?: "Milestone is cancelled"
                         }
                         maxAmountMinor = ms.outstandingAmountMinor

@@ -56,19 +56,21 @@ class AddExpenseViewModelTest {
 
     @Test
     fun `addExpense rejects invalid money string`() = runTest {
-        viewModel.addExpense("abc", "Other", "Cash", "discretionary", "2023-01-01", "")
+        testDispatcher.scheduler.runCurrent()
+        viewModel.addExpense("abc", "other", "cash", "discretionary", "2023-01-01", "")
         
         val state = viewModel.formState.value
         assertFalse(state.isSubmitting)
-        assertEquals("Invalid amount", state.error)
+        assertEquals("Enter a positive LKR amount with at most two decimal places; no sign or exponent.", state.error)
     }
     
     @Test
     fun `addExpense rejects invalid date`() = runTest {
-        viewModel.addExpense("10.00", "Other", "Cash", "discretionary", "2023/01/01", "")
+        testDispatcher.scheduler.runCurrent()
+        viewModel.addExpense("10.00", "other", "cash", "discretionary", "2023/01/01", "")
         
         val state = viewModel.formState.value
         assertFalse(state.isSubmitting)
-        assertEquals("Invalid date format. Use real calendar date (yyyy-MM-dd)", state.error)
+        assertEquals("Use YYYY-MM-DD.", state.error)
     }
 }

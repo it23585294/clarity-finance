@@ -7,6 +7,8 @@ import com.clarity.finance.data.repository.IncomeRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -56,7 +58,7 @@ class IncomeListViewModelTest {
         val i1 = income1.copy(receiptDate = "${currentMonthStr}-20")
         val i2 = income2.copy(receiptDate = "${currentMonthStr}-21")
         
-        `when`(incomeRepository.getIncomes("uid1")).thenReturn(MutableStateFlow(listOf(i1, i2)))
+        `when`(incomeRepository.getIncomes(org.mockito.kotlin.eq("uid1"), org.mockito.kotlin.any<com.clarity.finance.data.model.ReportingMonth>())).thenReturn(MutableStateFlow(listOf(i1, i2)))
         mockAuthState.value = user1
         
         val collectJob = launch(testDispatcher) { viewModel.uiState.collect {} }
@@ -79,7 +81,7 @@ class IncomeListViewModelTest {
         val i3 = Income("3", "salary", now.minusMonths(1).atEndOfMonth().toString(), "LKR", "100", 10000L, "native_lkr", "1", "")
         val i4 = Income("4", "salary", now.plusMonths(1).atDay(1).toString(), "LKR", "100", 10000L, "native_lkr", "1", "")
 
-        `when`(incomeRepository.getIncomes("uid1")).thenReturn(MutableStateFlow(listOf(i1, i2, i3, i4)))
+        `when`(incomeRepository.getIncomes(org.mockito.kotlin.eq("uid1"), org.mockito.kotlin.any<com.clarity.finance.data.model.ReportingMonth>())).thenReturn(MutableStateFlow(listOf(i1, i2, i3, i4)))
         mockAuthState.value = user1
         
         val collectJob = launch(testDispatcher) { viewModel.uiState.collect {} }
@@ -100,8 +102,9 @@ class IncomeListViewModelTest {
         val now = YearMonth.now(ZoneId.of("Asia/Colombo"))
         val i1 = Income("1", "salary", now.atDay(1).toString(), "LKR", "100", 10000L, "native_lkr", "1", "")
         
-        `when`(incomeRepository.getIncomes("uid1")).thenReturn(MutableStateFlow(listOf(i1)))
-        `when`(incomeRepository.getIncomes("uid2")).thenReturn(MutableStateFlow(emptyList()))
+        `when`(incomeRepository.getIncomes(org.mockito.kotlin.eq("uid1"), org.mockito.kotlin.any<com.clarity.finance.data.model.ReportingMonth>())).thenReturn(MutableStateFlow(listOf(i1)))
+        val secondAccount = MutableSharedFlow<List<Income>>(replay = 1)
+        `when`(incomeRepository.getIncomes(org.mockito.kotlin.eq("uid2"), org.mockito.kotlin.any<com.clarity.finance.data.model.ReportingMonth>())).thenReturn(secondAccount)
         
         mockAuthState.value = user1
         
@@ -112,6 +115,9 @@ class IncomeListViewModelTest {
         assertEquals(1, state1.incomes.size)
         
         mockAuthState.value = User("uid2", "user2@example.com")
+        runCurrent()
+        assertTrue(viewModel.uiState.value is IncomeListUiState.Loading)
+        secondAccount.emit(emptyList())
         advanceUntilIdle()
         
         val state2 = viewModel.uiState.value as IncomeListUiState.Success

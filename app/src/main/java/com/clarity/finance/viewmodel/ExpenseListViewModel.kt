@@ -6,6 +6,7 @@ import com.clarity.finance.data.model.Expense
 import com.clarity.finance.data.repository.AuthRepository
 import com.clarity.finance.data.repository.ExpenseRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
@@ -29,21 +30,18 @@ class ExpenseListViewModel(
 ) : ViewModel() {
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val expensesState: StateFlow<ExpensesUiState> = authRepository.authState
-        .flatMapLatest { user ->
-            if (user != null) {
-                expenseRepository.getExpenses(user.uid)
-                    .map { ExpensesUiState.Success(it) }
-            } else {
-                flowOf(ExpensesUiState.SignedOut)
+    val expensesState: StateFlow<ExpensesUiState> = authRepository.authState.flatMapLatest { user ->
+        if (user == null) flowOf(ExpensesUiState.SignedOut)
+        else kotlinx.coroutines.flow.flow<ExpensesUiState> {
+            emit(ExpensesUiState.Loading) // Clear the old owner's rows before waiting for a new listener.
+            while (kotlinx.coroutines.currentCoroutineContext().isActive) {
+                try { expenseRepository.getExpenses(user.uid).collect { emit(ExpensesUiState.Success(it)) } }
+                catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                catch (e: Exception) { emit(ExpensesUiState.Error(e.message ?: "Expenses unavailable; reconnect to retry.")) }
+                kotlinx.coroutines.delay(5000)
             }
         }
-        .catch { emit(ExpensesUiState.Error(it.message ?: "Failed to load expenses")) }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = ExpensesUiState.Loading
-        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ExpensesUiState.Loading)
 
     fun retryExpense(expense: Expense) {
         viewModelScope.launch {

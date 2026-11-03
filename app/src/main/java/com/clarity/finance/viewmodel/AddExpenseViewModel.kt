@@ -2,114 +2,57 @@ package com.clarity.finance.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.clarity.finance.data.model.Expense
-import com.clarity.finance.data.repository.AuthRepository
-import com.clarity.finance.data.repository.ExpenseRepository
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
+import com.clarity.finance.data.model.*
+import com.clarity.finance.data.repository.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.math.BigDecimal
-import java.time.LocalDate
-import java.time.format.DateTimeParseException
+import java.time.Clock
 import java.util.UUID
 
-data class AddExpenseFormState(
-    val isSubmitting: Boolean = false,
-    val isSuccess: Boolean = false,
-    val error: String? = null
-)
+data class AddExpenseFormState(val isSubmitting: Boolean = false, val isSuccess: Boolean = false,
+    val error: String? = null, val accountKey: String? = null)
 
-class AddExpenseViewModel(
-    private val authRepository: AuthRepository,
-    private val expenseRepository: ExpenseRepository
-) : ViewModel() {
-
-    private val _formState = MutableStateFlow(AddExpenseFormState())
-    val formState = _formState.asStateFlow()
-
-    fun resetState() {
-        _formState.value = AddExpenseFormState()
-    }
-
-    fun addExpense(
-        amountStr: String,
-        categoryId: String,
-        paymentChannelId: String,
-        spendingType: String,
-        expenseDate: String,
-        note: String
-    ) {
-        if (_formState.value.isSubmitting) return
-
-        val amountMinorResult = parseAmount(amountStr)
-        if (amountMinorResult.isFailure) {
-            _formState.value = _formState.value.copy(error = amountMinorResult.exceptionOrNull()?.message)
-            return
+class AddExpenseViewModel(private val authRepository: AuthRepository, private val expenseRepository: ExpenseRepository,
+    private val clock: Clock = Clock.systemUTC()) : ViewModel() {
+    private val mutable = MutableStateFlow(AddExpenseFormState())
+    val formState = mutable.asStateFlow()
+    private var uid: String? = null
+    private var generation = 0L
+    private var proposal: Expense? = null
+    init { viewModelScope.launch {
+        authRepository.authState.distinctUntilChangedBy { it?.uid }.collect { user ->
+            if (uid != user?.uid) {
+                generation++; uid = user?.uid; proposal = null
+                mutable.value = AddExpenseFormState(accountKey = uid)
+            }
         }
-
-        if (!isValidDate(expenseDate)) {
-            _formState.value = _formState.value.copy(error = "Invalid date format. Use real calendar date (yyyy-MM-dd)")
-            return
-        }
-
+    } }
+    fun resetState() { proposal = null; mutable.value = AddExpenseFormState(accountKey = uid) }
+    fun addExpense(amountStr: String, categoryId: String, paymentChannelId: String, spendingType: String, expenseDate: String, note: String) {
+        if (formState.value.isSubmitting || formState.value.isSuccess) return
+        val owner = uid ?: run { mutable.value = formState.value.copy(error = "User not authenticated"); return }
+        val desired = try {
+            val minor = SavingsMath.amount(amountStr.trim())
+            require(SavingsMath.date(expenseDate) <= SavingsMath.today(clock)) { "Use a real nonfuture expense date (yyyy-MM-dd)." }
+            require(note.trim().length <= 500) { "Note must have at most 500 characters." }
+            require(CatalogueDefaults.validId("category", categoryId) && paymentChannelId in Recurrence.channels && spendingType in setOf("committed", "discretionary")) { "Choose valid classifications." }
+            Expense(proposal?.id ?: UUID.randomUUID().toString(), minor, categoryId = categoryId,
+                paymentChannelId = paymentChannelId, spendingType = spendingType, expenseDate = expenseDate, note = note.trim())
+                .also { check(proposal == null || proposal == it) { "Retry the original saved details, or inspect Recovery before changing them." } }
+        } catch (e: Exception) { mutable.value = formState.value.copy(error = e.message); return }
+        proposal = desired // Stable even if durable acceptance itself is interrupted/returns an error.
+        val token = generation; mutable.value = formState.value.copy(isSubmitting = true, error = null)
         viewModelScope.launch {
-            val user = authRepository.authState.first()
-            if (user == null) {
-                _formState.value = _formState.value.copy(error = "User not authenticated")
-                return@launch
-            }
-
-            _formState.value = AddExpenseFormState(isSubmitting = true)
-
-            val expense = Expense(
-                id = UUID.randomUUID().toString(),
-                amountMinor = amountMinorResult.getOrThrow(),
-                currency = "LKR",
-                categoryId = categoryId,
-                paymentChannelId = paymentChannelId,
-                spendingType = spendingType,
-                expenseDate = expenseDate,
-                note = note.trim()
-            )
-
-            val result = expenseRepository.enqueueExpense(user.uid, expense)
-            if (result.isSuccess) {
-                // It was queued successfully
-                _formState.value = AddExpenseFormState(isSuccess = true)
-            } else {
-                _formState.value = AddExpenseFormState(
-                    error = result.exceptionOrNull()?.message ?: "Failed to save expense"
-                )
-            }
+            try {
+                val result = expenseRepository.enqueueExpense(owner, desired)
+                if (generation == token && uid == owner) mutable.value = formState.value.copy(isSubmitting = false,
+                    isSuccess = result.isSuccess, error = result.exceptionOrNull()?.message)
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (generation == token) mutable.value = formState.value.copy(isSubmitting = false, error = e.message) }
         }
     }
-
-    fun parseAmount(amount: String): Result<Long> {
-        return try {
-            val bd = BigDecimal(amount.trim())
-            if (bd <= BigDecimal.ZERO) return Result.failure(Exception("Amount must be positive"))
-            if (bd.scale() > 2) return Result.failure(Exception("Maximum 2 decimal places allowed"))
-            
-            val cents = bd.multiply(BigDecimal(100)).longValueExact()
-            Result.success(cents)
-        } catch (e: ArithmeticException) {
-            Result.failure(Exception("Amount is too large"))
-        } catch (e: Exception) {
-            Result.failure(Exception("Invalid amount"))
-        }
-    }
-
-    fun getDefaultDate(): String {
-        return LocalDate.now().toString()
-    }
-
-    private fun isValidDate(dateStr: String): Boolean {
-        return try {
-            LocalDate.parse(dateStr)
-            true
-        } catch (e: DateTimeParseException) {
-            false
-        }
-    }
+    fun parseAmount(amount: String): Result<Long> = try { Result.success(SavingsMath.amount(amount.trim())) }
+        catch (e: Exception) { Result.failure(e) }
+    fun getDefaultDate() = SavingsMath.today(clock).toString()
 }

@@ -37,7 +37,21 @@ data class AddEditIncomeFormState(
     val conversionRateStr: String = "",
     val actualLkrCreditStr: String = "", // Used only in UI when actual_credit is selected
     val note: String = ""
-)
+) {
+    val effectiveRateText: String? get() = try {
+        val original = plain(originalAmountStr, 2); val credit = plain(actualLkrCreditStr, 2)
+        credit.divide(original, 4, RoundingMode.HALF_UP).toPlainString()
+    } catch (_: Exception) { null }
+    val previewLkrText: String? get() = try {
+        val minor = plain(originalAmountStr, 2).multiply(plain(conversionRateStr, 8)).movePointRight(2)
+            .setScale(0, RoundingMode.HALF_UP).longValueExact()
+        require(minor > 0); BigDecimal.valueOf(minor, 2).toPlainString()
+    } catch (_: Exception) { null }
+    private fun plain(text: String, scale: Int): BigDecimal {
+        require(text.trim().matches(Regex("[0-9]+(?:\\.[0-9]{1,$scale})?")))
+        return BigDecimal(text.trim()).also { require(it.signum() > 0) }
+    }
+}
 
 class AddEditIncomeViewModel(
     private val authRepository: AuthRepository,
@@ -49,11 +63,27 @@ class AddEditIncomeViewModel(
 
     private var originalUpdatedAt: Timestamp? = null
     private var loadedUserId: String? = null
+    private var generation = 0L
+    private var sessionUid: String? = null
+    private var initialized = false
+    init { viewModelScope.launch {
+        authRepository.authState.collect { user ->
+            if (initialized && sessionUid != user?.uid && (sessionUid != null || loadedUserId != null)) {
+                generation++; originalUpdatedAt = null; loadedUserId = null
+                _formState.value = AddEditIncomeFormState(isLoading = false, error = "Account changed. Operation aborted.")
+            }
+            initialized = true; sessionUid = user?.uid
+        }
+    } }
+
 
     fun loadIncome(incomeId: String) {
+        ++generation
         _formState.value = _formState.value.copy(isLoading = true, isEditMode = true, incomeId = incomeId)
+        val token = generation
         viewModelScope.launch {
             val user = authRepository.authState.first()
+            if (token != generation) return@launch
             if (user == null) {
                 _formState.value = _formState.value.copy(error = "User not authenticated", isLoading = false)
                 return@launch
@@ -61,8 +91,13 @@ class AddEditIncomeViewModel(
             loadedUserId = user.uid
 
             val result = incomeRepository.getIncome(user.uid, incomeId)
+            if (token != generation || sessionUid != user.uid) return@launch
             if (result.isSuccess) {
                 val income = result.getOrThrow()
+                if (income.linkedPaymentId != null) {
+                    _formState.value = _formState.value.copy(isLoading = false, isMissing = true, error = "Linked receipt: inspect its project. It cannot be edited or deleted here.")
+                    return@launch
+                }
                 originalUpdatedAt = income.updatedAt
                 
                 var rateStr = ""
@@ -120,7 +155,7 @@ class AddEditIncomeViewModel(
 
     fun saveChanges() {
         if (_formState.value.isSubmitting || _formState.value.isDeleting) return
-        val state = _formState.value
+        val state = _formState.value.let { if (!it.isEditMode && it.incomeId.isEmpty()) it.copy(incomeId = UUID.randomUUID().toString()) else it }
 
         if (!isValidDate(state.receiptDate)) {
             _formState.value = state.copy(error = "Invalid date format or future date.")
@@ -181,15 +216,17 @@ class AddEditIncomeViewModel(
 
         _formState.value = state.copy(isSubmitting = true, error = null)
 
+        val token = generation
         viewModelScope.launch {
             val user = authRepository.authState.first()
+            if (token != generation) return@launch
             if (user == null || (state.isEditMode && user.uid != loadedUserId)) {
                 _formState.value = _formState.value.copy(isSubmitting = false, error = "Account changed or not authenticated.")
                 return@launch
             }
 
             val income = Income(
-                id = if (state.isEditMode) state.incomeId else UUID.randomUUID().toString(),
+                id = state.incomeId,
                 sourceId = state.sourceId,
                 receiptDate = state.receiptDate,
                 currency = state.currency,
@@ -206,6 +243,7 @@ class AddEditIncomeViewModel(
                 incomeRepository.enqueueIncome(user.uid, income)
             }
 
+            if (token != generation || sessionUid != user.uid) return@launch
             if (result.isSuccess) {
                 _formState.value = _formState.value.copy(isSubmitting = false, isSuccess = true)
             } else {
@@ -233,14 +271,17 @@ class AddEditIncomeViewModel(
         }
         _formState.value = _formState.value.copy(isDeleting = true, error = null)
 
+        val token = generation
         viewModelScope.launch {
             val user = authRepository.authState.first()
+            if (token != generation) return@launch
             if (user == null || user.uid != loadedUserId) {
                 _formState.value = _formState.value.copy(isDeleting = false, error = "Account changed. Operation aborted.")
                 return@launch
             }
 
             val result = incomeRepository.deleteIncome(user.uid, _formState.value.incomeId, originalUpdatedAt!!)
+            if (token != generation || sessionUid != user.uid) return@launch
             if (result.isSuccess) {
                 _formState.value = _formState.value.copy(isDeleting = false, isDeleted = true)
             } else {
@@ -264,22 +305,24 @@ class AddEditIncomeViewModel(
 
     fun parseAmount(amount: String): Result<BigDecimal> {
         return try {
+            require(amount.trim().matches(Regex("[0-9]+(?:\\.[0-9]{1,2})?"))) { "Use a positive plain decimal amount." }
             val bd = BigDecimal(amount.trim())
             if (bd <= BigDecimal.ZERO) return Result.failure(Exception("Amount must be positive"))
             if (bd.scale() > 2) return Result.failure(Exception("Maximum 2 decimal places allowed"))
             Result.success(bd)
-        } catch (e: NumberFormatException) {
+        } catch (e: IllegalArgumentException) {
             Result.failure(Exception("Invalid amount format"))
         }
     }
 
     private fun parseRate(rate: String): Result<BigDecimal> {
         return try {
+            require(rate.trim().matches(Regex("[0-9]+(?:\\.[0-9]{1,8})?"))) { "Use a positive plain decimal rate." }
             val bd = BigDecimal(rate.trim())
             if (bd <= BigDecimal.ZERO) return Result.failure(Exception("Rate must be positive"))
             if (bd.scale() > 8) return Result.failure(Exception("Maximum 8 decimal places allowed"))
             Result.success(bd)
-        } catch (e: NumberFormatException) {
+        } catch (e: IllegalArgumentException) {
             Result.failure(Exception("Invalid rate format"))
         }
     }

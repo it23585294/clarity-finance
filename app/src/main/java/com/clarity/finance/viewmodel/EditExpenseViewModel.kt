@@ -45,10 +45,26 @@ class EditExpenseViewModel(
 
     private var originalUpdatedAt: Timestamp? = null
     private var loadedUserId: String? = null
+    private var generation = 0L
+    private var sessionUid: String? = null
+    private var initialized = false
+    init { viewModelScope.launch {
+        authRepository.authState.collect { user ->
+            if (initialized && sessionUid != user?.uid && (sessionUid != null || loadedUserId != null)) {
+                generation++; originalUpdatedAt = null; loadedUserId = null
+                _formState.value = EditExpenseFormState(isLoading = false, error = "Account changed. Operation aborted.")
+            }
+            initialized = true; sessionUid = user?.uid
+        }
+    } }
+
 
     fun loadExpense(expenseId: String) {
+        ++generation
+        val token = generation
         viewModelScope.launch {
             val user = authRepository.authState.first()
+            if (token != generation) return@launch
             if (user == null) {
                 _formState.value = _formState.value.copy(error = "User not authenticated", isLoading = false)
                 return@launch
@@ -56,6 +72,7 @@ class EditExpenseViewModel(
             loadedUserId = user.uid
 
             val result = expenseRepository.getExpense(user.uid, expenseId)
+            if (token != generation || sessionUid != user.uid) return@launch
             if (result.isSuccess) {
                 val expense = result.getOrThrow()
                 originalUpdatedAt = expense.updatedAt
@@ -129,8 +146,10 @@ class EditExpenseViewModel(
 
         _formState.value = state.copy(isSubmitting = true, error = null)
 
+        val token = generation
         viewModelScope.launch {
             val user = authRepository.authState.first()
+            if (token != generation) return@launch
             if (user == null || user.uid != loadedUserId) {
                 _formState.value = _formState.value.copy(isSubmitting = false, error = "Account changed. Operation aborted.")
                 return@launch
@@ -149,6 +168,7 @@ class EditExpenseViewModel(
 
             val result = expenseRepository.updateExpense(user.uid, expense, originalUpdatedAt!!)
             
+            if (token != generation || sessionUid != user.uid) return@launch
             if (result.isSuccess) {
                 _formState.value = _formState.value.copy(isSubmitting = false, isSuccess = true)
             } else {
@@ -178,8 +198,10 @@ class EditExpenseViewModel(
 
         _formState.value = _formState.value.copy(isDeleting = true, error = null)
 
+        val token = generation
         viewModelScope.launch {
             val user = authRepository.authState.first()
+            if (token != generation) return@launch
             if (user == null || user.uid != loadedUserId) {
                 _formState.value = _formState.value.copy(isDeleting = false, error = "Account changed. Operation aborted.")
                 return@launch
@@ -187,6 +209,7 @@ class EditExpenseViewModel(
 
             val result = expenseRepository.deleteExpense(user.uid, _formState.value.expenseId, originalUpdatedAt!!)
             
+            if (token != generation || sessionUid != user.uid) return@launch
             if (result.isSuccess) {
                 _formState.value = _formState.value.copy(isDeleting = false, isDeleted = true)
             } else {
