@@ -169,7 +169,7 @@ fun RecurringScreen(viewModel: RecurringViewModel, onBack: () -> Unit, onExpense
     }
     state.cancel?.let { template ->
         AlertDialog(onDismissRequest = viewModel::keepTemplate, title = { Text("Cancel recurring template?") },
-            text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("${template.config.name}: stop all unconfirmed occurrences, including overdue ones. Recorded expenses and confirmation history remain. Pending confirmations keep their original payload; whichever operation commits first determines the result.")
                 state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 if (state.unknown != null) Text("Local save outcome unknown. Keep this proposal; close the dialog and retry the same local save.")

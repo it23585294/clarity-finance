@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -89,7 +90,9 @@ class DashboardNavigationTest {
         click("Spending insights")
         compose.onNodeWithText("Committed: LKR 40000.00 (80.0%)").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Discretionary: LKR 10000.00 (20.0%)").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Housing: LKR 40000.00").performScrollTo().performClick()
+        // Tap the exposed left side; the fixed Add Expense FAB can cover the scroll-to edge on a short display.
+        compose.onNodeWithText("Housing: LKR 40000.00").performScrollTo()
+            .performTouchInput { click(Offset(16.dp.toPx(), center.y)) }
         compose.onNodeWithText("Reporting fixture rent").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Reporting fixture meal").assertDoesNotExist()
         compose.onNodeWithText("Reporting fixture income").assertDoesNotExist()

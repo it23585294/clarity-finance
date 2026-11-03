@@ -77,7 +77,9 @@ class GoalNavigationTest {
         }
     }
     private fun locate(matcher: SemanticsMatcher) {
-        if (compose.onAllNodes(matcher).fetchSemanticsNodes().isEmpty() && compose.onAllNodesWithTag("goal-history").fetchSemanticsNodes().isNotEmpty())
+        val belongsToList = matcher and hasAnyAncestor(hasTestTag("goal-history"))
+        if (compose.onAllNodesWithTag("goal-history").fetchSemanticsNodes().isNotEmpty() &&
+            (compose.onAllNodes(matcher).fetchSemanticsNodes().isEmpty() || compose.onAllNodes(belongsToList).fetchSemanticsNodes().isNotEmpty()))
             compose.onNodeWithTag("goal-history").performScrollToNode(matcher)
     }
     private fun visible(node: SemanticsNodeInteraction) {
@@ -150,7 +152,7 @@ class GoalNavigationTest {
     }
     @Test fun invalidFormAndOverdueRevisionRemainAccessibleAt320dpWithEnlargedFont() {
         val data = Data(); show(data); click("Savings Goal"); click("Create goal"); click("Save proposal")
-        compose.onNodeWithText("Goal details").assertIsDisplayed(); assertTrue(data.operations.isEmpty())
+        text("Goal details"); assertTrue(data.operations.isEmpty())
         click("Close form")
         compose.runOnIdle {
             val today = SavingsMath.today()
