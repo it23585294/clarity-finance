@@ -21,7 +21,8 @@ fun HomeScreen(
     onNavigateToPendingPayments: () -> Unit,
     onNavigateToCrypto: () -> Unit,
     onNavigateToDashboard: () -> Unit,
-    onNavigateToGoal: () -> Unit = {}
+    onNavigateToGoal: () -> Unit = {},
+    onNavigateToRecurring: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -86,6 +87,9 @@ fun HomeScreen(
 
                 Button(onClick = onNavigateToGoal, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
                     Text("Savings Goal")
+                }
+                Button(onClick = onNavigateToRecurring, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                    Text("Recurring Expenses")
                 }
                 OutlinedButton(
                     onClick = { viewModel.logout() },

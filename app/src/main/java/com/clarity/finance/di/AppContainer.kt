@@ -20,6 +20,12 @@ import com.clarity.finance.data.repository.ReportingRepository
 import com.clarity.finance.data.repository.FirestoreReportingRepository
 
 class AppContainer(private val context: Context) {
+    val recurringRepository: com.clarity.finance.data.repository.RecurringRepository by lazy {
+        com.clarity.finance.data.repository.FirestoreRecurringRepository(
+            com.clarity.finance.data.repository.FirestoreRecurringRemote(FirebaseFirestore.getInstance()) {
+                FirebaseAuth.getInstance().currentUser?.uid
+            }, recoveryStore)
+    }
     val goalRepository: com.clarity.finance.data.repository.GoalRepository by lazy {
         com.clarity.finance.data.repository.FirestoreGoalRepository(
             com.clarity.finance.data.repository.FirestoreGoalRemote(FirebaseFirestore.getInstance()) {

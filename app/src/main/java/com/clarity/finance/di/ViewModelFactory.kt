@@ -29,11 +29,14 @@ class ViewModelFactory(
     private val paymentRepository: PaymentRepository,
     private val cryptoRepository: CryptoRepository,
     private val reportingRepository: ReportingRepository? = null,
-    private val goalRepository: com.clarity.finance.data.repository.GoalRepository? = null
+    private val goalRepository: com.clarity.finance.data.repository.GoalRepository? = null,
+    private val recurringRepository: com.clarity.finance.data.repository.RecurringRepository? = null
 ) : ViewModelProvider.Factory {
     val hasGoals get() = goalRepository != null
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass == com.clarity.finance.viewmodel.RecurringViewModel::class.java)
+            return com.clarity.finance.viewmodel.RecurringViewModel(authRepository, requireNotNull(recurringRepository)) as T
         if (modelClass == com.clarity.finance.viewmodel.GoalCardViewModel::class.java)
             return com.clarity.finance.viewmodel.GoalCardViewModel(authRepository, requireNotNull(goalRepository)) as T
         if (modelClass == com.clarity.finance.viewmodel.GoalViewModel::class.java)

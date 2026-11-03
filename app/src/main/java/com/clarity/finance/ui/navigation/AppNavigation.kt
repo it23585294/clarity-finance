@@ -83,7 +83,8 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
                     onNavigateToPendingPayments = { navController.navigate("pendingPayments") },
                     onNavigateToCrypto = { navController.navigate("cryptoResults") },
                     onNavigateToDashboard = { navController.navigate("financialDashboard") },
-                    onNavigateToGoal = { navController.navigate("savingsGoal") }
+                    onNavigateToGoal = { navController.navigate("savingsGoal") },
+                    onNavigateToRecurring = { navController.navigate("recurringExpenses") }
                 )
             }
         }
@@ -105,6 +106,12 @@ fun AppNavigation(viewModelFactory: ViewModelFactory) {
                     }
                 }
             )
+        }
+        composable("recurringExpenses") {
+            val recurringViewModel: com.clarity.finance.viewmodel.RecurringViewModel = viewModel(factory = viewModelFactory)
+            com.clarity.finance.ui.recurring.RecurringScreen(recurringViewModel,
+                onBack = { navController.popBackStack() },
+                onExpense = { navController.navigate("editExpense/${android.net.Uri.encode(it)}") })
         }
         composable("savingsGoal") {
             val goalViewModel: com.clarity.finance.viewmodel.GoalViewModel = viewModel(factory = viewModelFactory)
