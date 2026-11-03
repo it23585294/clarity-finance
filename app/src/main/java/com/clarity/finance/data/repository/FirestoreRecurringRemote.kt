@@ -99,6 +99,8 @@ class FirestoreRecurringRemote(private val firestore: FirebaseFirestore, private
                     return@runTransaction RecurringOutcome.Rejected("The scheduled occurrence differs from this template version. Reopen the current occurrence.")
                 check(confirmation.dueDate <= Recurrence.today(clock).toString()) { "This occurrence is not due yet." }
                 Recurrence.validate(confirmation.actual, Recurrence.today(clock))
+                if (archivedSelection(tx, root, confirmation.actual.categoryId))
+                    return@runTransaction RecurringOutcome.Rejected("The actual category was archived. Dismiss this rejected proposal and review an active category; no expense was recorded.")
                 val expenseRef = root.collection("expenses").document(confirmation.expenseId)
                 check(!tx.get(expenseRef).exists()) { "Expense identity exists without a confirmation. Keep this proposal for inspection." }
                 check(activeUid() == uid) { "Account changed." }
@@ -106,6 +108,9 @@ class FirestoreRecurringRemote(private val firestore: FirebaseFirestore, private
                     "createdAt" to FieldValue.serverTimestamp(), "updatedAt" to FieldValue.serverTimestamp()))
                 tx.set(occurrenceRef!!, confirmation.values() + mapOf("operationId" to op.operationId, "createdAt" to FieldValue.serverTimestamp()))
             } else {
+                if (op.kind != "CANCEL" && (before == null || op.config!!.categoryId != before.config.categoryId) &&
+                    archivedSelection(tx, root, op.config!!.categoryId))
+                    return@runTransaction RecurringOutcome.Rejected("The selected category was archived. Review an active category; no template change was recorded.")
                 check(activeUid() == uid) { "Account changed." }
                 val data = op.payload() + mapOf("version" to op.version, "lastOperationId" to op.operationId, "updatedAt" to FieldValue.serverTimestamp())
                 if (before == null) tx.set(templateRef, data + ("createdAt" to FieldValue.serverTimestamp())) else tx.update(templateRef, data)
@@ -114,6 +119,16 @@ class FirestoreRecurringRemote(private val firestore: FirebaseFirestore, private
                 "version" to op.version, "payload" to op.payload(), "createdAt" to FieldValue.serverTimestamp()))
             RecurringOutcome.Confirmed
         }
+    }
+    private fun archivedSelection(tx: Transaction, root: DocumentReference, id: String): Boolean {
+        val category = tx.get(root.collection("expenseCategories").document(id))
+        if (!category.exists()) {
+            check(!id.startsWith("custom_")) { "Custom category is unavailable. Original proposal retained for reconciliation." }
+            return false
+        }
+        // Archive is irreversible in rules. A consistent server read therefore establishes that an older
+        // confirmation cannot commit later. Missing/access errors do not establish this monotonic fact.
+        return category.get("archived") as? Boolean ?: error("Category archive state is unavailable.")
     }
     private fun DocumentSnapshot.text(field: String) = get(field) as? String ?: error("Missing/invalid $field.")
     private fun DocumentSnapshot.integer(field: String) = get(field) as? Long ?: error("Missing/invalid integer $field.")

@@ -24,7 +24,7 @@ data class GoalUiState(val signedIn: Boolean = false, val snapshot: GoalSnapshot
         } == true)
 }
 
-/** Dashboard observes only. Synchronization is deliberately started only by the allocation screen. */
+/** Production synchronization is Application-owned; the flag permits isolated worker tests. */
 open class GoalViewModel(private val auth: AuthRepository, private val repository: GoalRepository,
     private val clock: Clock = Clock.systemUTC(), private val synchronize: Boolean = true) : ViewModel() {
     private var uid: String? = null

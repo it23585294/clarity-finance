@@ -24,6 +24,9 @@ class FirestoreRecurringRemoteTest {
     private val templates = mock(CollectionReference::class.java)
     private val operations = mock(CollectionReference::class.java)
     private val occurrences = mock(CollectionReference::class.java)
+    private val categories = mock(CollectionReference::class.java)
+    private val categoryRef = mock(DocumentReference::class.java)
+    private val categoryDoc = mock(DocumentSnapshot::class.java)
     private val expenses = mock(CollectionReference::class.java)
     private val templateRef = mock(DocumentReference::class.java)
     private val receiptRef = mock(DocumentReference::class.java)
@@ -44,6 +47,9 @@ class FirestoreRecurringRemoteTest {
         `when`(firestore.collection("users")).thenReturn(users); `when`(users.document("alice")).thenReturn(owner)
         for ((name, collection) in mapOf("recurringTemplates" to templates, "recurringOperations" to operations, "recurringOccurrences" to occurrences, "expenses" to expenses))
             `when`(owner.collection(name)).thenReturn(collection)
+        `when`(owner.collection("expenseCategories")).thenReturn(categories)
+        `when`(categories.document(any())).thenReturn(categoryRef)
+        `when`(tx.get(categoryRef)).thenReturn(categoryDoc)
         `when`(templates.document(any())).thenReturn(templateRef); `when`(operations.document(any())).thenReturn(receiptRef)
         `when`(occurrences.document(any())).thenReturn(occurrenceRef); `when`(expenses.document(any())).thenReturn(expenseRef)
         `when`(tx.get(templateRef)).thenReturn(templateDoc); `when`(tx.get(receiptRef)).thenReturn(receiptDoc)
@@ -176,4 +182,22 @@ class FirestoreRecurringRemoteTest {
         listener.firstValue.onEvent(null, denied); runCurrent(); assertSame(denied, failure); verify(registration).remove()
         job.cancelAndJoin()
     }
+    @Test fun `archived category definitively rejects a new occurrence but matching confirmation reconciles first`() = runTest {
+        setup(); existing(); fields(categoryDoc, mapOf("archived" to true))
+        val outcome = remote.apply("alice", op)
+        assertTrue(outcome is RecurringOutcome.Rejected)
+        assertTrue((outcome as RecurringOutcome.Rejected).reason.contains("archived"))
+        verify(tx, never()).set(any<DocumentReference>(), any<Map<String, Any>>())
+        accepted()
+        assertEquals(RecurringOutcome.Confirmed, remote.apply("alice", op))
+        verify(tx, times(1)).get(categoryRef) // Matching immutable history never rechecks mutable catalogue state.
+    }
+    @Test fun `custom active category is preserved in the actual expense payload`() = runTest {
+        setup(); existing(); fields(categoryDoc, mapOf("archived" to false))
+        val proposal = op.copy(confirmation = confirmation.copy(actual = confirmation.actual.copy(categoryId = "custom_transit")))
+        assertEquals(RecurringOutcome.Confirmed, remote.apply("alice", proposal))
+        val values = argumentCaptor<Map<String, Any>>()
+        verify(tx).set(eq(expenseRef), values.capture()); assertEquals("custom_transit", values.firstValue["categoryId"])
+    }
+
 }

@@ -20,13 +20,15 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** Uses the existing durable store. Only the active screen/account runs its scoped synchronizer. */
+/** Durable proposals; one process coordinator synchronizes all years independently of screens. */
 class FirestoreCryptoRepository(
     private val remote: CryptoRemote,
     private val store: SubmissionRecoveryStore
 ) : CryptoRepository {
     private val gson = Gson()
     private val mutex = Mutex()
+    private val sweep = Mutex()
+    private val acknowledged = mutableSetOf<Pair<String, String>>()
     private val types = setOf("CRYPTO_CREATE", "CRYPTO_UPDATE", "CRYPTO_DELETE")
 
     override suspend fun submit(uid: String, operation: CryptoOperation) = mutex.withLock {
@@ -37,53 +39,46 @@ class FirestoreCryptoRepository(
         require(operation.result.id.isNotBlank() && operation.operationId.isNotBlank())
         val existing = types.flatMap { store.getRecords(uid, it) }.filter { it.recordId == operation.result.id }
         val record = record(uid, operation)
-        check(existing.all { it.resolvedType == record.resolvedType && it.payloadJson == record.payloadJson }) {
+        check(existing.all { it.resolvedType == record.resolvedType && decode(it) == operation }) {
             "Resolve the saved operation for this result before making another change."
         }
-        store.saveOperation(record)
+        if (existing.isEmpty()) store.saveOperation(record) // Preserve legacy JSON that predates protocolVersion.
     }
 
     override suspend fun retry(uid: String, operation: CryptoOperation) = mutex.withLock {
         val saved = store.getRecords(uid, operation.type).singleOrNull { it.recordId == operation.result.id }
             ?: error("Saved operation no longer exists. Refresh the list.")
-        check(saved.payloadJson == record(uid, operation).payloadJson) { "Retry must use the original saved details." }
+        check(decode(saved) == operation) { "Retry must use the original saved details." }
         store.updateOperationStatus(saved.copy(status = "PENDING", errorReason = null))
     }
 
     override suspend fun dismissRejected(uid: String, operation: CryptoOperation) = mutex.withLock {
         val saved = store.getRecords(uid, operation.type).singleOrNull { it.recordId == operation.result.id }
             ?: error("Saved operation no longer exists.")
-        check(saved.status == "FAILED" && saved.payloadJson == record(uid, operation).payloadJson) {
+        check(saved.status == "REJECTED" && decode(saved) == operation) {
             "Only a definitively rejected operation can be dismissed. Pending outcomes must be reconciled."
         }
         store.removeRecord(uid, saved.recordId, saved.resolvedType)
     }
 
+    override suspend fun resolve(uid: String, operation: CryptoOperation) {
+        val saved = mutex.withLock {
+            store.getRecords(uid, operation.type).single { it.recordId == operation.result.id }.also {
+                check(decode(it) == operation) { "Saved proposal changed; reopen recovery." }
+            }
+        }
+        val rejected = try { remote.resolve(uid, operation); false }
+        catch (e: DefinitiveMutationRejection) { true }
+        catch (e: CancellationException) { throw e }
+        mutex.withLock {
+            if (rejected) store.updateOperationStatus(saved.copy(status = "REJECTED", errorReason = "Server fenced this proposal. Confirmed history is retained."))
+            else store.removeRecord(uid, saved.recordId, saved.resolvedType)
+        }
+    }
+
     override fun observe(uid: String, year: Int, cutoff: String): Flow<CryptoSnapshot> = channelFlow {
         // These records include other years so offline backdated operations also recover.
         val records = store.getOperationRecordsFlow(uid, types)
-        launch {
-            try {
-                while (isActive) {
-                    val pending = types.flatMap { store.getRecords(uid, it) }.filter { it.status == "PENDING" }
-                    for (saved in pending) {
-                        try {
-                            val operation = decode(saved)
-                            val acknowledged = withTimeoutOrNull(10000L) { remote.apply(uid, operation); true } ?: false
-                            if (acknowledged) mutex.withLock { store.removeRecord(uid, saved.recordId, saved.resolvedType) }
-                            // Timeout leaves the original operation pending; the transaction may still commit.
-                        } catch (e: CancellationException) { throw e }
-                        catch (e: Exception) {
-                            if (rejected(e)) mutex.withLock {
-                                store.updateOperationStatus(saved.copy(status = "FAILED", errorReason = e.message ?: "Write rejected."))
-                            }
-                        }
-                    }
-                    delay(5000L)
-                }
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { send(CryptoSnapshot(error = "Recovery unavailable: ${e.message}")) }
-        }
         val server = flow {
             var last = CryptoSnapshot()
             emit(last)
@@ -102,7 +97,7 @@ class FirestoreCryptoRepository(
             combine(server, records) { snapshot, saved ->
                 val operations = saved.map { it to decode(it) }
                 val overlays = operations.map { (record, operation) ->
-                    operation.result.copy(sync = if (record.status == "PENDING") CryptoSync.PENDING else CryptoSync.FAILED,
+                    operation.result.copy(sync = if (record.status != "REJECTED") CryptoSync.PENDING else CryptoSync.FAILED,
                         error = record.errorReason, deleting = operation.kind == "DELETE")
                 }
                 val ids = overlays.map { it.id }.toSet()
@@ -123,10 +118,35 @@ class FirestoreCryptoRepository(
         return operation
     }
 
-    private fun rejected(error: Exception): Boolean = error is IllegalStateException || error is IllegalArgumentException ||
-        (error is FirebaseFirestoreException && error.code in setOf(
-            FirebaseFirestoreException.Code.PERMISSION_DENIED, FirebaseFirestoreException.Code.UNAUTHENTICATED,
-            FirebaseFirestoreException.Code.INVALID_ARGUMENT, FirebaseFirestoreException.Code.NOT_FOUND,
-            FirebaseFirestoreException.Code.ALREADY_EXISTS
-        ))
+    override suspend fun synchronize(uid: String) {
+        while (currentCoroutineContext().isActive) {
+            sweep.withLock {
+                for (saved in types.flatMap { store.getRecords(uid, it) }.filter { it.status != "REJECTED" }) {
+                    val operation = decode(saved)
+                    val uncertain = saved.copy(status = "UNCERTAIN", errorReason = "Awaiting server reconciliation. The original proposal is retained.")
+                    store.updateOperationStatus(uncertain)
+                    var reason = "Timed out awaiting reconciliation; a Firebase Task may still complete. Original proposal retained."
+                    val outcome = if ((uid to operation.operationId) in acknowledged) 1 else try {
+                        if (withTimeoutOrNull(10000) { remote.apply(uid, operation); true } == true) 1 else 0
+                    } catch (e: DefinitiveMutationRejection) { reason = e.message ?: "Server fenced this proposal."; -1 }
+                    catch (e: CancellationException) { throw e }
+                    catch (e: Exception) { reason = uncertainSyncMessage(e); 0 }
+                    // Local recovery failures must not be confused with a remote rejection.
+                    mutex.withLock {
+                        val latest = store.getRecords(uid, operation.type).singleOrNull { it.recordId == saved.recordId }
+                        if (latest == null) { acknowledged.remove(uid to operation.operationId); return@withLock }
+                        check(latest.payloadJson == saved.payloadJson) { "Saved proposal changed during reconciliation." }
+                        if (latest.status == "REJECTED" && outcome != 1) return@withLock
+                        if (outcome == 1) {
+                            acknowledged += uid to operation.operationId
+                            store.removeRecord(uid, saved.recordId, saved.resolvedType)
+                            acknowledged.remove(uid to operation.operationId)
+                        } else if (outcome == -1) store.updateOperationStatus(uncertain.copy(status = "REJECTED", errorReason = "$reason Confirmed history is unchanged."))
+                        else store.updateOperationStatus(uncertain.copy(errorReason = reason))
+                    }
+                }
+            }
+            delay(5000)
+        }
+    }
 }

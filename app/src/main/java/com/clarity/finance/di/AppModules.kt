@@ -27,13 +27,27 @@ fun platformModule(context: Context) = module {
 /** Remotes retain in-flight Tasks; neither they nor recovery repositories are screen-scoped. */
 val repositoryModule = module {
     single { SubmissionRecoveryStore(get()) }
+    single<kotlinx.coroutines.CoroutineScope> { kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO) }
+    single<FinancialRemote> {
+        val auth = get<FirebaseAuth>()
+        FirestoreFinancialRemote(get()) { auth.currentUser?.uid }
+    }
+    single { FinancialQueue(get(), get()) }
+    single<FinancialRecoveryAccess> { get<FinancialQueue>() }
+    single<CatalogueRepository> { FirestoreCatalogueRepository(get(), get()) }
+    single { SessionSyncCoordinator(get(), listOf(
+        SyncWorker("transactions") { uid -> get<FinancialQueue>().synchronize(uid) },
+        SyncWorker("crypto") { uid -> get<CryptoRepository>().synchronize(uid) },
+        SyncWorker("savings") { uid -> get<GoalRepository>().synchronize(uid) },
+        SyncWorker("recurring") { uid -> get<RecurringRepository>().synchronize(uid) }
+    ), get()) }
     single<AuthRepository> { FirebaseAuthRepository(get()) }
-    single<ExpenseRepository> { FirestoreExpenseRepository(get(), get()) }
-    single<IncomeRepository> { FirestoreIncomeRepository(get(), get()) }
+    single<ExpenseRepository> { FirestoreExpenseRepository(get(), get(), get()) }
+    single<IncomeRepository> { FirestoreIncomeRepository(get(), get(), get()) }
     single<PaymentRepository> { FirestorePaymentRepository(get(), get()) }
     single<CryptoRemote> {
         val auth = get<FirebaseAuth>()
-        FirestoreCryptoRemote(get()) { auth.currentUser?.uid }
+        FirestoreCryptoRemote(get(), { auth.currentUser?.uid }, get())
     }
     single<CryptoRepository> { FirestoreCryptoRepository(get(), get()) }
     single<ReportingRepository> { FirestoreReportingRepository(get(), get()) }
@@ -53,6 +67,7 @@ val repositoryModule = module {
 val viewModelModule = module {
     factory<ViewModelProvider.Factory> { (type: KClass<out ViewModel>) -> KoinViewModelFactory(type, this) }
     viewModel { AuthViewModel(get()) }
+    viewModel { CatalogueViewModel(get(), get(), get()) }
     viewModel { HomeViewModel(get()) }
     viewModel { ExpenseListViewModel(get(), get()) }
     viewModel { AddExpenseViewModel(get(), get()) }
@@ -65,7 +80,7 @@ val viewModelModule = module {
     viewModel { PaymentConfirmationViewModel(get(), get()) }
     viewModel { CryptoViewModel(get(), get()) }
     viewModel { DashboardViewModel(get(), get()) }
-    viewModel { GoalViewModel(get(), get()) }
+    viewModel { GoalViewModel(get(), get(), synchronize = false) }
     viewModel { GoalCardViewModel(get(), get()) }
-    viewModel { RecurringViewModel(get(), get()) }
+    viewModel { RecurringViewModel(get(), get(), synchronize = false) }
 }

@@ -8,7 +8,8 @@ data class CryptoOperation(
     val operationId: String,
     val kind: String,
     val result: CryptoResult,
-    val expectedUpdatedAt: Timestamp? = null
+    val expectedUpdatedAt: Timestamp? = null,
+    val protocolVersion: Int = 2
 ) {
     val type: String get() = "CRYPTO_$kind"
 }
@@ -24,9 +25,11 @@ data class CryptoSnapshot(
 )
 
 interface CryptoRepository {
+    suspend fun synchronize(uid: String) {}
     fun observe(uid: String, year: Int, cutoff: String): Flow<CryptoSnapshot>
     /** Returns after durable local acceptance, not after server confirmation. */
     suspend fun submit(uid: String, operation: CryptoOperation)
     suspend fun retry(uid: String, operation: CryptoOperation)
+    suspend fun resolve(uid: String, operation: CryptoOperation) { error("Online resolution unavailable.") }
     suspend fun dismissRejected(uid: String, operation: CryptoOperation)
 }

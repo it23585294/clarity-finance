@@ -22,6 +22,31 @@ import java.io.IOException
 @OptIn(ExperimentalCoroutinesApi::class)
 class FirestoreCryptoRepositoryTest {
     @get:Rule val temp = TemporaryFolder()
+    @Test fun `pre-protocol crypto JSON remains immutable and can be retried fenced and dismissed safely`() = runTest {
+        val store = SubmissionRecoveryStore(PreferenceDataStoreFactory.create(scope = backgroundScope,
+            produceFile = { temp.newFile("legacy-crypto.preferences_pb") }))
+        val json = com.google.gson.Gson().toJsonTree(operation).asJsonObject.also { it.remove("protocolVersion") }.toString()
+        val legacy = com.google.gson.Gson().fromJson(json, CryptoOperation::class.java)
+        assertEquals(0, legacy.protocolVersion)
+        val saved = SubmissionRecord("a", operation.result.id, json, "UNCERTAIN", type = operation.type)
+        store.saveOperation(saved)
+        val remote = object : CryptoRemote {
+            override fun observe(uid: String, year: Int, cutoff: String) = kotlinx.coroutines.flow.flowOf(CryptoRemoteSnapshot(emptyList(), false))
+            override suspend fun apply(uid: String, operation: CryptoOperation) = error("Unused")
+            override suspend fun resolve(uid: String, operation: CryptoOperation) { throw DefinitiveMutationRejection("Acknowledged fence") }
+        }
+        val repository = FirestoreCryptoRepository(remote, store)
+        repository.retry("a", legacy); repository.submit("a", legacy)
+        assertEquals(json, store.getRecords("a", operation.type).single().payloadJson)
+        repository.resolve("a", legacy)
+        assertEquals("REJECTED", store.getRecords("a", operation.type).single().status)
+        assertEquals(json, store.getRecords("a", operation.type).single().payloadJson)
+        repository.dismissRejected("a", legacy); assertTrue(store.getRecords("a", operation.type).isEmpty())
+    }
+    private fun FirestoreCryptoRepository.observing(uid: String, year: Int, cutoff: String) = kotlinx.coroutines.flow.channelFlow {
+        launch { synchronize(uid) } // Simulates the Application-owned worker independently of observation.
+        observe(uid, year, cutoff).collect { send(it) }
+    }
     private val operation = CryptoOperation("op-1", "CREATE", CryptoResult("r1", "gain", 6000000, "2025-01-01"))
 
     private class Remote : CryptoRemote {
@@ -64,7 +89,7 @@ class FirestoreCryptoRepositoryTest {
         repository.submit("b", operation.copy(operationId = "b-op"))
         var latest = CryptoSnapshot()
         var observer = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            repository.observe("a", 2026, "2026-10-26").collect { latest = it }
+            repository.observing("a", 2026, "2026-10-26").collect { latest = it }
         }
         runCurrent()
         assertEquals(CryptoSync.PENDING, latest.results.single().sync)
@@ -77,7 +102,7 @@ class FirestoreCryptoRepositoryTest {
         repository = FirestoreCryptoRepository(remote, store)
         remote.failure = null
         observer = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            repository.observe("a", 2026, "2026-10-26").collect { latest = it }
+            repository.observing("a", 2026, "2026-10-26").collect { latest = it }
         }
         runCurrent()
         assertTrue(store.getRecords("a", "CRYPTO_CREATE").isEmpty())
@@ -97,11 +122,11 @@ class FirestoreCryptoRepositoryTest {
         repository.submit("a", operation)
         var latest = CryptoSnapshot()
         val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            repository.observe("a", 2025, "2025-12-31").collect { latest = it }
+            repository.observing("a", 2025, "2025-12-31").collect { latest = it }
         }
         runCurrent()
         advanceTimeBy(10001); runCurrent()
-        assertEquals("PENDING", store.getRecords("a", "CRYPTO_CREATE").single().status)
+        assertEquals("UNCERTAIN", store.getRecords("a", "CRYPTO_CREATE").single().status)
         assertEquals(CryptoSync.PENDING, latest.results.single().sync)
         try { repository.submit("a", operation.copy(result = operation.result.copy(amountMinor = 1))); fail() }
         catch (_: IllegalStateException) { }
@@ -118,17 +143,17 @@ class FirestoreCryptoRepositoryTest {
     @Test fun `definitive rejection remains visible retryable and dismissible without changing other records`() = runTest {
         val store = SubmissionRecoveryStore(PreferenceDataStoreFactory.create(scope = backgroundScope,
             produceFile = { temp.newFile("failed.preferences_pb") }))
-        val remote = Remote().apply { failure = IllegalStateException("Changed elsewhere") }
+        val remote = Remote().apply { failure = DefinitiveMutationRejection("Changed elsewhere") }
         val repository = FirestoreCryptoRepository(remote, store)
         repository.submit("a", operation)
         repository.submit("b", operation)
         var latest = CryptoSnapshot()
         val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            repository.observe("a", 2025, "2025-12-31").collect { latest = it }
+            repository.observing("a", 2025, "2025-12-31").collect { latest = it }
         }
         runCurrent()
         assertEquals(CryptoSync.FAILED, latest.results.single().sync)
-        assertEquals("Changed elsewhere", latest.results.single().error)
+        assertEquals("Changed elsewhere Confirmed history is unchanged.", latest.results.single().error)
         repository.retry("a", operation)
         assertEquals("PENDING", store.getRecords("a", "CRYPTO_CREATE").single().status)
         advanceTimeBy(5000); runCurrent()

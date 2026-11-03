@@ -26,7 +26,7 @@ data class RecurringUiState(val signedIn: Boolean = false, val templates: Report
 }
 
 class RecurringViewModel(private val auth: AuthRepository, private val repository: RecurringRepository,
-    private val clock: Clock = Clock.systemUTC()) : ViewModel() {
+    private val clock: Clock = Clock.systemUTC(), private val synchronize: Boolean = true) : ViewModel() {
     private val mutable = MutableStateFlow(RecurringUiState(today = Recurrence.today(clock).toString()))
     val state = mutable.asStateFlow()
     private var uid: String? = null
@@ -56,7 +56,7 @@ class RecurringViewModel(private val auth: AuthRepository, private val repositor
                             delay(5000)
                         }
                     }
-                    launch {
+                    if (synchronize) launch {
                         while (isActive) {
                             try { repository.synchronize(owner) }
                             catch (e: CancellationException) { throw e }

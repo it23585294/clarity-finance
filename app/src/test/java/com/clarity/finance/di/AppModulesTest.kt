@@ -77,6 +77,8 @@ class AppModulesTest {
                 single<ReportingRepository> { unused() }
                 single<GoalRepository> { unused() }
                 single<RecurringRepository> { unused() }
+                single<CatalogueRepository> { unused() }
+                single<FinancialRecoveryAccess> { unused() }
             })
         }
         val owners = ViewModelStore()
@@ -84,7 +86,7 @@ class AppModulesTest {
             val types = listOf(AuthViewModel::class, HomeViewModel::class, ExpenseListViewModel::class, AddExpenseViewModel::class,
                 EditExpenseViewModel::class, IncomeListViewModel::class, AddEditIncomeViewModel::class, PaymentListViewModel::class,
                 AddPaymentViewModel::class, PaymentDetailViewModel::class, PaymentConfirmationViewModel::class, CryptoViewModel::class,
-                DashboardViewModel::class, GoalViewModel::class, GoalCardViewModel::class, RecurringViewModel::class)
+                DashboardViewModel::class, GoalViewModel::class, GoalCardViewModel::class, RecurringViewModel::class, CatalogueViewModel::class)
             for (type in types) {
                 val a = graph.koin.get<ViewModel>(type)
                 val b = graph.koin.get<ViewModel>(type)

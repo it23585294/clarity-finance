@@ -9,8 +9,9 @@ import org.koin.core.context.startKoin
 class ClarityApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        startKoin {
+        val graph = startKoin {
             modules(platformModule(this@ClarityApplication), repositoryModule, viewModelModule)
         }
+        graph.koin.get<com.clarity.finance.data.repository.SessionSyncCoordinator>().start()
     }
 }

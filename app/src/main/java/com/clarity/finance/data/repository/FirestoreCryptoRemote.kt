@@ -17,12 +17,14 @@ data class CryptoRemoteSnapshot(val results: List<CryptoResult>, val fromCache: 
 interface CryptoRemote {
     fun observe(uid: String, year: Int, cutoff: String): Flow<CryptoRemoteSnapshot>
     suspend fun apply(uid: String, operation: CryptoOperation)
+    suspend fun resolve(uid: String, operation: CryptoOperation) { error("Online resolution unavailable.") }
 }
 
 /** No access to income, expenses, project payments or goal collections. */
 class FirestoreCryptoRemote(
     private val firestore: FirebaseFirestore,
-    private val activeUid: () -> String?
+    private val activeUid: () -> String?,
+    private val financial: FinancialRemote
 ) : CryptoRemote {
     private fun collection(uid: String) = firestore.collection("users").document(uid).collection("cryptoResults")
 
@@ -42,30 +44,17 @@ class FirestoreCryptoRemote(
 
     override suspend fun apply(uid: String, operation: CryptoOperation) {
         check(activeUid() == uid) { "Account changed. Saved operation belongs to the original account." }
-        val result = operation.result
-        CryptoReporting.validate(result.direction, result.amountMinor, result.resultDate, result.note, CryptoReporting.today())
-        require(operation.kind in setOf("CREATE", "UPDATE", "DELETE"))
-        require(result.id.isNotBlank() && operation.operationId.isNotBlank())
-        val ref = collection(uid).document(result.id)
-        firestore.runTransaction { transaction ->
-            check(activeUid() == uid) { "Account changed. Reopen Crypto Results." }
-            val snapshot = transaction.get(ref)
-            val existing = if (snapshot.exists()) snapshot.crypto() else null
-            if (!operation.requiresWrite(existing)) return@runTransaction
-            check(activeUid() == uid) { "Account changed. Reopen Crypto Results." }
-            if (operation.kind == "DELETE") transaction.delete(ref)
-            else {
-                val data = mutableMapOf<String, Any>(
-                    "direction" to result.direction, "amountMinor" to result.amountMinor,
-                    "resultDate" to result.resultDate, "note" to result.note,
-                    "lastOperationId" to operation.operationId, "updatedAt" to FieldValue.serverTimestamp()
-                )
-                if (operation.kind == "CREATE") {
-                    data["createdAt"] = FieldValue.serverTimestamp()
-                    transaction.set(ref, data)
-                } else transaction.update(ref, data)
-            }
-        }.await()
+        financial.apply(uid, FinancialOperation(operation.operationId, "CRYPTO", operation.kind, operation.result.id,
+            expectedUpdatedAt = operation.expectedUpdatedAt,
+            crypto = operation.result.takeUnless { operation.kind == "DELETE" },
+            legacyPayload = if (operation.protocolVersion < 2) com.google.gson.Gson().toJson(operation) else null))
+    }
+
+    override suspend fun resolve(uid: String, operation: CryptoOperation) {
+        check(activeUid() == uid) { "Account changed. Saved proposal retained." }
+        financial.fence(uid, FinancialOperation(operation.operationId, "CRYPTO", operation.kind, operation.result.id,
+            expectedUpdatedAt = operation.expectedUpdatedAt, crypto = operation.result.takeUnless { operation.kind == "DELETE" },
+            legacyPayload = if (operation.protocolVersion < 2) com.google.gson.Gson().toJson(operation) else null))
     }
 
     private fun DocumentSnapshot.crypto(): CryptoResult {

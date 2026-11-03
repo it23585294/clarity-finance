@@ -6,6 +6,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.CancellationException
 
 class FirebaseAuthRepository(
     private val auth: FirebaseAuth
@@ -28,13 +29,13 @@ class FirebaseAuthRepository(
         val result = auth.signInWithEmailAndPassword(email, password).await()
         val firebaseUser = result.user ?: throw Exception("Login failed")
         User(uid = firebaseUser.uid, email = firebaseUser.email ?: "")
-    }
+    }.onFailure { if (it is CancellationException) throw it }
 
     override suspend fun register(email: String, password: String): Result<User> = runCatching {
         val result = auth.createUserWithEmailAndPassword(email, password).await()
         val firebaseUser = result.user ?: throw Exception("Registration failed")
         User(uid = firebaseUser.uid, email = firebaseUser.email ?: "")
-    }
+    }.onFailure { if (it is CancellationException) throw it }
 
     override suspend fun logout() {
         auth.signOut()

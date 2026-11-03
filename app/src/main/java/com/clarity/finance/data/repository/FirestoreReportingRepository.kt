@@ -71,11 +71,12 @@ class FirestoreReportingRepository(
             createdAt = doc.getTimestamp("createdAt"), updatedAt = doc.getTimestamp("updatedAt"), isFromCache = doc.metadata.isFromCache)
     }
 
-    override fun recovery(uid: String) = recoveryStore.getOperationRecordsFlow(uid, setOf(
-        "EXPENSE", "INCOME", "CREATE_PROJECT", "CREATE_MILESTONE", "PAYMENT_DIRECT", "PAYMENT_MILESTONE", "CANCEL_MILESTONE",
-        "CRYPTO_CREATE", "CRYPTO_UPDATE", "CRYPTO_DELETE", "RECURRING_CONFIRM"
-    )).map { records ->
-        ReportingRecovery(records.count { it.status in setOf("PENDING", "UNCERTAIN") }, records.count { it.status in setOf("FAILED", "CONFLICT", "REJECTED") })
+    override fun recovery(uid: String) = recoveryStore.getAllRecordsFlow(uid).map { all ->
+        val records = all.filter { it.resolvedType.startsWith("FINANCIAL_") || it.resolvedType in setOf(
+            "EXPENSE", "INCOME", "CREATE_PROJECT", "CREATE_MILESTONE", "PAYMENT_DIRECT", "PAYMENT_MILESTONE", "CANCEL_MILESTONE",
+            "CRYPTO_CREATE", "CRYPTO_UPDATE", "CRYPTO_DELETE", "RECURRING_CONFIRM") }
+        // Legacy FAILED/CONFLICT did not establish logical rejection. Retain them as unresolved.
+        ReportingRecovery(records.count { it.status != "REJECTED" }, records.count { it.status == "REJECTED" })
     }
 
     private fun DocumentSnapshot.requiredString(field: String) = getString(field) ?: error("Missing $field.")

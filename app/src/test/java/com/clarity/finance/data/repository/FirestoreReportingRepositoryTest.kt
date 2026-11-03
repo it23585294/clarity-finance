@@ -163,7 +163,7 @@ class FirestoreReportingRepositoryTest {
         store.saveRecord(rejected)
         store.saveRecord(SubmissionRecord("b", "same", "other-owner", "PENDING", type = "INCOME"))
         val reports = FirestoreReportingRepository(firestore, store)
-        assertEquals(ReportingRecovery(1, 1), reports.recovery("a").first())
+        assertEquals(ReportingRecovery(2, 0), reports.recovery("a").first()) // Legacy access failure is unresolved, not proof of rejection.
         assertEquals(ReportingRecovery(1, 0), reports.recovery("b").first())
         assertEquals(listOf(legacy), store.getRecords("a", "EXPENSE"))
         assertEquals(listOf(rejected), store.getRecords("a", "CRYPTO_UPDATE"))
