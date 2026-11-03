@@ -14,5 +14,6 @@ data class Expense(
     // UI-only metadata (not saved explicitly to Firestore via Map)
     val isPending: Boolean = false,
     val syncError: String? = null,
-    val isConflict: Boolean = false
+    val isConflict: Boolean = false,
+    val recurringOccurrenceId: String? = null // Immutable origin link; confirmation is retained after correction/deletion.
 )
