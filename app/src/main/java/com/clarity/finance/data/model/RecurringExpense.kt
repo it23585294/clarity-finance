@@ -42,13 +42,13 @@ object Recurrence {
     fun validate(config: RecurringConfig) {
         require(config.name.isNotBlank() && config.name.length <= 100) { "Enter a name of at most 100 characters." }
         require(config.suggestedMinor > 0) { "Suggested amount must be positive." }
-        require(config.categoryId in ExpenseCategories.labels && config.paymentChannelId in channels && config.spendingType in setOf("committed", "discretionary")) { "Choose valid expense classifications." }
+        require(CatalogueDefaults.validId("category", config.categoryId) && config.paymentChannelId in channels && config.spendingType in setOf("committed", "discretionary")) { "Choose valid expense classifications." }
         SavingsMath.date(config.firstDueDate)
         require(config.cadence == "monthly" && config.anchorDay in 1..31) { "Monthly day must be between 1 and 31." }
     }
     fun validate(actual: ActualRecurringExpense, today: LocalDate = LocalDate.MAX) {
         require(actual.amountMinor > 0 && actual.currency == "LKR") { "Enter a positive LKR amount." }
-        require(actual.categoryId in ExpenseCategories.labels && actual.paymentChannelId in channels && actual.spendingType in setOf("committed", "discretionary")) { "Choose valid expense classifications." }
+        require(CatalogueDefaults.validId("category", actual.categoryId) && actual.paymentChannelId in channels && actual.spendingType in setOf("committed", "discretionary")) { "Choose valid expense classifications." }
         require(SavingsMath.date(actual.expenseDate) <= today) { "Actual payment date cannot be in the future." }
         require(actual.note.length <= 500) { "Note must have at most 500 characters." }
     }

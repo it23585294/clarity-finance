@@ -43,7 +43,7 @@ object MonthlyReporting {
             require(!it.isPending && it.syncError == null && !it.isConflict) { "Unconfirmed expense in reporting data." }
             date(it.expenseDate)
             require(period.contains(it.expenseDate) && it.currency == "LKR" && it.amountMinor > 0)
-            require(it.categoryId in ExpenseCategories.labels) { "Unknown expense category." }
+            require(CatalogueDefaults.validId("category", it.categoryId)) { "Unknown expense category." }
             when (it.spendingType) {
                 "committed" -> committed = Math.addExact(committed, it.amountMinor)
                 "discretionary" -> discretionary = Math.addExact(discretionary, it.amountMinor)
@@ -55,7 +55,7 @@ object MonthlyReporting {
         // Round committed once to one decimal; use its complement so the displayed pair sums to 100.0%.
         val committedShare = if (total == 0L) null else BigDecimal.valueOf(committed)
             .multiply(BigDecimal(100)).divide(BigDecimal.valueOf(total), 1, RoundingMode.HALF_UP)
-        val categories = amounts.map { (id, amount) -> CategorySpending(id, ExpenseCategories.labels.getValue(id), amount,
+        val categories = amounts.map { (id, amount) -> CategorySpending(id, ExpenseCategories.labels[id] ?: id, amount,
             BigDecimal.valueOf(amount).divide(BigDecimal.valueOf(total), 8, RoundingMode.HALF_UP).toFloat()) }
             .sortedWith(compareByDescending<CategorySpending> { it.amountMinor }.thenBy { it.label })
         return SpendingSummary(total, committed, discretionary, committedShare?.toPlainString(),
@@ -66,7 +66,7 @@ object MonthlyReporting {
         require(!row.isPending && row.syncError == null && !row.isConflict) { "Unconfirmed income in reporting data." }
         date(row.receiptDate)
         require(period.contains(row.receiptDate) && row.lkrAmountMinor > 0)
-        require(row.sourceId in setOf("salary", "freelance", "adsense") && row.currency in setOf("LKR", "USD")) { "Invalid ordinary income source or currency." }
+        require(CatalogueDefaults.validId("source", row.sourceId) && row.currency in setOf("LKR", "USD")) { "Invalid ordinary income source or currency." }
         Math.addExact(sum, row.lkrAmountMinor)
     }
 

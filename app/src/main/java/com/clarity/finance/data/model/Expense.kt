@@ -15,5 +15,7 @@ data class Expense(
     val isPending: Boolean = false,
     val syncError: String? = null,
     val isConflict: Boolean = false,
-    val recurringOccurrenceId: String? = null // Immutable origin link; confirmation is retained after correction/deletion.
+    val recurringOccurrenceId: String? = null, // Immutable origin link; confirmation is retained after correction/deletion.
+    val isFromCache: Boolean = false,
+    val queuedChange: String? = null
 )

@@ -21,12 +21,13 @@ data class ExpectedPayment(
     val createdAt: Timestamp? = null,
     val updatedAt: Timestamp? = null,
     val hasPendingWrites: Boolean = false,
-    val isFromCache: Boolean = false
+    val isFromCache: Boolean = false,
+    val queuedChange: String? = null
 ) {
     val confirmationMessage: String?
         get() = when {
+            queuedChange != null -> queuedChange
             hasPendingWrites -> "Awaiting server confirmation. Check your internet connection."
-            isFromCache -> "Showing cached data. Connect to refresh before making changes."
             updatedAt == null -> "This record is missing its server timestamp. Refresh or inspect the saved document."
             else -> null
         }
@@ -54,12 +55,13 @@ data class Milestone(
     val createdAt: Timestamp? = null,
     val updatedAt: Timestamp? = null,
     val hasPendingWrites: Boolean = false,
-    val isFromCache: Boolean = false
+    val isFromCache: Boolean = false,
+    val queuedChange: String? = null
 ) {
     val confirmationMessage: String?
         get() = when {
+            queuedChange != null -> queuedChange
             hasPendingWrites -> "Awaiting server confirmation. Check your internet connection."
-            isFromCache -> "Showing cached data. Connect to refresh before making changes."
             updatedAt == null -> "This record is missing its server timestamp. Refresh or inspect the saved document."
             else -> null
         }

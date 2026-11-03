@@ -19,5 +19,7 @@ data class Income(
     // UI-only metadata
     val isPending: Boolean = false,
     val syncError: String? = null,
-    val isConflict: Boolean = false
+    val isConflict: Boolean = false,
+    val isFromCache: Boolean = false,
+    val queuedChange: String? = null
 )

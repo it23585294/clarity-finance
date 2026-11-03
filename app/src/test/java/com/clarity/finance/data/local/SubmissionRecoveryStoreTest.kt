@@ -1,6 +1,9 @@
 package com.clarity.finance.data.local
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -69,4 +72,25 @@ class SubmissionRecoveryStoreTest {
         assertEquals(1, afterRemoveUid2.size)
         assertEquals("uid2", afterRemoveUid2.first().uid)
     }
+    @Test fun `corrupt recovery data never becomes empty and no writer discards it`() = runTest {
+        val disk = PreferenceDataStoreFactory.create(scope = backgroundScope,
+            produceFile = { tempFolder.newFile("corrupt.preferences_pb") })
+        val key = stringPreferencesKey("submission_records")
+        disk.edit { it[key] = "{" }
+        val store = SubmissionRecoveryStore(disk)
+        val record = SubmissionRecord("owner", "id", "{}", "PENDING", type = "EXPENSE")
+        val actions: List<suspend () -> Unit> = listOf(
+            { store.getRecords("owner", "EXPENSE"); Unit },
+            { store.getRecordsFlow("owner", "EXPENSE").first(); Unit },
+            { store.getAllRecords("owner"); Unit },
+            { store.saveRecord(record) }, { store.saveOperation(record) },
+            { store.removeRecord("owner", "id", "EXPENSE") })
+        for (action in actions) {
+            try { action(); fail("Corrupt data must be reported") } catch (expected: IllegalStateException) {
+                assertTrue(expected.message!!.contains("nothing was discarded"))
+            }
+            assertEquals("{", disk.data.first()[key])
+        }
+    }
+
 }

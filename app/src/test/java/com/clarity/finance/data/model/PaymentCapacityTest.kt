@@ -22,7 +22,9 @@ class PaymentCapacityTest {
     }
     @Test fun `pending cached and malformed documents have distinct states`() {
         assertTrue(project().copy(hasPendingWrites = true).confirmationMessage!!.contains("Awaiting"))
-        assertTrue(project().copy(isFromCache = true).confirmationMessage!!.contains("cached"))
+        val cached = project().copy(isFromCache = true, updatedAt = Timestamp(1, 0))
+        assertTrue(cached.isFromCache); assertNull(cached.confirmationMessage); assertTrue(cached.canModify)
+        assertTrue(project().copy(isFromCache = true).confirmationMessage!!.contains("missing"))
         assertTrue(project().confirmationMessage!!.contains("missing"))
         assertFalse(project().canModify)
         assertTrue(project().copy(updatedAt = Timestamp(1, 0)).canModify)
