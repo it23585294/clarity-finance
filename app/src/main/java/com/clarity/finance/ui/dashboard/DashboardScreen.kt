@@ -51,6 +51,7 @@ fun DashboardScreen(
             .padding(bottom = 88.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (!state.signedIn) Text("Sign in to view recorded finances.")
             else {
+                com.clarity.finance.ui.CatalogueStatus()
                 Text("Reporting month: ${state.month}", style = MaterialTheme.typography.titleMedium)
                 Text("Asia/Colombo transaction dates • Based on recorded transactions.")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -107,19 +108,20 @@ fun DashboardScreen(
                         spending.categories.forEach { category ->
                             OutlinedCard(onClick = { viewModel.selectCategory(category.id); page = "history" }, modifier = Modifier.fillMaxWidth()) {
                                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text("${category.label}: LKR ${MonthlyReporting.money(category.amountMinor)}")
+                                    val label = com.clarity.finance.ui.LocalCatalogue.current.label("category", category.id)
+                                    Text("${label}: LKR ${MonthlyReporting.money(category.amountMinor)}")
                                     LinearProgressIndicator(progress = { category.barFraction }, modifier = Modifier.fillMaxWidth())
-                                    Text("Inspect ${category.label} expenses")
+                                    Text("Inspect $label expenses")
                                 }
                             }
                         }
                     }
                 }
                 if (page == "history") {
-                    Text("Expense category: ${state.selectedCategory?.let { ExpenseCategories.labels[it] } ?: "All categories"}", style = MaterialTheme.typography.titleMedium)
+                    Text("Expense category: ${state.selectedCategory?.let { com.clarity.finance.ui.LocalCatalogue.current.labels("category")[it] ?: it } ?: "All categories"}", style = MaterialTheme.typography.titleMedium)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(selected = state.selectedCategory == null, onClick = { viewModel.selectCategory(null) }, label = { Text("All categories") })
-                        ExpenseCategories.labels.forEach { (id, label) ->
+                        com.clarity.finance.ui.LocalCatalogue.current.labels("category").forEach { (id, label) ->
                             FilterChip(selected = state.selectedCategory == id, onClick = { viewModel.selectCategory(id) }, label = { Text(label) })
                         }
                     }
@@ -127,7 +129,7 @@ fun DashboardScreen(
                     BatchStatus(state.expenses)
                     if (state.expenses.records != null && state.expenseHistory.isEmpty()) Text("No matching expenses recorded for this month.")
                     state.expenseHistory.forEach { row ->
-                        HistoryCard("${ExpenseCategories.labels[row.categoryId] ?: row.categoryId} • ${row.expenseDate}",
+                        HistoryCard("${com.clarity.finance.ui.LocalCatalogue.current.label("category", row.categoryId)} • ${row.expenseDate}",
                             "LKR ${MonthlyReporting.money(row.amountMinor)} • ${row.spendingType}", row.note.orEmpty(),
                             "Inspect / edit expense", { onExpense(row.id) })
                     }
@@ -136,7 +138,7 @@ fun DashboardScreen(
                         BatchStatus(state.income)
                         if (state.income.records != null && state.incomeHistory.isEmpty()) Text("No received income recorded for this month.")
                         state.incomeHistory.forEach { row ->
-                            HistoryCard("${row.sourceId.replaceFirstChar { it.uppercase() }} • ${row.receiptDate}",
+                            HistoryCard("${com.clarity.finance.ui.LocalCatalogue.current.label("source", row.sourceId)} • ${row.receiptDate}",
                                 "LKR ${MonthlyReporting.money(row.lkrAmountMinor)}", row.note,
                                 if (row.linkedPaymentId != null) "Linked receipt: inspect project" else "Inspect / edit income",
                                 { row.linkedPaymentId?.let(onProject) ?: onIncome(row.id) })

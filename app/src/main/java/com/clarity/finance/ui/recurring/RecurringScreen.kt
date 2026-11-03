@@ -77,7 +77,7 @@ fun RecurringScreen(viewModel: RecurringViewModel, onBack: () -> Unit, onExpense
                         OutlinedCard(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(template.config.name, style = MaterialTheme.typography.titleMedium)
-                                Text("Suggested LKR ${SavingsMath.money(template.config.suggestedMinor)} • ${ExpenseCategories.labels[template.config.categoryId]}")
+                                Text("Suggested LKR ${SavingsMath.money(template.config.suggestedMinor)} • ${com.clarity.finance.ui.LocalCatalogue.current.label("category", template.config.categoryId)}")
                                 Text(if (template.isCancelled) "Cancelled • confirmation history retained" else "Monthly • first due ${template.config.firstDueDate} • day ${template.config.anchorDay}, clamped to month end")
                                 OutlinedButton(onClick = { viewModel.select(template) }) { Text("Inspect ${template.config.name}") }
                             }
@@ -96,7 +96,7 @@ fun RecurringScreen(viewModel: RecurringViewModel, onBack: () -> Unit, onExpense
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(template.config.name, style = MaterialTheme.typography.headlineSmall)
                             Text("Suggested LKR ${SavingsMath.money(template.config.suggestedMinor)}; this is not confirmed spending.")
-                            Text("${ExpenseCategories.labels[template.config.categoryId]} • ${template.config.spendingType} • ${Recurrence.channels[template.config.paymentChannelId]}")
+                            Text("${com.clarity.finance.ui.LocalCatalogue.current.label("category", template.config.categoryId)} • ${template.config.spendingType} • ${Recurrence.channels[template.config.paymentChannelId]}")
                             Text("Monthly day ${template.config.anchorDay}, clamped to month end. First due date: ${template.config.firstDueDate} (fixed).")
                             Text("Edits apply to all unconfirmed months, including missed months. Confirmed dates/expenses keep their original identities. Pending confirmations retain their original details and may be rejected if a template change commits first.")
                             if (template.isCancelled) Text("Cancelled. All unconfirmed occurrences, including already-due items, are stopped. Past expenses and confirmations remain.")
@@ -149,7 +149,9 @@ fun RecurringScreen(viewModel: RecurringViewModel, onBack: () -> Unit, onExpense
                     }
                     if (!actual) field("Template name", form.name) { viewModel.update(form.copy(name = it)) }
                     field(if (actual) "Actual amount (LKR)" else "Suggested amount (LKR)", form.amount, true) { viewModel.update(form.copy(amount = it)) }
-                    RecurringChoice("Category", form.categoryId, ExpenseCategories.labels, enabled) { viewModel.update(form.copy(categoryId = it)) }
+                    val catalogue = com.clarity.finance.ui.LocalCatalogue.current
+                    com.clarity.finance.ui.CatalogueStatus()
+                    RecurringChoice("Category", form.categoryId, catalogue.choices("category", if (form.kind == "EDIT") form.categoryId else null).associate { it.id to it.name }, enabled) { viewModel.update(form.copy(categoryId = it, spendingType = catalogue.defaultValue("category", it) ?: form.spendingType)) }
                     RecurringChoice("Spending type", form.spendingType, mapOf("committed" to "Committed", "discretionary" to "Discretionary"), enabled) { viewModel.update(form.copy(spendingType = it)) }
                     RecurringChoice("Payment channel", form.paymentChannelId, Recurrence.channels, enabled) { viewModel.update(form.copy(paymentChannelId = it)) }
                     if (actual) {
@@ -161,7 +163,7 @@ fun RecurringScreen(viewModel: RecurringViewModel, onBack: () -> Unit, onExpense
                     }
                     state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     if (state.unknown != null) Text("Local save outcome unknown. Close this form, then use Retry local save. The original proposal identity and details are retained.")
-                    Button(onClick = viewModel::save, enabled = state.canPrepare) { Text(if (actual) "Confirm payment proposal" else "Save template proposal") }
+                    Button(onClick = viewModel::save, enabled = state.canPrepare && catalogue.accepts("category", form.categoryId, if (form.kind == "EDIT") state.selected?.config?.categoryId else null)) { Text(if (actual) "Confirm payment proposal" else "Save template proposal") }
                     OutlinedButton(onClick = viewModel::closeForm, enabled = !state.busy) { Text("Close form") }
                 }
             }

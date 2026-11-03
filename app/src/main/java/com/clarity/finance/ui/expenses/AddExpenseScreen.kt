@@ -17,12 +17,12 @@ fun AddExpenseScreen(
 ) {
     val formState by viewModel.formState.collectAsStateWithLifecycle()
 
-    var amountStr by remember { mutableStateOf("") }
-    var categoryId by remember { mutableStateOf("other") }
-    var paymentChannelId by remember { mutableStateOf("cash") }
-    var spendingType by remember { mutableStateOf("discretionary") }
-    var expenseDate by remember { mutableStateOf(viewModel.getDefaultDate()) }
-    var note by remember { mutableStateOf("") }
+    var amountStr by remember(formState.accountKey) { mutableStateOf("") }
+    var categoryId by remember(formState.accountKey) { mutableStateOf("other") }
+    var paymentChannelId by remember(formState.accountKey) { mutableStateOf("cash") }
+    var spendingType by remember(formState.accountKey) { mutableStateOf("discretionary") }
+    var expenseDate by remember(formState.accountKey) { mutableStateOf(viewModel.getDefaultDate()) }
+    var note by remember(formState.accountKey) { mutableStateOf("") }
 
     // Auto-navigate on success
     LaunchedEffect(formState.isSuccess) {

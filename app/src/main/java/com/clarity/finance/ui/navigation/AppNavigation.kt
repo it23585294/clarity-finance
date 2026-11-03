@@ -23,6 +23,8 @@ import com.clarity.finance.viewmodel.SessionState
 
 @Composable
 fun AppNavigation(graph: Koin = GlobalContext.get()) {
+    val catalogueViewModel: com.clarity.finance.viewmodel.CatalogueViewModel = injectedViewModel(graph)
+    val catalogueState by catalogueViewModel.state.collectAsStateWithLifecycle()
     val navController = rememberNavController()
     val authViewModel: AuthViewModel = injectedViewModel(graph)
     val sessionState by authViewModel.sessionState.collectAsStateWithLifecycle()
@@ -56,6 +58,7 @@ fun AppNavigation(graph: Koin = GlobalContext.get()) {
         }
     }
 
+    androidx.compose.runtime.CompositionLocalProvider(com.clarity.finance.ui.LocalCatalogue provides catalogueState.catalogue) {
     NavHost(navController = navController, startDestination = startDestination) {
         composable("login") {
             LoginScreen(
@@ -85,10 +88,12 @@ fun AppNavigation(graph: Koin = GlobalContext.get()) {
                     onNavigateToCrypto = { navController.navigate("cryptoResults") },
                     onNavigateToDashboard = { navController.navigate("financialDashboard") },
                     onNavigateToGoal = { navController.navigate("savingsGoal") },
-                    onNavigateToRecurring = { navController.navigate("recurringExpenses") }
+                    onNavigateToRecurring = { navController.navigate("recurringExpenses") },
+                    onNavigateToCatalogue = { navController.navigate("catalogue") }
                 )
             }
         }
+        composable("catalogue") { com.clarity.finance.ui.CatalogueScreen(catalogueViewModel) { navController.popBackStack() } }
         composable("financialDashboard") {
             val dashboardViewModel: com.clarity.finance.viewmodel.DashboardViewModel = injectedViewModel(graph)
             com.clarity.finance.ui.dashboard.DashboardScreen(
@@ -124,6 +129,7 @@ fun AppNavigation(graph: Koin = GlobalContext.get()) {
             val paymentListViewModel: com.clarity.finance.viewmodel.PaymentListViewModel = injectedViewModel(graph)
             com.clarity.finance.ui.payments.ExpectedPaymentsScreen(
                 viewModel = paymentListViewModel,
+                onRecovery = { navController.navigate("catalogue") },
                 onNavigateToProjectDetail = { id -> navController.navigate("projectDetail/$id") },
                 onNavigateToAddPayment = { navController.navigate("addPayment") },
                 onNavigateBack = { navController.popBackStack() }
@@ -144,6 +150,7 @@ fun AppNavigation(graph: Koin = GlobalContext.get()) {
             val paymentDetailViewModel: com.clarity.finance.viewmodel.PaymentDetailViewModel = injectedViewModel(graph)
             com.clarity.finance.ui.payments.ProjectDetailScreen(
                 viewModel = paymentDetailViewModel,
+                onRecovery = { navController.navigate("catalogue") },
                 paymentId = paymentId,
                 onNavigateToConfirmation = { pId, msId ->
                     if (msId != null) {
@@ -177,7 +184,9 @@ fun AppNavigation(graph: Koin = GlobalContext.get()) {
             com.clarity.finance.ui.income.IncomeListScreen(
                 viewModel = incomeListViewModel,
                 onNavigateToAddIncome = { navController.navigate("addEditIncome/new") },
-                onNavigateToEditIncome = { id -> navController.navigate("addEditIncome/$id") },
+                onRecovery = { navController.navigate("catalogue") },
+                onNavigateToEditIncome = { id -> navController.navigate("addEditIncome/${android.net.Uri.encode(id)}") },
+                onNavigateToProject = { id -> navController.navigate("projectDetail/${android.net.Uri.encode(id)}") },
                 onNavigateBack = { navController.popBackStack() }
             )
         }
@@ -200,6 +209,7 @@ fun AppNavigation(graph: Koin = GlobalContext.get()) {
                 val expenseListViewModel: ExpenseListViewModel = injectedViewModel(graph)
                 com.clarity.finance.ui.expenses.ExpensesScreen(
                     viewModel = expenseListViewModel,
+                    onRecovery = { navController.navigate("catalogue") },
                     onNavigateToAddExpense = {
                         navController.navigate("addExpense")
                     },
@@ -230,4 +240,5 @@ fun AppNavigation(graph: Koin = GlobalContext.get()) {
             )
         }
     }
+}
 }

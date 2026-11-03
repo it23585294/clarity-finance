@@ -1,6 +1,8 @@
 package com.clarity.finance.ui.income
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -80,9 +82,11 @@ fun AddEditIncomeScreen(
             }
         }
 
-        val sources = listOf("salary" to "Salary", "freelance" to "Freelance", "adsense" to "Adsense")
+        val catalogue = com.clarity.finance.ui.LocalCatalogue.current
+        val sources = catalogue.choices("source", if (formState.isEditMode) formState.sourceId else null).map { it.id to it.name }
         
-        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Column(modifier = Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(16.dp)) {
+            com.clarity.finance.ui.CatalogueStatus()
             // Source
             var srcExpanded by remember { mutableStateOf(false) }
             ExposedDropdownMenuBox(
@@ -90,7 +94,7 @@ fun AddEditIncomeScreen(
                 onExpandedChange = { srcExpanded = !srcExpanded }
             ) {
                 OutlinedTextField(
-                    value = sources.find { it.first == formState.sourceId }?.second ?: "Salary",
+                    value = catalogue.label("source", formState.sourceId),
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Source") },
@@ -102,7 +106,7 @@ fun AddEditIncomeScreen(
                         DropdownMenuItem(
                             text = { Text(option.second) },
                             onClick = {
-                                viewModel.updateForm(sourceId = option.first)
+                                viewModel.updateForm(sourceId = option.first, currency = catalogue.defaultValue("source", option.first) ?: formState.currency)
                                 srcExpanded = false
                             }
                         )
@@ -191,13 +195,8 @@ fun AddEditIncomeScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                     
-                    // Show derived rate
-                    val origResult = viewModel.parseAmount(formState.originalAmountStr)
-                    val lkrResult = viewModel.parseAmount(formState.actualLkrCreditStr)
-                    if (origResult.isSuccess && lkrResult.isSuccess && origResult.getOrThrow() > BigDecimal.ZERO) {
-                        val derived = lkrResult.getOrThrow().divide(origResult.getOrThrow(), 4, RoundingMode.HALF_UP)
-                        Text("Effective rate: ~$derived LKR/USD", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 4.dp))
-                    }
+                    formState.effectiveRateText?.let { Text("Effective rate: ~$it LKR/USD", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 4.dp)) }
+
                 }
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -212,13 +211,8 @@ fun AddEditIncomeScreen(
             // Preview LKR
             Spacer(modifier = Modifier.height(16.dp))
             if (formState.currency == "USD" && formState.conversionBasis == "confirmed_rate") {
-                val origResult = viewModel.parseAmount(formState.originalAmountStr)
-                val rateResult = viewModel.parseAmount(formState.conversionRateStr) // Use basic parsing for preview
-                if (origResult.isSuccess && rateResult.isSuccess) {
-                    val lkr = origResult.getOrThrow().multiply(rateResult.getOrThrow()).setScale(2, RoundingMode.HALF_UP)
-                    Text("Preview: $lkr LKR", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
+                formState.previewLkrText?.let { Text("Preview: $it LKR", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary) }
+
             }
 
             if (formState.error != null) {
@@ -229,7 +223,7 @@ fun AddEditIncomeScreen(
             Button(
                 onClick = { viewModel.saveChanges() },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !formState.isSubmitting && !formState.isDeleting
+                enabled = !formState.isSubmitting && !formState.isDeleting && sources.any { it.first == formState.sourceId }
             ) {
                 if (formState.isSubmitting) CircularProgressIndicator(modifier = Modifier.size(24.dp))
                 else Text(if (formState.isEditMode) "Save Changes" else "Add Income")

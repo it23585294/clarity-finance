@@ -21,7 +21,8 @@ fun ExpensesScreen(
     viewModel: ExpenseListViewModel,
     onNavigateToAddExpense: () -> Unit,
     onNavigateToEditExpense: (String) -> Unit,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onRecovery: () -> Unit = {}
 ) {
     val uiState by viewModel.expensesState.collectAsStateWithLifecycle()
 
@@ -38,6 +39,9 @@ fun ExpensesScreen(
         }
         
         Spacer(modifier = Modifier.height(16.dp))
+
+        com.clarity.finance.ui.CatalogueStatus()
+        TextButton(onClick = onRecovery) { Text("Review saved changes") }
         
         Button(
             onClick = onNavigateToAddExpense,
@@ -68,7 +72,7 @@ fun ExpensesScreen(
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(state.expenses, key = { it.id }) { expense ->
-                            val isClickable = !expense.isPending && expense.syncError == null && !expense.isConflict
+                            val isClickable = !expense.isPending && expense.syncError == null && !expense.isConflict && expense.queuedChange == null
                             ExpenseItem(
                                 expense = expense,
                                 modifier = if (isClickable) Modifier.clickable { onNavigateToEditExpense(expense.id) } else Modifier,
@@ -85,17 +89,7 @@ fun ExpensesScreen(
 
 @Composable
 fun ExpenseItem(expense: Expense, modifier: Modifier = Modifier, onRetry: () -> Unit) {
-    val categoryUiMap = mapOf(
-        "food_dining" to "Food & Dining",
-        "transport" to "Transport",
-        "housing" to "Housing",
-        "utilities" to "Utilities",
-        "shopping" to "Shopping",
-        "health" to "Health",
-        "entertainment" to "Entertainment",
-        "education" to "Education",
-        "other" to "Other"
-    )
+    val categoryUiMap = com.clarity.finance.ui.LocalCatalogue.current.labels("category")
 
     val channelUiMap = mapOf(
         "cash" to "Cash",
@@ -105,18 +99,20 @@ fun ExpenseItem(expense: Expense, modifier: Modifier = Modifier, onRetry: () -> 
     )
     
     Column(modifier = modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        expense.queuedChange?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(text = "${expense.expenseDate} - ${categoryUiMap[expense.categoryId] ?: expense.categoryId}", style = MaterialTheme.typography.bodyLarge)
-            val amountStr = String.format(java.util.Locale.US, "%.2f", expense.amountMinor / 100.0)
+            Text(text = "${expense.expenseDate} - ${com.clarity.finance.ui.LocalCatalogue.current.label("category", expense.categoryId)}", style = MaterialTheme.typography.bodyLarge)
+            val amountStr = java.math.BigDecimal.valueOf(expense.amountMinor, 2).toPlainString()
             Text(text = "${expense.currency} $amountStr", style = MaterialTheme.typography.titleMedium)
         }
         Spacer(modifier = Modifier.height(4.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(text = "${channelUiMap[expense.paymentChannelId] ?: expense.paymentChannelId} • ${expense.spendingType}", style = MaterialTheme.typography.bodyMedium)
             
+            if (expense.isFromCache && !expense.isPending) Text("Cached", style = MaterialTheme.typography.bodySmall)
             if (expense.syncError != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = if (expense.isConflict) "Conflict" else "Failed", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    Text(text = if (expense.isConflict) "Rejected" else "Awaiting reconciliation", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.width(4.dp))
                     TextButton(onClick = onRetry) {
                         Text("Retry", style = MaterialTheme.typography.bodySmall)

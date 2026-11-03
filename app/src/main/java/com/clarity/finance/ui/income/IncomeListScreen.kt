@@ -24,7 +24,9 @@ fun IncomeListScreen(
     viewModel: IncomeListViewModel,
     onNavigateToAddIncome: () -> Unit,
     onNavigateToEditIncome: (String) -> Unit,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToProject: (String) -> Unit = {},
+    onRecovery: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -53,52 +55,58 @@ fun IncomeListScreen(
             }
             is IncomeListUiState.SignedOut -> {}
             is IncomeListUiState.Success -> {
-                // Month Selector
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = { viewModel.changeMonth(-1) }) { Icon(Icons.Default.ArrowBack, contentDescription = "Previous") }
-                    Text(text = "${state.currentMonth.month.name} ${state.currentMonth.year}", style = MaterialTheme.typography.titleMedium)
-                    IconButton(onClick = { viewModel.changeMonth(1) }) { Icon(Icons.Default.ArrowForward, contentDescription = "Next") }
-                }
-
-                // Totals
-                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        val totalStr = java.math.BigDecimal.valueOf(state.confirmedTotalLkr, 2).toPlainString()
-                        Text("Confirmed Total: LKR $totalStr", style = MaterialTheme.typography.titleLarge)
-                        
-                        if (state.pendingTotalLkr > 0) {
-                            val pendStr = java.math.BigDecimal.valueOf(state.pendingTotalLkr, 2).toPlainString()
-                            Text("+ Pending: LKR $pendStr", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+                LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    item {
+                        // Month Selector
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(onClick = { viewModel.changeMonth(-1) }) { Icon(Icons.Default.ArrowBack, contentDescription = "Previous") }
+                            Text(text = "${state.currentMonth.month.name} ${state.currentMonth.year}", style = MaterialTheme.typography.titleMedium)
+                            IconButton(onClick = { viewModel.changeMonth(1) }) { Icon(Icons.Default.ArrowForward, contentDescription = "Next") }
                         }
 
-                        if (state.totalsBySource.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("By Source:", style = MaterialTheme.typography.labelLarge)
-                            state.totalsBySource.forEach { (source, amount) ->
-                                val srcStr = java.math.BigDecimal.valueOf(amount, 2).toPlainString()
-                                Text("• $source: LKR $srcStr", style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = onRecovery) { Text("Review saved changes") }
+                        com.clarity.finance.ui.CatalogueStatus()
+                        // Totals
+                        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                val totalStr = java.math.BigDecimal.valueOf(state.confirmedTotalLkr, 2).toPlainString()
+                                Text("Confirmed Total: LKR $totalStr", style = MaterialTheme.typography.titleLarge)
+
+                                if (state.pendingTotalLkr > 0) {
+                                    val pendStr = java.math.BigDecimal.valueOf(state.pendingTotalLkr, 2).toPlainString()
+                                    Text("+ Pending: LKR $pendStr", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+                                }
+
+                                if (state.totalsBySource.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("By Source:", style = MaterialTheme.typography.labelLarge)
+                                    state.totalsBySource.forEach { (source, amount) ->
+                                        val srcStr = java.math.BigDecimal.valueOf(amount, 2).toPlainString()
+                                        Text("• ${com.clarity.finance.ui.LocalCatalogue.current.label("source", source)}: LKR $srcStr", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
                             }
                         }
-                    }
-                }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                if (state.incomes.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No income recorded for this month")
                     }
-                } else {
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    if (state.incomes.isEmpty()) {
+                        item {
+                            Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                Text("No income recorded for this month")
+                            }
+                        }
+                    } else {
                         items(state.incomes, key = { it.id }) { income ->
-                            val isClickable = !income.isPending && income.syncError == null && !income.isConflict && income.linkedPaymentId == null
+                            val isClickable = !income.isPending && income.syncError == null && !income.isConflict && income.queuedChange == null
                             IncomeItem(
                                 income = income,
-                                modifier = if (isClickable) Modifier.clickable { onNavigateToEditIncome(income.id) } else Modifier,
+                                modifier = if (isClickable) Modifier.clickable { income.linkedPaymentId?.let(onNavigateToProject) ?: onNavigateToEditIncome(income.id) } else Modifier,
                                 onRetry = { viewModel.retryIncome(income) }
                             )
                             HorizontalDivider()
@@ -113,8 +121,9 @@ fun IncomeListScreen(
 @Composable
 fun IncomeItem(income: Income, modifier: Modifier = Modifier, onRetry: () -> Unit) {
     Column(modifier = modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        income.queuedChange?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(text = "${income.receiptDate} - ${income.sourceId}", style = MaterialTheme.typography.bodyLarge)
+            Text(text = "${income.receiptDate} - ${com.clarity.finance.ui.LocalCatalogue.current.label("source", income.sourceId)}", style = MaterialTheme.typography.bodyLarge)
             val lkrStr = java.math.BigDecimal.valueOf(income.lkrAmountMinor, 2).toPlainString()
             Text(text = "LKR $lkrStr", style = MaterialTheme.typography.titleMedium)
         }
@@ -127,9 +136,10 @@ fun IncomeItem(income: Income, modifier: Modifier = Modifier, onRetry: () -> Uni
             }
             Text(text = "Original: ${income.currency} $displayOriginalAmount", style = MaterialTheme.typography.bodyMedium)
             
+            if (income.isFromCache && !income.isPending) Text("Cached", style = MaterialTheme.typography.bodySmall)
             if (income.syncError != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = if (income.isConflict) "Conflict" else "Failed", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    Text(text = if (income.isConflict) "Rejected" else "Awaiting reconciliation", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.width(4.dp))
                     TextButton(onClick = onRetry) { Text("Retry", style = MaterialTheme.typography.bodySmall) }
                 }

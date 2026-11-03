@@ -24,6 +24,7 @@ fun AddPaymentScreen(
     onNavigateBack: () -> Unit
 ) {
     val formState by viewModel.formState.collectAsStateWithLifecycle()
+    val catalogue = com.clarity.finance.ui.LocalCatalogue.current
     val editable = !formState.isLoading && !formState.isSubmitting && !formState.isRetry
 
     LaunchedEffect(formState.isSuccess) {
@@ -90,14 +91,16 @@ fun AddPaymentScreen(
                 singleLine = true
             )
 
+            com.clarity.finance.ui.CatalogueStatus()
             Text("Source", style = MaterialTheme.typography.titleMedium)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("salary", "freelance", "adsense").forEach { src ->
+                com.clarity.finance.ui.LocalCatalogue.current.choices("source").forEach { source ->
+                    val src = source.id
                     FilterChip(
                         enabled = editable,
                         selected = formState.sourceId == src,
-                        onClick = { viewModel.updateForm(sourceId = src) },
-                        label = { Text(src.replaceFirstChar { it.uppercase() }) }
+                        onClick = { viewModel.updateForm(sourceId = src, currency = source.defaultValue) },
+                        label = { Text(source.name) }
                     )
                 }
             }
@@ -156,7 +159,7 @@ fun AddPaymentScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
                     onClick = { viewModel.savePayment() },
-                    enabled = !formState.isSubmitting && !formState.isLoading
+                    enabled = !formState.isSubmitting && !formState.isLoading && (formState.isRetry || catalogue.accepts("source", formState.sourceId))
                 ) {
                     if (formState.isSubmitting) {
                         CircularProgressIndicator(

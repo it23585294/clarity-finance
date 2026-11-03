@@ -40,7 +40,9 @@ fun ExpenseFormContent(
     onCancel: () -> Unit,
     saveButtonText: String = "Save"
 ) {
-    val categories = categoryUiMap.keys.toList()
+    val catalogue = com.clarity.finance.ui.LocalCatalogue.current
+    val categoryUiMap = catalogue.labels("category")
+    val categories = catalogue.choices("category", if (saveButtonText != "Save") categoryId else null).map { it.id }
     val channels = channelUiMap.keys.toList()
 
     Column(
@@ -50,23 +52,28 @@ fun ExpenseFormContent(
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
+        if (catalogue.entries == null) Text("Loading categories. Connect to load uncached choices.")
+        if (catalogue.fromCache) Text("Cached category choices; proposals await server checks.")
+        catalogue.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         OutlinedTextField(
             value = amountStr,
             onValueChange = onAmountChange,
             label = { Text("Amount (LKR)") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            enabled = !isSubmitting,
             modifier = Modifier.fillMaxWidth()
         )
         
         Spacer(modifier = Modifier.height(8.dp))
 
+        if (categoryId !in categories) Text("Choose an active category before saving.", color = MaterialTheme.colorScheme.error)
         var catExpanded by remember { mutableStateOf(false) }
         ExposedDropdownMenuBox(
             expanded = catExpanded,
             onExpandedChange = { catExpanded = !catExpanded }
         ) {
             OutlinedTextField(
-                value = categoryUiMap[categoryId] ?: "Other",
+                value = catalogue.label("category", categoryId),
                 onValueChange = {},
                 readOnly = true,
                 label = { Text("Category") },
@@ -82,6 +89,7 @@ fun ExpenseFormContent(
                         text = { Text(categoryUiMap[selectionOption]!!) },
                         onClick = {
                             onCategoryChange(selectionOption)
+                            catalogue.defaultValue("category", selectionOption)?.let(onSpendingTypeChange)
                             catExpanded = false
                         }
                     )
@@ -165,7 +173,7 @@ fun ExpenseFormContent(
         Button(
             onClick = onSave,
             modifier = Modifier.fillMaxWidth(),
-            enabled = !isSubmitting
+            enabled = !isSubmitting && categoryId in categories
         ) {
             if (isSubmitting) {
                 CircularProgressIndicator(modifier = Modifier.size(24.dp))

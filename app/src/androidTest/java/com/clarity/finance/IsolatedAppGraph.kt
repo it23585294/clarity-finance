@@ -20,7 +20,16 @@ fun isolatedAppGraph(
     crypto: CryptoRepository = unusedRepository(),
     reporting: ReportingRepository = unusedRepository(),
     goal: GoalRepository = emptyGoalObserver(),
-    recurring: RecurringRepository = unusedRepository()
+    recurring: RecurringRepository = unusedRepository(),
+    catalogue: CatalogueRepository = object : CatalogueRepository {
+        override fun observe(uid: String) = flowOf(com.clarity.finance.data.model.CatalogueSnapshot(com.clarity.finance.data.model.CatalogueDefaults.entries(), false))
+    },
+    recovery: FinancialRecoveryAccess = object : FinancialRecoveryAccess {
+        override fun observe(uid: String) = flowOf(FinancialRecovery())
+        override suspend fun submit(uid: String, operation: FinancialOperation) = error("Unexpected isolated write")
+        override suspend fun resolve(uid: String, operation: FinancialOperation) = error("Unexpected isolated resolution")
+        override suspend fun dismissRejected(uid: String, operation: FinancialOperation) = error("Unexpected isolated dismissal")
+    }
 ): KoinApplication = koinApplication {
     modules(viewModelModule, module {
         single<AuthRepository> { auth }
@@ -31,6 +40,8 @@ fun isolatedAppGraph(
         single<ReportingRepository> { reporting }
         single<GoalRepository> { goal }
         single<RecurringRepository> { recurring }
+        single<CatalogueRepository> { catalogue }
+        single<FinancialRecoveryAccess> { recovery }
     })
 }
 

@@ -70,7 +70,10 @@ fun CryptoScreen(viewModel: CryptoViewModel, onBack: () -> Unit) {
                                 OutlinedButton(onClick = { viewModel.dismissRejected(result) }, enabled = !state.busy) { Text("Dismiss rejected proposal") }
                             }
                             Text("Dismiss only removes the rejected local proposal. Then reopen the server record to correct it, or add the corrected result.", style = MaterialTheme.typography.bodySmall)
-                        } else Text("Saved locally. Synchronises while this screen is open. A timeout does not cancel the write.", style = MaterialTheme.typography.bodySmall)
+                        } else {
+                            Text("Saved locally. Synchronises while the app is running. A timeout does not cancel the write.", style = MaterialTheme.typography.bodySmall)
+                            OutlinedButton(onClick = { viewModel.resolve(result) }, enabled = !state.busy) { Text("Reconcile or withdraw safely (online)") }
+                        }
                     }
                 }
                 Text("Month history (confirmed/cached records)", style = MaterialTheme.typography.titleMedium)
@@ -90,10 +93,10 @@ fun CryptoScreen(viewModel: CryptoViewModel, onBack: () -> Unit) {
                 Text("Note: ${result.note.ifEmpty { "None" }}")
                 Text("Status: ${status(result)}")
                 result.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                if (result.sync == CryptoSync.CONFIRMED && !state.selectedHasAttempt) {
+                if (result.sync in setOf(CryptoSync.CONFIRMED, CryptoSync.CACHED) && !state.selectedHasAttempt) {
                     OutlinedButton(onClick = { viewModel.edit(result) }, enabled = !state.busy) { Text("Edit Result") }
                     OutlinedButton(onClick = { viewModel.requestDelete(result) }, enabled = !state.busy) { Text("Delete Result") }
-                } else Text("Resolve any saved proposal first. Editing and deletion require a confirmed server version.")
+                } else Text("Resolve any saved proposal first. Changes use the recorded version and await server conflict checks.")
             }
         }, confirmButton = { TextButton(onClick = viewModel::closeDetails) { Text("Close") } })
     }
