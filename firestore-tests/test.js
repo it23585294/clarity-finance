@@ -1,6 +1,7 @@
 ﻿const { assertFails, assertSucceeds, initializeTestEnvironment } = require('@firebase/rules-unit-testing');
 const { doc, setDoc, getDoc, getDocs, collection, query, where, orderBy, updateDoc, deleteDoc, serverTimestamp, writeBatch, runTransaction } = require('firebase/firestore');
 const fs = require('fs');
+require('./final-requirements.test.js');
 
 describe('Clarity Expense Firestore Rules', function() {
     this.timeout(30000); // 30 seconds

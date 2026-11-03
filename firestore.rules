@@ -164,6 +164,157 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Stable owner catalogues. Defaults are virtual until renamed/archived; financial references retain IDs.
+    function cId(kind, id) {
+      return id is string && (id.matches('^custom_[A-Za-z0-9_-]{1,100}$')
+        || (kind == 'category' ? id in ['food_dining','transport','housing','utilities','shopping','health','entertainment','education','other']
+          : id in ['salary','freelance','adsense']));
+    }
+    function cPath(uid, kind, id) {
+      return kind == 'category' ? /databases/$(database)/documents/users/$(uid)/expenseCategories/$(id)
+        : /databases/$(database)/documents/users/$(uid)/incomeSources/$(id);
+    }
+    function cActive(uid, kind, id) {
+      let path = cPath(uid, kind, id);
+      return cId(kind, id) && (existsAfter(path) ? getAfter(path).data.archived == false : !id.matches('^custom_.*$'));
+    }
+    function cValid(kind, d) {
+      return d.keys().hasAll(['name','archived','defaultValue','createdAt','updatedAt'])
+        && d.keys().hasOnly(['name','archived','defaultValue','createdAt','updatedAt'])
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 100 && d.name.matches('.*[^ \\t\\r\\n].*')
+        && d.archived is bool && (kind == 'category' ? d.defaultValue in ['committed','discretionary'] : d.defaultValue in ['LKR','USD'])
+        && d.createdAt is timestamp && d.updatedAt == request.time;
+    }
+    match /users/{uid}/expenseCategories/{id} {
+      allow read: if gOwner(uid);
+      allow create: if gOwner(uid) && cId('category', id) && cValid('category', request.resource.data)
+        && request.resource.data.createdAt == request.time && fGuard(uid, 'CATEGORY', '', id);
+      allow update: if gOwner(uid) && cValid('category', request.resource.data) && request.resource.data.createdAt == resource.data.createdAt
+        && (!resource.data.archived || request.resource.data.archived) && fGuard(uid, 'CATEGORY', '', id);
+      allow delete: if false;
+    }
+    match /users/{uid}/incomeSources/{id} {
+      allow read: if gOwner(uid);
+      allow create: if gOwner(uid) && cId('source', id) && cValid('source', request.resource.data)
+        && request.resource.data.createdAt == request.time && fGuard(uid, 'SOURCE', '', id);
+      allow update: if gOwner(uid) && cValid('source', request.resource.data) && request.resource.data.createdAt == resource.data.createdAt
+        && (!resource.data.archived || request.resource.data.archived) && fGuard(uid, 'SOURCE', '', id);
+      allow delete: if false;
+    }
+
+    // Durable mutation protocol. No fields are added to legacy financial schemas.
+    // Receipts and per-record pointers prove both directions of one atomic mutation.
+    function fTarget(uid, d) {
+      return d.group == 'EXPENSE' ? /databases/$(database)/documents/users/$(uid)/expenses/$(d.targetId)
+        : d.group in ['INCOME','RECEIPT'] ? /databases/$(database)/documents/users/$(uid)/incomeReceipts/$(d.targetId)
+        : d.group == 'PROJECT' ? /databases/$(database)/documents/users/$(uid)/expectedPayments/$(d.targetId)
+        : d.group == 'MILESTONE' ? /databases/$(database)/documents/users/$(uid)/expectedPayments/$(d.parentId)/milestones/$(d.targetId)
+        : d.group == 'CRYPTO' ? /databases/$(database)/documents/users/$(uid)/cryptoResults/$(d.targetId)
+        : cPath(uid, d.group == 'CATEGORY' ? 'category' : 'source', d.targetId);
+    }
+    function fState(uid, group, parent, id) {
+      let g = group == 'RECEIPT' ? 'INCOME' : group;
+      return g == 'MILESTONE' ? /databases/$(database)/documents/users/$(uid)/syncStates/$(g)/parents/$(parent)/records/$(id)
+        : /databases/$(database)/documents/users/$(uid)/syncStates/$(g)/records/$(id);
+    }
+    function fProof(d) {
+      return d.keys().hasAll(['group','kind','targetId','parentId','expectedUpdatedAt','payload','createdAt'])
+        && d.keys().hasOnly(['group','kind','targetId','parentId','expectedUpdatedAt','payload','createdAt'])
+        && d.group in ['EXPENSE','INCOME','RECEIPT','PROJECT','MILESTONE','CRYPTO','CATEGORY','SOURCE']
+        && gId(d.targetId) && d.parentId is string
+        && (d.group in ['MILESTONE','RECEIPT'] ? gId(d.parentId) : d.parentId == '')
+        && d.kind in ['CREATE','UPDATE','DELETE','CANCEL','ARCHIVE']
+        && (d.kind == 'CREATE' ? d.expectedUpdatedAt == null : d.expectedUpdatedAt is timestamp)
+        && (d.kind != 'DELETE' || d.group in ['EXPENSE','INCOME','CRYPTO'])
+        && (d.kind != 'CANCEL' || d.group in ['PROJECT','MILESTONE'])
+        && (d.kind != 'ARCHIVE' || d.group in ['CATEGORY','SOURCE'])
+        && (d.group != 'RECEIPT' || d.kind == 'CREATE')
+        && d.payload is map && d.createdAt == request.time;
+    }
+    function fIncomeValues(d) {
+      return {'sourceId':d.sourceId,'receiptDate':d.receiptDate,'currency':d.currency,'originalAmountStr':d.originalAmountStr,
+        'lkrAmountMinor':d.lkrAmountMinor,'conversionBasis':d.conversionBasis,'conversionRateStr':d.get('conversionRateStr',null),'note':d.note};
+    }
+    function fValues(group, d) {
+      return group == 'EXPENSE' ? {'amountMinor':d.amountMinor,'currency':d.currency,'categoryId':d.categoryId,'paymentChannelId':d.paymentChannelId,
+          'spendingType':d.spendingType,'expenseDate':d.expenseDate,'note':d.get('note','')}
+        : group == 'INCOME' ? fIncomeValues(d)
+        : group == 'RECEIPT' ? {'sourceId':d.sourceId,'receiptDate':d.receiptDate,'currency':d.currency,'originalAmountStr':d.originalAmountStr,
+          'lkrAmountMinor':d.lkrAmountMinor,'conversionBasis':d.conversionBasis,'conversionRateStr':d.get('conversionRateStr',null),'note':d.note,
+          'originalAmountMinor':d.originalAmountMinor,'linkedPaymentId':d.linkedPaymentId,'linkedMilestoneId':d.get('linkedMilestoneId',null)}
+        : group == 'PROJECT' ? {'type':d.type,'title':d.title,'sourceId':d.sourceId,'currency':d.currency,'dueDate':d.dueDate,'agreedAmountMinor':d.agreedAmountMinor,'note':d.note}
+        : group == 'MILESTONE' ? {'title':d.title,'dueDate':d.dueDate,'agreedAmountMinor':d.agreedAmountMinor}
+        : group == 'CRYPTO' ? {'direction':d.direction,'amountMinor':d.amountMinor,'resultDate':d.resultDate,'note':d.note}
+        : {'name':d.name,'archived':d.archived,'defaultValue':d.defaultValue};
+    }
+    function fMutation(uid, d) {
+      let path = fTarget(uid, d);
+      return (d.kind == 'CREATE' ? (!exists(path) && !exists(fState(uid, d.group, d.parentId, d.targetId)))
+          : exists(path) && get(path).data.updatedAt == d.expectedUpdatedAt)
+        && (d.group != 'RECEIPT' || d.parentId == getAfter(path).data.linkedPaymentId)
+        && (d.kind == 'DELETE' ? (!existsAfter(path) && d.payload == {})
+          : (existsAfter(path) && getAfter(path).data.updatedAt == request.time
+            && (d.kind == 'CANCEL' ? (d.payload == {} && get(path).data.isCancelled == false && getAfter(path).data.isCancelled == true)
+              : d.payload == fValues(d.group, getAfter(path).data))));
+    }
+    function fReceipt(uid, op, d) {
+      let state = getAfter(fState(uid, d.group, d.parentId, d.targetId)).data;
+      return fProof(d) && !existsAfter(/databases/$(database)/documents/users/$(uid)/syncFences/$(op))
+        && state.operationId == op && state.updatedAt == request.time && state.deleted == (d.kind == 'DELETE')
+        && fMutation(uid, d)
+        && (d.group == 'CRYPTO' && d.kind != 'DELETE' ? getAfter(fTarget(uid, d)).data.lastOperationId == op
+          : (d.group == 'MILESTONE' ? getAfter(fTarget(uid, d)).data.lastMilestoneOpId == op : true));
+    }
+    function fScope(d, group, parent, id) {
+      return d.targetId == id && (group == 'INCOME'
+        ? ((d.group == 'INCOME' && d.parentId == '') || (d.group == 'RECEIPT' && gId(d.parentId)))
+        : d.group == group && d.parentId == parent);
+    }
+    function fGuard(uid, group, parent, id) {
+      let path = fState(uid, group, parent, id);
+      return !existsAfter(path) || (getAfter(path).data.updatedAt == request.time
+        && !exists(/databases/$(database)/documents/users/$(uid)/syncOperations/$(getAfter(path).data.operationId))
+        && fScope(getAfter(/databases/$(database)/documents/users/$(uid)/syncOperations/$(getAfter(path).data.operationId)).data, group, parent, id));
+    }
+    function fStateWrite(uid, group, parent, id, d) {
+      let opPath = /databases/$(database)/documents/users/$(uid)/syncOperations/$(d.operationId);
+      let fencePath = /databases/$(database)/documents/users/$(uid)/syncFences/$(d.operationId);
+      let proof = existsAfter(opPath) ? getAfter(opPath).data : getAfter(fencePath).data;
+      let target = fTarget(uid, proof);
+      return d.keys().hasAll(['operationId','deleted','updatedAt']) && d.keys().hasOnly(['operationId','deleted','updatedAt'])
+        && gId(d.operationId) && d.deleted is bool && d.updatedAt == request.time
+        && fScope(proof, group, parent, id)
+        && (existsAfter(opPath) ? (!exists(opPath) && d.deleted == (proof.kind == 'DELETE') && fMutation(uid, proof))
+          : (!exists(fencePath) && !exists(fState(uid, group, parent, id))
+            && (exists(target) ? (!d.deleted && existsAfter(target) && getAfter(target).data == get(target).data)
+              : (d.deleted && !existsAfter(target)))));
+    }
+    match /users/{uid}/syncOperations/{op} {
+      allow read: if gOwner(uid);
+      allow create: if gOwner(uid) && gId(op) && fReceipt(uid, op, request.resource.data);
+      allow update, delete: if false;
+    }
+    match /users/{uid}/syncFences/{op} {
+      allow read: if gOwner(uid);
+      allow create: if gOwner(uid) && gId(op) && fProof(request.resource.data)
+        && !existsAfter(/databases/$(database)/documents/users/$(uid)/syncOperations/$(op))
+        && existsAfter(fState(uid, request.resource.data.group, request.resource.data.parentId, request.resource.data.targetId))
+        && (exists(fState(uid, request.resource.data.group, request.resource.data.parentId, request.resource.data.targetId))
+          || getAfter(fState(uid, request.resource.data.group, request.resource.data.parentId, request.resource.data.targetId)).data.operationId == op);
+      allow update, delete: if false;
+    }
+    match /users/{uid}/syncStates/{group}/records/{id} {
+      allow read: if gOwner(uid);
+      allow create, update: if gOwner(uid) && group in ['EXPENSE','INCOME','PROJECT','CRYPTO','CATEGORY','SOURCE']
+        && fStateWrite(uid, group, '', id, request.resource.data);
+      allow delete: if false;
+    }
+    match /users/{uid}/syncStates/MILESTONE/parents/{parent}/records/{id} {
+      allow read: if gOwner(uid);
+      allow create, update: if gOwner(uid) && fStateWrite(uid, 'MILESTONE', parent, id, request.resource.data);
+      allow delete: if false;
+    }
+
     // Recurring templates are obligations. Only an atomic confirmed occurrence creates actual spending.
     function rId(id) { return id is string && id.matches('^[A-Za-z0-9-]{1,128}$'); }
     function rTemplateValues(d) {
@@ -171,7 +322,7 @@ service cloud.firestore {
         'suggestedMinor':d.suggestedMinor,'firstDueDate':d.firstDueDate,'anchorDay':d.anchorDay,'cadence':d.cadence,'isCancelled':d.isCancelled};
     }
     function rClassifications(d) {
-      return d.categoryId in ['food_dining','transport','housing','utilities','shopping','health','entertainment','education','other']
+      return cId('category', d.categoryId)
         && d.spendingType in ['committed','discretionary'] && d.paymentChannelId in ['cash','primary_bank_card','secondary_bank_card','other'];
     }
     function rTemplate(d) {
@@ -223,9 +374,11 @@ service cloud.firestore {
     match /users/{uid}/recurringTemplates/{templateId} {
       allow read: if gOwner(uid);
       allow create: if gOwner(uid) && rId(templateId) && rTemplate(request.resource.data)
+        && cActive(uid, 'category', request.resource.data.categoryId)
         && !request.resource.data.isCancelled && request.resource.data.version == 0 && request.resource.data.createdAt == request.time
         && rTemplateOperation(uid, templateId, request.resource.data) && rOperation(uid, request.resource.data.lastOperationId).kind == 'CREATE';
       allow update: if gOwner(uid) && rTemplate(request.resource.data) && !resource.data.isCancelled
+        && (request.resource.data.categoryId == resource.data.categoryId || cActive(uid, 'category', request.resource.data.categoryId))
         && request.resource.data.createdAt == resource.data.createdAt && request.resource.data.firstDueDate == resource.data.firstDueDate
         && request.resource.data.version > resource.data.version && request.resource.data.version == resource.data.version + 1
         && rTemplateOperation(uid, templateId, request.resource.data)
@@ -291,10 +444,10 @@ service cloud.firestore {
         && data.keys().hasOnly(requiredKeys.concat(['note', 'recurringOccurrenceId']))
         && data.amountMinor is int && data.amountMinor > 0
         && data.currency == 'LKR'
-        && data.categoryId in ['food_dining', 'transport', 'housing', 'utilities', 'shopping', 'health', 'entertainment', 'education', 'other']
+        && cId('category', data.categoryId)
         && data.paymentChannelId in ['cash', 'primary_bank_card', 'secondary_bank_card', 'other']
         && data.spendingType in ['committed', 'discretionary']
-        && data.expenseDate is string && data.expenseDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && gDate(data.expenseDate) && gDay(data.expenseDate) <= gToday()
         && (!('note' in data) || (data.note is string && data.note.size() <= 500))
         && (!('recurringOccurrenceId' in data) || (data.recurringOccurrenceId is string
             && gDate(data.expenseDate) && gDay(data.expenseDate) <= gToday()))
@@ -317,13 +470,13 @@ service cloud.firestore {
 
       return data.keys().hasAll(requiredKeys)
         && data.keys().hasOnly(allowedKeys)
-        && data.sourceId in ['salary', 'freelance', 'adsense']
+        && cId('source', data.sourceId)
         && data.currency in ['LKR', 'USD']
         && data.conversionBasis in ['native_lkr', 'confirmed_rate', 'actual_credit']
         && isValidAmountStr(data.originalAmountStr)
         && data.lkrAmountMinor is int && data.lkrAmountMinor > 0
         && (!('originalAmountMinor' in data.keys()) || (data.originalAmountMinor is int && data.originalAmountMinor > 0))
-        && data.receiptDate is string && data.receiptDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && gDate(data.receiptDate) && gDay(data.receiptDate) <= gToday()
         && data.note is string && data.note.size() <= 500
         && data.updatedAt == request.time
         && (isCreate ? data.createdAt == request.time : true)
@@ -410,24 +563,30 @@ service cloud.firestore {
     }
 
     match /users/{userId}/cryptoResults/{resultId} {
-      allow read, delete: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow delete: if gOwner(userId) && fGuard(userId, 'CRYPTO', '', resultId);
       allow create: if request.auth != null && request.auth.uid == userId
+                    && fGuard(userId, 'CRYPTO', '', resultId)
         && validCrypto(request.resource.data) && request.resource.data.createdAt == request.time;
       allow update: if request.auth != null && request.auth.uid == userId
+                    && fGuard(userId, 'CRYPTO', '', resultId)
         && validCrypto(request.resource.data) && request.resource.data.createdAt == resource.data.createdAt;
     }
 
     match /users/{userId}/expenses/{expenseId} {
-      allow read, delete: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.uid == userId;
 
+      allow delete: if gOwner(userId) && fGuard(userId, 'EXPENSE', '', expenseId);
       allow create: if request.auth != null && request.auth.uid == userId
-                    && isValidExpense(request.resource.data, true)
+                    && fGuard(userId, 'EXPENSE', '', expenseId)
+                    && isValidExpense(request.resource.data, true) && cActive(userId, 'category', request.resource.data.categoryId)
                     && ('recurringOccurrenceId' in request.resource.data
                         ? rLinkedExpense(userId, expenseId, request.resource.data)
                         : !expenseId.matches('^rec_.*'));
 
       allow update: if request.auth != null && request.auth.uid == userId
-                    && isValidExpense(request.resource.data, false)
+                    && fGuard(userId, 'EXPENSE', '', expenseId)
+                    && isValidExpense(request.resource.data, false) && (request.resource.data.categoryId == resource.data.categoryId || cActive(userId, 'category', request.resource.data.categoryId))
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amountMinor', 'currency', 'categoryId', 'paymentChannelId', 'spendingType', 'expenseDate', 'note', 'updatedAt'])
                     && request.resource.data.createdAt == resource.data.createdAt;
     }
@@ -436,10 +595,13 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == userId;
 
       allow delete: if request.auth != null && request.auth.uid == userId
+                    && fGuard(userId, 'INCOME', '', receiptId)
                     && (!('linkedPaymentId' in resource.data) || resource.data.linkedPaymentId == null);
 
       allow create: if request.auth != null && request.auth.uid == userId
+                    && fGuard(userId, 'INCOME', '', receiptId)
                     && isValidIncome(request.resource.data, true)
+                    && (cActive(userId, 'source', request.resource.data.sourceId) || request.resource.data.get('linkedPaymentId', null) is string)
                     && (
                       (!('linkedPaymentId' in request.resource.data) || request.resource.data.linkedPaymentId == null)
                       ? (!('linkedMilestoneId' in request.resource.data) || request.resource.data.linkedMilestoneId == null)
@@ -448,7 +610,8 @@ service cloud.firestore {
                     );
 
       allow update: if request.auth != null && request.auth.uid == userId
-                    && isValidIncome(request.resource.data, false)
+                    && fGuard(userId, 'INCOME', '', receiptId)
+                    && isValidIncome(request.resource.data, false) && (request.resource.data.sourceId == resource.data.sourceId || cActive(userId, 'source', request.resource.data.sourceId))
                     && (!('linkedPaymentId' in resource.data) || resource.data.linkedPaymentId == null)
                     && (!('linkedPaymentId' in request.resource.data) || request.resource.data.linkedPaymentId == null)
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sourceId', 'receiptDate', 'currency', 'originalAmountStr', 'lkrAmountMinor', 'conversionBasis', 'conversionRateStr', 'originalAmountMinor', 'note', 'updatedAt'])
@@ -459,8 +622,13 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == userId;
 
       allow create: if request.auth != null && request.auth.uid == userId
+                    && fGuard(userId, 'PROJECT', '', paymentId)
                     && request.resource.data.keys().hasAll(['type', 'title', 'sourceId', 'currency', 'dueDate', 'agreedAmountMinor', 'allocatedAmountMinor', 'directReceivedAmountMinor', 'milestoneReceivedAmountMinor', 'isCancelled', 'note', 'createdAt', 'updatedAt'])
                     && request.resource.data.keys().hasOnly(['type', 'title', 'sourceId', 'currency', 'dueDate', 'agreedAmountMinor', 'allocatedAmountMinor', 'directReceivedAmountMinor', 'milestoneReceivedAmountMinor', 'isCancelled', 'note', 'createdAt', 'updatedAt'])
+                    && cActive(userId, 'source', request.resource.data.sourceId)
+                    && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 100
+                    && gDate(request.resource.data.dueDate) && request.resource.data.note is string && request.resource.data.note.size() <= 500
+                    && request.resource.data.currency in ['LKR','USD']
                     && request.resource.data.type in ['standalone', 'project']
                     && isValidPaymentAmounts(request.resource.data)
                     && request.resource.data.allocatedAmountMinor == 0
@@ -471,12 +639,15 @@ service cloud.firestore {
                     && request.resource.data.updatedAt == request.time;
 
       allow update: if request.auth != null && request.auth.uid == userId
+                    && (fGuard(userId, 'PROJECT', '', paymentId) || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['allocatedAmountMinor','directReceivedAmountMinor','milestoneReceivedAmountMinor','lastReceiptId','lastMilestoneId','lastMilestoneOpId','updatedAt']))
                     && request.resource.data.updatedAt == request.time
                     && request.resource.data.createdAt == resource.data.createdAt
                     && request.resource.data.type == resource.data.type
                     && request.resource.data.currency == resource.data.currency
                     && request.resource.data.sourceId == resource.data.sourceId
                     && isValidPaymentAmounts(request.resource.data)
+                    && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 100
+                    && gDate(request.resource.data.dueDate) && request.resource.data.note is string && request.resource.data.note.size() <= 500
                     && (
                       // Branch 1: Direct Payment
                       (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['directReceivedAmountMinor', 'lastReceiptId', 'updatedAt'])
@@ -538,12 +709,15 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == userId;
 
       allow create: if request.auth != null && request.auth.uid == userId
+                    && fGuard(userId, 'MILESTONE', paymentId, milestoneId)
                     && exists(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId))
                     && get(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.isCancelled == false
                     && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.isCancelled == false
                     && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.type == 'project'
                     && request.resource.data.keys().hasAll(['title', 'dueDate', 'agreedAmountMinor', 'receivedAmountMinor', 'isCancelled', 'lastMilestoneOpId', 'createdAt', 'updatedAt'])
                     && request.resource.data.keys().hasOnly(['title', 'dueDate', 'agreedAmountMinor', 'receivedAmountMinor', 'isCancelled', 'lastMilestoneOpId', 'createdAt', 'updatedAt'])
+                    && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 100
+                    && gDate(request.resource.data.dueDate)
                     && isValidMilestoneAmounts(request.resource.data)
                     && request.resource.data.receivedAmountMinor == 0
                     && request.resource.data.isCancelled == false
@@ -555,10 +729,13 @@ service cloud.firestore {
                     && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.lastMilestoneId == milestoneId;
 
       allow update: if request.auth != null && request.auth.uid == userId
+                    && (fGuard(userId, 'MILESTONE', paymentId, milestoneId) || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['receivedAmountMinor','lastReceiptId','updatedAt']))
                     && exists(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId))
                     && getAfter(/databases/$(database)/documents/users/$(userId)/expectedPayments/$(paymentId)).data.type == 'project'
                     && request.resource.data.updatedAt == request.time
                     && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 100
+                    && gDate(request.resource.data.dueDate)
                     && isValidMilestoneAmounts(request.resource.data)
                     && (
                       // Branch 1: Payment
