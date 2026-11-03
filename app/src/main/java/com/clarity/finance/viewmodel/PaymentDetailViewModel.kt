@@ -49,6 +49,60 @@ class PaymentDetailViewModel(
     private val paymentRepository: PaymentRepository
 ) : ViewModel() {
 
+    data class AgreementForm(val owner: String, val payment: ExpectedPayment, val milestone: Milestone? = null,
+        val title: String, val amount: String, val due: String, val note: String = "", val operationId: String = java.util.UUID.randomUUID().toString(),
+        val busy: Boolean = false, val locked: Boolean = false, val error: String? = null)
+    private val mutableEdit = MutableStateFlow<AgreementForm?>(null)
+    val editForm = mutableEdit.asStateFlow()
+    fun editProject() {
+        val current = uiState.value as? PaymentDetailUiState.Success ?: return
+        if (current.payment.canModify) mutableEdit.value = AgreementForm(current.ownerUid, current.payment,
+            title = current.payment.title, amount = java.math.BigDecimal.valueOf(current.payment.agreedAmountMinor, 2).toPlainString(),
+            due = current.payment.dueDate, note = current.payment.note)
+    }
+    fun editMilestone(milestone: Milestone) {
+        val current = uiState.value as? PaymentDetailUiState.Success ?: return
+        if (current.payment.canModify && milestone.canModify && current.milestones.any { it == milestone })
+            mutableEdit.value = AgreementForm(current.ownerUid, current.payment, milestone, milestone.title,
+                java.math.BigDecimal.valueOf(milestone.agreedAmountMinor, 2).toPlainString(), milestone.dueDate)
+    }
+    fun updateEdit(title: String? = null, amount: String? = null, due: String? = null, note: String? = null) {
+        val form = mutableEdit.value ?: return
+        if (!form.busy && !form.locked) mutableEdit.value = form.copy(title = title ?: form.title, amount = amount ?: form.amount,
+            due = due ?: form.due, note = note ?: form.note, error = null)
+    }
+    fun closeEdit() { if (mutableEdit.value?.busy != true) mutableEdit.value = null }
+    fun saveEdit() {
+        val form = mutableEdit.value ?: return
+        if (form.busy) return
+        val minor = try {
+            require(form.title.trim().isNotEmpty() && form.title.trim().length <= 100 && form.note.trim().length <= 500) { "Check the title (1-100 characters) and optional note (at most 500)." }
+            com.clarity.finance.data.model.SavingsMath.date(form.due)
+            com.clarity.finance.data.model.SavingsMath.amount(form.amount.trim()).also {
+                require(it <= 100000000000L) { "Use the existing maximum agreement amount of 1,000,000,000.00." }
+                require(it >= (form.milestone?.receivedAmountMinor ?: Math.addExact(form.payment.allocatedAmountMinor, form.payment.directReceivedAmountMinor))) { "Agreement cannot be below received/allocated money." }
+            }
+        } catch (e: Exception) { mutableEdit.value = form.copy(error = e.message); return }
+        val token = generation
+        mutableEdit.value = form.copy(busy = true, locked = true, error = null)
+        viewModelScope.launch {
+            try {
+                check(authRepository.authState.first()?.uid == form.owner && token == generation) { "Account or project changed." }
+                val result = kotlinx.coroutines.withTimeoutOrNull(10000) {
+                    if (form.milestone == null) paymentRepository.updateExpectedPayment(form.owner,
+                        form.payment.copy(title = form.title.trim(), agreedAmountMinor = minor, dueDate = form.due, note = form.note.trim()), form.payment.updatedAt!!)
+                    else paymentRepository.updateMilestone(form.owner, form.milestone.copy(title = form.title.trim(), agreedAmountMinor = minor, dueDate = form.due),
+                        form.milestone.updatedAt!!, form.operationId)
+                }
+                if (token != generation) return@launch
+                if (result?.isSuccess == true) mutableEdit.value = null
+                else mutableEdit.value = form.copy(locked = true, error = result?.exceptionOrNull()?.message
+                    ?: "Local save outcome unknown. Retry these same details or inspect Recovery; no server success is assumed.")
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) { if (token == generation) mutableEdit.value = form.copy(locked = true, error = e.message) }
+        }
+    }
+
     private val _paymentId = MutableStateFlow<String?>(null)
     private val refresh = MutableStateFlow(0L)
     fun retryLoad() { refresh.value++ }
@@ -96,6 +150,7 @@ class PaymentDetailViewModel(
         viewModelScope.launch {
             authRepository.authState.distinctUntilChangedBy { it?.uid }.collect {
                 generation++
+                mutableEdit.value = null
                 _isCancelling.value = false
                 pendingMilestone = null
                 pendingMilestoneOpId = null
@@ -109,6 +164,7 @@ class PaymentDetailViewModel(
     fun load(paymentId: String) {
         if (_paymentId.value != paymentId) {
             generation++
+            mutableEdit.value = null
             _isCancelling.value = false
             pendingMilestone = null
             pendingMilestoneOpId = null
@@ -333,7 +389,7 @@ class PaymentDetailViewModel(
                     _cancelState.value = "Milestone belongs to another project"
                     return@launch
                 }
-                if (currentSuccess.payment.confirmationMessage != null || milestone.hasPendingWrites || milestone.isFromCache) {
+                if (currentSuccess.payment.confirmationMessage != null || milestone.hasPendingWrites) {
                     _cancelState.value = currentSuccess.payment.confirmationMessage ?: milestone.confirmationMessage
                     return@launch
                 }

@@ -25,12 +25,28 @@ fun ProjectDetailScreen(
     viewModel: PaymentDetailViewModel,
     paymentId: String,
     onNavigateToConfirmation: (String, String?) -> Unit,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onRecovery: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val cancelError by viewModel.cancelError.collectAsStateWithLifecycle()
     val milestoneState by viewModel.milestoneState.collectAsStateWithLifecycle()
     val isCancelling by viewModel.isCancelling.collectAsStateWithLifecycle()
+    val editForm by viewModel.editForm.collectAsStateWithLifecycle()
+
+    editForm?.let { form -> AlertDialog(onDismissRequest = viewModel::closeEdit,
+        title = { Text(if (form.milestone == null) "Edit agreement" else "Edit milestone") },
+        text = { Column(Modifier.verticalScroll(rememberScrollState()).imePadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Type, source, currency and received amounts stay unchanged. Proposals await version and capacity checks.")
+            val enabled = !form.busy && !form.locked
+            OutlinedTextField(form.title, { viewModel.updateEdit(title = it) }, label = { Text("Title") }, enabled = enabled, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(form.amount, { viewModel.updateEdit(amount = it) }, label = { Text("Agreed amount (${form.payment.currency})") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), enabled = enabled, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(form.due, { viewModel.updateEdit(due = it) }, label = { Text("Due date (YYYY-MM-DD)") }, enabled = enabled, modifier = Modifier.fillMaxWidth())
+            if (form.milestone == null) OutlinedTextField(form.note, { viewModel.updateEdit(note = it) }, label = { Text("Optional note") }, enabled = enabled, modifier = Modifier.fillMaxWidth())
+            form.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        } }, confirmButton = { TextButton(onClick = viewModel::saveEdit, enabled = !form.busy) { Text(if (form.locked) "Retry same save" else "Save proposal") } },
+        dismissButton = { TextButton(onClick = viewModel::closeEdit, enabled = !form.busy) { Text("Close") } }) }
 
     var showAddMilestoneDialog by remember { mutableStateOf(false) }
     var showCancelProjectDialog by remember { mutableStateOf(false) }
@@ -171,6 +187,8 @@ fun ProjectDetailScreen(
                         Text(text = "Outstanding: ${p.currency} ${java.math.BigDecimal.valueOf(p.outstandingAmountMinor, 2).toPlainString()}")
                         Text(text = "Unallocated: ${p.currency} ${java.math.BigDecimal.valueOf(p.unallocatedAmountMinor, 2).toPlainString()}")
                         
+                        TextButton(onClick = onRecovery) { Text("Review saved changes") }
+                        if (p.isFromCache) Text("Cached agreement. Proposed changes await server version and capacity checks.")
                         if (p.confirmationMessage != null) {
                             Text(
                                 text = p.confirmationMessage ?: "",
@@ -189,6 +207,7 @@ fun ProjectDetailScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
+                                OutlinedButton(enabled = p.canModify && !isCancelling, onClick = viewModel::editProject) { Text("Edit agreement") }
                                 if (p.unallocatedAmountMinor > 0) {
                                     Button(enabled = p.canModify && !isCancelling, onClick = { onNavigateToConfirmation(p.id, null) }) { Text("Record Direct") }
                                 }
@@ -224,6 +243,8 @@ fun ProjectDetailScreen(
                                     Text(text = "Received: ${p.currency} ${java.math.BigDecimal.valueOf(ms.receivedAmountMinor, 2).toPlainString()}")
                                     Text(text = "Unpaid agreement: ${p.currency} ${java.math.BigDecimal.valueOf(ms.outstandingAmountMinor, 2).toPlainString()}")
                                     
+                                    if (ms.isFromCache) Text("Cached milestone; changes await server checks.")
+                                    OutlinedButton(enabled = p.canModify && ms.canModify && !isCancelling, onClick = { viewModel.editMilestone(ms) }) { Text("Edit milestone") }
                                     if (ms.confirmationMessage != null) {
                                         Text(
                                             text = ms.confirmationMessage ?: "",

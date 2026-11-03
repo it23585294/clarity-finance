@@ -22,7 +22,8 @@ fun ExpectedPaymentsScreen(
     viewModel: PaymentListViewModel,
     onNavigateToProjectDetail: (String) -> Unit,
     onNavigateToAddPayment: () -> Unit,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onRecovery: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -39,6 +40,7 @@ fun ExpectedPaymentsScreen(
             }
         }
 
+        TextButton(onClick = onRecovery) { Text("Review saved changes") }
         Spacer(modifier = Modifier.height(16.dp))
 
         when (val state = uiState) {
