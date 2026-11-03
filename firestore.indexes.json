@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "recurringOccurrences",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "templateId", "order": "ASCENDING" },
+        { "fieldPath": "month", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

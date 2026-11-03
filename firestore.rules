@@ -164,12 +164,131 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Recurring templates are obligations. Only an atomic confirmed occurrence creates actual spending.
+    function rId(id) { return id is string && id.matches('^[A-Za-z0-9-]{1,128}$'); }
+    function rTemplateValues(d) {
+      return {'name':d.name,'categoryId':d.categoryId,'spendingType':d.spendingType,'paymentChannelId':d.paymentChannelId,
+        'suggestedMinor':d.suggestedMinor,'firstDueDate':d.firstDueDate,'anchorDay':d.anchorDay,'cadence':d.cadence,'isCancelled':d.isCancelled};
+    }
+    function rClassifications(d) {
+      return d.categoryId in ['food_dining','transport','housing','utilities','shopping','health','entertainment','education','other']
+        && d.spendingType in ['committed','discretionary'] && d.paymentChannelId in ['cash','primary_bank_card','secondary_bank_card','other'];
+    }
+    function rTemplate(d) {
+      let fields = ['name','categoryId','spendingType','paymentChannelId','suggestedMinor','firstDueDate','anchorDay','cadence',
+        'isCancelled','version','lastOperationId','createdAt','updatedAt'];
+      return d.keys().hasAll(fields) && d.keys().hasOnly(fields)
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 100 && d.name.matches('.*[^ \\t\\r\\n].*')
+        && rClassifications(d) && d.suggestedMinor is int && d.suggestedMinor > 0
+        && gDate(d.firstDueDate) && d.anchorDay is int && d.anchorDay >= 1 && d.anchorDay <= 31 && d.cadence == 'monthly'
+        && d.isCancelled is bool && d.version is int && d.version >= 0 && rId(d.lastOperationId)
+        && d.createdAt is timestamp && d.updatedAt == request.time;
+    }
+    function rActual(d) {
+      let fields = ['amountMinor','currency','categoryId','spendingType','paymentChannelId','expenseDate','note'];
+      return d is map && d.keys().hasAll(fields) && d.keys().hasOnly(fields)
+        && d.amountMinor is int && d.amountMinor > 0 && d.currency == 'LKR' && rClassifications(d)
+        && gDate(d.expenseDate) && gDay(d.expenseDate) <= gToday() && d.note is string && d.note.size() <= 500;
+    }
+    function rExpenseValues(d) {
+      return {'amountMinor':d.amountMinor,'currency':d.currency,'categoryId':d.categoryId,'spendingType':d.spendingType,
+        'paymentChannelId':d.paymentChannelId,'expenseDate':d.expenseDate,'note':d.note};
+    }
+    function rOccurrenceValues(d) {
+      return {'templateId':d.templateId,'month':d.month,'dueDate':d.dueDate,'templateVersion':d.templateVersion,
+        'templateName':d.templateName,'expenseId':d.expenseId,'actual':d.actual};
+    }
+    function rLastDay(date) {
+      let y = int(date[0:4]); let m = int(date[5:7]);
+      return m == 2 ? (y % 400 == 0 || (y % 4 == 0 && y % 100 != 0) ? 29 : 28) : (m in [4,6,9,11] ? 30 : 31);
+    }
+    function rScheduled(t, d) {
+      return d.month is string && d.month.matches('^[0-9]{4}-[0-9]{2}$') && gDate(d.month + '-01')
+        && d.month >= t.firstDueDate[0:7] && gDate(d.dueDate) && d.dueDate[0:7] == d.month && gDay(d.dueDate) <= gToday()
+        && (d.month == t.firstDueDate[0:7] ? d.dueDate == t.firstDueDate
+          : int(d.dueDate[8:10]) == (t.anchorDay > rLastDay(d.dueDate) ? rLastDay(d.dueDate) : t.anchorDay));
+    }
+    function rOperation(uid, id) { return getAfter(/databases/$(database)/documents/users/$(uid)/recurringOperations/$(id)).data; }
+    function rTemplateOperation(uid, id, d) {
+      let op = rOperation(uid, d.lastOperationId);
+      return !exists(/databases/$(database)/documents/users/$(uid)/recurringOperations/$(d.lastOperationId))
+        && op.templateId == id && op.recordId == id && op.version == d.version && op.payload == rTemplateValues(d);
+    }
+    function rLinkedExpense(uid, id, d) {
+      let path = /databases/$(database)/documents/users/$(uid)/recurringOccurrences/$(d.recurringOccurrenceId);
+      let occurrence = getAfter(path).data;
+      return id == 'rec_' + d.recurringOccurrenceId && !exists(path) && occurrence.expenseId == id
+        && occurrence.createdAt == request.time && occurrence.actual == rExpenseValues(d);
+    }
+    match /users/{uid}/recurringTemplates/{templateId} {
+      allow read: if gOwner(uid);
+      allow create: if gOwner(uid) && rId(templateId) && rTemplate(request.resource.data)
+        && !request.resource.data.isCancelled && request.resource.data.version == 0 && request.resource.data.createdAt == request.time
+        && rTemplateOperation(uid, templateId, request.resource.data) && rOperation(uid, request.resource.data.lastOperationId).kind == 'CREATE';
+      allow update: if gOwner(uid) && rTemplate(request.resource.data) && !resource.data.isCancelled
+        && request.resource.data.createdAt == resource.data.createdAt && request.resource.data.firstDueDate == resource.data.firstDueDate
+        && request.resource.data.version > resource.data.version && request.resource.data.version == resource.data.version + 1
+        && rTemplateOperation(uid, templateId, request.resource.data)
+        && ((rOperation(uid, request.resource.data.lastOperationId).kind == 'EDIT' && !request.resource.data.isCancelled)
+          || (rOperation(uid, request.resource.data.lastOperationId).kind == 'CANCEL' && request.resource.data.isCancelled
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isCancelled','version','lastOperationId','updatedAt'])));
+      allow delete: if false;
+    }
+    match /users/{uid}/recurringOccurrences/{occurrenceId} {
+      function validOccurrence(d) {
+        let templatePath = /databases/$(database)/documents/users/$(uid)/recurringTemplates/$(d.templateId);
+        let template = get(templatePath).data;
+        let expensePath = /databases/$(database)/documents/users/$(uid)/expenses/$(d.expenseId);
+        let expense = getAfter(expensePath).data;
+        let op = rOperation(uid, d.operationId);
+        return rId(d.templateId) && rId(d.operationId) && occurrenceId == d.templateId + '_' + d.month && d.expenseId == 'rec_' + occurrenceId
+          && exists(templatePath) && !template.isCancelled && getAfter(templatePath).data == template
+          && d.templateVersion is int && d.templateVersion == template.version && d.templateName == template.name && rScheduled(template, d)
+          && !exists(expensePath) && expense.recurringOccurrenceId == occurrenceId && expense.createdAt == request.time && expense.updatedAt == request.time
+          && expense.note is string && d.actual == rExpenseValues(expense) && rActual(d.actual)
+          && !exists(/databases/$(database)/documents/users/$(uid)/recurringOperations/$(d.operationId))
+          && op.kind == 'CONFIRM' && op.recordId == occurrenceId && op.templateId == d.templateId
+          && op.version == d.templateVersion && op.payload == rOccurrenceValues(d);
+      }
+      allow read: if gOwner(uid);
+      allow create: if gOwner(uid)
+        && request.resource.data.keys().hasAll(['templateId','month','dueDate','templateVersion','templateName','expenseId','actual','operationId','createdAt'])
+        && request.resource.data.keys().hasOnly(['templateId','month','dueDate','templateVersion','templateName','expenseId','actual','operationId','createdAt'])
+        && request.resource.data.createdAt == request.time && validOccurrence(request.resource.data);
+      allow update, delete: if false;
+    }
+    match /users/{uid}/recurringOperations/{operationId} {
+      function templateReceipt(d) {
+        let path = /databases/$(database)/documents/users/$(uid)/recurringTemplates/$(d.templateId);
+        let after = getAfter(path).data;
+        return d.recordId == d.templateId && after.lastOperationId == operationId && after.version == d.version
+          && after.updatedAt == request.time && d.payload == rTemplateValues(after)
+          && (d.kind == 'CREATE' ? !exists(path)
+            : exists(path) && after.version > get(path).data.version && after.version == get(path).data.version + 1);
+      }
+      function confirmationReceipt(d) {
+        let path = /databases/$(database)/documents/users/$(uid)/recurringOccurrences/$(d.recordId);
+        let after = getAfter(path).data;
+        return !exists(path) && after.operationId == operationId && after.templateId == d.templateId
+          && after.templateVersion == d.version && d.payload == rOccurrenceValues(after);
+      }
+      allow read: if gOwner(uid);
+      allow create: if gOwner(uid) && rId(operationId)
+        && request.resource.data.keys().hasAll(['kind','templateId','recordId','version','payload','createdAt'])
+        && request.resource.data.keys().hasOnly(['kind','templateId','recordId','version','payload','createdAt'])
+        && request.resource.data.kind in ['CREATE','EDIT','CANCEL','CONFIRM'] && rId(request.resource.data.templateId)
+        && request.resource.data.recordId is string && request.resource.data.version is int && request.resource.data.version >= 0
+        && request.resource.data.payload is map && request.resource.data.createdAt == request.time
+        && (request.resource.data.kind == 'CONFIRM' ? confirmationReceipt(request.resource.data) : templateReceipt(request.resource.data));
+      allow update, delete: if false;
+    }
+
     function isValidExpense(data, isCreate) {
       let baseKeys = ['amountMinor', 'currency', 'categoryId', 'paymentChannelId', 'spendingType', 'expenseDate', 'updatedAt'];
       let requiredKeys = baseKeys.concat(['createdAt']);
 
       return data.keys().hasAll(requiredKeys)
-        && data.keys().hasOnly(requiredKeys.concat(['note']))
+        && data.keys().hasOnly(requiredKeys.concat(['note', 'recurringOccurrenceId']))
         && data.amountMinor is int && data.amountMinor > 0
         && data.currency == 'LKR'
         && data.categoryId in ['food_dining', 'transport', 'housing', 'utilities', 'shopping', 'health', 'entertainment', 'education', 'other']
@@ -177,6 +296,8 @@ service cloud.firestore {
         && data.spendingType in ['committed', 'discretionary']
         && data.expenseDate is string && data.expenseDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
         && (!('note' in data) || (data.note is string && data.note.size() <= 500))
+        && (!('recurringOccurrenceId' in data) || (data.recurringOccurrenceId is string
+            && gDate(data.expenseDate) && gDay(data.expenseDate) <= gToday()))
         && data.updatedAt == request.time
         && (isCreate ? data.createdAt == request.time : true);
     }
@@ -300,7 +421,10 @@ service cloud.firestore {
       allow read, delete: if request.auth != null && request.auth.uid == userId;
 
       allow create: if request.auth != null && request.auth.uid == userId
-                    && isValidExpense(request.resource.data, true);
+                    && isValidExpense(request.resource.data, true)
+                    && ('recurringOccurrenceId' in request.resource.data
+                        ? rLinkedExpense(userId, expenseId, request.resource.data)
+                        : !expenseId.matches('^rec_.*'));
 
       allow update: if request.auth != null && request.auth.uid == userId
                     && isValidExpense(request.resource.data, false)
