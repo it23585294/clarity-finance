@@ -35,6 +35,24 @@ class FirestoreReportingRepositoryTest {
     private val repository = FirestoreReportingRepository(firestore, recovery)
     private val period = ReportingMonth(YearMonth.of(2026, 1))
 
+    @Test fun `ordinary and reporting decoders retain immutable creation separately from update time`() = runTest {
+        val document = doc(expenseFields - "note")
+        val ordinary = document.expenseRow()
+        assertEquals(Timestamp(1, 0), ordinary.createdAt)
+        assertEquals(Timestamp(2, 0), ordinary.updatedAt)
+        assertEquals("", ordinary.note)
+        val listener = setup("expenses", "expenseDate")
+        var latest = ReportingBatch<Expense>()
+        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            repository.expenses("owner", period).collect { latest = it }
+        }
+        listener.onEvent(snapshot(listOf(document)), null); runCurrent()
+        assertEquals(ordinary.createdAt, latest.records!!.single().createdAt)
+        assertEquals(ordinary.updatedAt, latest.records!!.single().updatedAt)
+        assertEquals(150000L, MonthlyReporting.expenses(latest.records!!, period).totalMinor)
+        job.cancelAndJoin(); verify(registration).remove()
+    }
+
     private fun setup(name: String, field: String?): EventListener<QuerySnapshot> {
         `when`(firestore.collection("users")).thenReturn(users)
         `when`(users.document("owner")).thenReturn(owner)

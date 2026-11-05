@@ -17,5 +17,12 @@ data class Expense(
     val isConflict: Boolean = false,
     val recurringOccurrenceId: String? = null, // Immutable origin link; confirmation is retained after correction/deletion.
     val isFromCache: Boolean = false,
-    val queuedChange: String? = null
+    val queuedChange: String? = null,
+    // Read-only server metadata. Never add this to immutable proposals or financial write payloads.
+    @Transient val createdAt: com.google.firebase.Timestamp? = null
 )
+
+/** Actual payment date owns the period; immutable server creation orders records within that date. */
+object ExpenseHistoryOrder {
+    val newestFirst: Comparator<Expense> = TransactionHistoryOrder.expenses
+}

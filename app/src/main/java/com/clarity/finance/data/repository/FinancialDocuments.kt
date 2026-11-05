@@ -19,7 +19,7 @@ internal fun DocumentSnapshot.expenseRow(): Expense {
     check(origin == null || id == "rec_$origin")
     return Expense(id, integer("amountMinor"), text("currency"), text("categoryId"), text("paymentChannelId"),
         text("spendingType"), text("expenseDate"), note, getTimestamp("updatedAt"), metadata.hasPendingWrites(),
-        recurringOccurrenceId = origin, isFromCache = metadata.isFromCache).also {
+        recurringOccurrenceId = origin, isFromCache = metadata.isFromCache, createdAt = getTimestamp("createdAt")).also {
         check(it.amountMinor > 0 && CatalogueDefaults.validId("category", it.categoryId))
         SavingsMath.date(it.expenseDate)
     }

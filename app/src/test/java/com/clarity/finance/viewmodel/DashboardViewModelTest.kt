@@ -38,6 +38,76 @@ class DashboardViewModelTest {
     }
     @After fun cleanup() { repo.gate?.complete(Unit); store.clear(); Dispatchers.resetMain() }
 
+    @Test fun `category filtering preserves creation order through corrections and backdating`() = runTest(dispatcher) {
+        runCurrent()
+        val old = expense.copy(id = "a-old", createdAt = com.google.firebase.Timestamp(1, 0))
+        val newer = expense.copy(id = "z-new", createdAt = com.google.firebase.Timestamp(3, 0))
+        val middle = expense.copy(id = "middle", categoryId = "food_dining", createdAt = com.google.firebase.Timestamp(2, 0))
+        expenseFlow().value = ReportingBatch(listOf(old, newer, middle), false); runCurrent()
+        assertEquals(listOf("z-new", "middle", "a-old"), vm.state.value.expenseHistory.map { it.id })
+        vm.selectCategory("transport"); runCurrent()
+        assertEquals(listOf("z-new", "a-old"), vm.state.value.expenseHistory.map { it.id })
+        expenseFlow().value = ReportingBatch(listOf(old.copy(note = "Edited", updatedAt = com.google.firebase.Timestamp(999, 0)),
+            newer, middle.copy(categoryId = "transport", updatedAt = com.google.firebase.Timestamp(999, 0))), false); runCurrent()
+        assertEquals(listOf("z-new", "middle", "a-old"), vm.state.value.expenseHistory.map { it.id })
+        assertEquals("4500.00", vm.state.value.expensesText)
+        expenseFlow().value = ReportingBatch(listOf(newer, middle.copy(categoryId = "transport")), false)
+        expenseFlow(month = "2025-12").value = ReportingBatch(listOf(old.copy(expenseDate = "2025-12-31")), false); runCurrent()
+        assertEquals("3000.00", vm.state.value.expensesText)
+        vm.changeMonth(-1); runCurrent()
+        assertEquals(listOf("a-old"), vm.state.value.expenseHistory.map { it.id })
+        assertEquals("1500.00", vm.state.value.expensesText)
+    }
+
+    @Test fun `income and crypto history sort immutable creation without changing totals or old receipt links`() = runTest(dispatcher) {
+        runCurrent(); vm.changeMonth(-1); runCurrent()
+        val old = income.copy(id = "a", receiptDate = "2025-12-31", createdAt = com.google.firebase.Timestamp(1, 0), linkedPaymentId = "project")
+        val newest = old.copy(id = "z", createdAt = com.google.firebase.Timestamp(2, 0))
+        val earlierDate = old.copy(id = "earlier-date", receiptDate = "2025-12-30", createdAt = com.google.firebase.Timestamp(999, 0))
+        repo.incomes.value = listOf(old, earlierDate, newest)
+        repo.cryptos.value = listOf(CryptoResult("a", "gain", 6000000, "2025-12-31", createdAt = com.google.firebase.Timestamp(1, 0)),
+            CryptoResult("z", "loss", 2500000, "2025-12-31", createdAt = com.google.firebase.Timestamp(2, 0)))
+        runCurrent()
+        assertEquals(listOf("z", "a", "earlier-date"), vm.state.value.incomeHistory.map { it.id })
+        assertEquals(listOf("z", "a"), vm.state.value.cryptoHistory.map { it.id })
+        assertEquals("3000.00", vm.state.value.incomeText); assertEquals("+35000.00", vm.state.value.cryptoText)
+        assertTrue(vm.state.value.incomeHistory.all { it.linkedPaymentId == "project" })
+        repo.incomes.value = listOf(old.copy(updatedAt = com.google.firebase.Timestamp(9999, 0)), earlierDate, newest); runCurrent()
+        assertEquals(listOf("z", "a", "earlier-date"), vm.state.value.incomeHistory.map { it.id })
+        repo.incomes.value = listOf(old.copy(receiptDate = "2025-11-30"), earlierDate, newest); runCurrent()
+        assertEquals(listOf("z", "earlier-date"), vm.state.value.incomeHistory.map { it.id })
+        assertEquals("2000.00", vm.state.value.incomeText)
+    }
+
+    @Test fun `crypto overflow retains creation ordered inspectable rows without reordering aggregate inputs`() = runTest(dispatcher) {
+        runCurrent()
+        val old = CryptoResult("a", "gain", Long.MAX_VALUE, "2026-01-01", createdAt = com.google.firebase.Timestamp(1, 0))
+        val newer = old.copy(id = "z", createdAt = com.google.firebase.Timestamp(2, 0))
+        repo.cryptos.value = listOf(old, newer); runCurrent()
+        assertNull(vm.state.value.cryptoText)
+        assertTrue(vm.state.value.crypto.error!!.contains("supported integer range"))
+        assertEquals(listOf("z", "a"), vm.state.value.cryptoHistory.map { it.id })
+        vm.selectCategory("transport"); runCurrent()
+        assertEquals(listOf("z", "a"), vm.state.value.cryptoHistory.map { it.id })
+    }
+
+    @Test fun `history orders same day creation descending while edits filters and reporting periods remain stable`() = runTest(dispatcher) {
+        runCurrent()
+        val older = expense.copy(id = "a", createdAt = com.google.firebase.Timestamp(1, 0))
+        val newer = expense.copy(id = "z", createdAt = com.google.firebase.Timestamp(2, 0))
+        expenseFlow().value = ReportingBatch(listOf(older, newer), false); runCurrent()
+        assertEquals(listOf("z", "a"), vm.state.value.expenseHistory.map { it.id })
+        assertEquals("3000.00", vm.state.value.expensesText)
+        expenseFlow().value = ReportingBatch(listOf(older.copy(updatedAt = com.google.firebase.Timestamp(999, 0)), newer), false); runCurrent()
+        vm.selectCategory("transport"); runCurrent()
+        assertEquals(listOf("z", "a"), vm.state.value.expenseHistory.map { it.id })
+        expenseFlow().value = ReportingBatch(listOf(older), false); runCurrent()
+        assertEquals(listOf("a"), vm.state.value.expenseHistory.map { it.id })
+        assertEquals("1500.00", vm.state.value.expensesText)
+        vm.changeMonth(-1); runCurrent()
+        assertTrue(vm.state.value.expenseHistory.isEmpty())
+    }
+
     @Test fun `ordinary negative surplus is unchanged by crypto pending income or recovery proposals`() = runTest(dispatcher) {
         runCurrent()
         expenseFlow().value = ReportingBatch(listOf(expense), false)

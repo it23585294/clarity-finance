@@ -37,6 +37,23 @@ class CryptoViewModelTest {
     }
     @After fun cleanup() { owners.clear(); Dispatchers.resetMain() }
 
+    @Test fun `creation ordered history survives edits and backdate moves month without changing yearly net`() = runTest(dispatcher) {
+        runCurrent()
+        val older = gain.copy(id = "a", createdAt = Timestamp(1, 0))
+        val newer = loss.copy(id = "z", createdAt = Timestamp(2, 0))
+        repository.results.value = listOf(older, newer); runCurrent()
+        assertEquals(listOf("z", "a"), vm.state.value.history.map { it.id })
+        assertEquals("+35000.00", vm.state.value.monthNet)
+        repository.results.value = listOf(older.copy(note = "Corrected", updatedAt = Timestamp(999, 0)), newer); runCurrent()
+        assertEquals(listOf("z", "a"), vm.state.value.history.map { it.id })
+        repository.results.value = listOf(older.copy(resultDate = "2026-09-30"), newer); runCurrent()
+        assertEquals(listOf("z"), vm.state.value.history.map { it.id })
+        assertEquals("-25000.00", vm.state.value.monthNet); assertEquals("+35000.00", vm.state.value.ytdNet)
+        vm.changeMonth(-1); runCurrent()
+        assertEquals(listOf("a"), vm.state.value.history.map { it.id })
+        assertEquals("+60000.00", vm.state.value.monthNet)
+    }
+
     @Test fun `empty signed in month and past year cutoffs are clear with no future years`() = runTest(dispatcher) {
         runCurrent()
         assertTrue(vm.state.value.history.isEmpty())

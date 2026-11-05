@@ -44,7 +44,7 @@ class FirestoreReportingRepository(
         Expense(doc.id, doc.requiredLong("amountMinor"), doc.requiredString("currency"),
             doc.requiredString("categoryId"), doc.requiredString("paymentChannelId"), doc.requiredString("spendingType"),
             doc.requiredString("expenseDate"), doc.expenseNote(), doc.getTimestamp("updatedAt"),
-            recurringOccurrenceId = doc.recurringOrigin())
+            recurringOccurrenceId = doc.recurringOrigin(), createdAt = doc.getTimestamp("createdAt"))
     }
 
     override fun income(uid: String, month: ReportingMonth) = listen(month(uid, "incomeReceipts", "receiptDate", month)) { doc ->

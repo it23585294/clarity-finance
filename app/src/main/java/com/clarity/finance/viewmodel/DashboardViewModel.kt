@@ -144,6 +144,7 @@ class DashboardViewModel(
         var cryptoHistory = emptyList<CryptoResult>()
         val cryptoInput = try {
             cryptoHistory = MonthlyReporting.cryptoHistory(old.crypto.records.orEmpty(), period)
+                .sortedWith(TransactionHistoryOrder.crypto)
             old.crypto
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { old.crypto.copy(error = e.message ?: "Invalid crypto reporting data.") }
@@ -159,8 +160,8 @@ class DashboardViewModel(
             expensesText = spending?.totalMinor?.let(MonthlyReporting::money), surplusText = surplus, surplusError = surplusError,
             cryptoText = cryptoNet?.let(CryptoReporting::money), pendingAmounts = pending?.mapValues { MonthlyReporting.money(it.value) },
             expenseHistory = expenses.records.orEmpty().filter { old.selectedCategory == null || it.categoryId == old.selectedCategory }
-                .sortedWith(compareByDescending<Expense> { it.expenseDate }.thenBy { it.id }),
-            incomeHistory = income.records.orEmpty().sortedWith(compareByDescending<Income> { it.receiptDate }.thenBy { it.id }),
+                .sortedWith(ExpenseHistoryOrder.newestFirst),
+            incomeHistory = income.records.orEmpty().sortedWith(TransactionHistoryOrder.income),
             cryptoHistory = cryptoHistory)
     }
 }

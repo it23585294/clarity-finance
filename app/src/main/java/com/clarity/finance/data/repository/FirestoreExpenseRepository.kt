@@ -26,7 +26,7 @@ class FirestoreExpenseRepository(private val firestore: FirebaseFirestore, priva
         val annotated = confirmed.map { row -> row.copy(queuedChange = recovery.attempts.firstOrNull {
             it.operation.group == "EXPENSE" && it.operation.targetId == row.id
         }?.let { "${it.operation.kind}: ${it.status}. ${it.error.orEmpty()} Confirmed value retained." }) }
-        (annotated + creates).sortedWith(compareByDescending<Expense> { it.expenseDate }.thenBy { it.id })
+        (annotated + creates).sortedWith(com.clarity.finance.data.model.ExpenseHistoryOrder.newestFirst)
     }
     override suspend fun enqueueExpense(userId: String, expense: Expense): Result<Unit> = localResult {
         queue.submit(userId, FinancialOperation(expense.id, "EXPENSE", "CREATE", expense.id, expense = expense))

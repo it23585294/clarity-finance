@@ -31,7 +31,7 @@ class FirestoreIncomeRepository(private val firestore: FirebaseFirestore, privat
             it.operation.group == "INCOME" && it.operation.targetId == row.id
         }?.let { "${it.operation.kind}: ${it.status}. ${it.error.orEmpty()} Confirmed value retained." }) }
         (annotated + creates).filter { period == null || period.contains(it.receiptDate) }
-            .sortedWith(compareByDescending<Income> { it.receiptDate }.thenBy { it.id })
+            .sortedWith(com.clarity.finance.data.model.TransactionHistoryOrder.income)
     }
     override suspend fun enqueueIncome(userId: String, income: Income): Result<Unit> = localResult {
         queue.submit(userId, FinancialOperation(income.id, "INCOME", "CREATE", income.id, income = income))

@@ -176,7 +176,8 @@ class CryptoViewModel(
             canNextYear = month.year < today().year, canPreviousYear = month.year > 1,
             monthNet = totals?.first ?: "Unavailable", ytdNet = totals?.second ?: "Unavailable", selected = selected,
             selectedHasAttempt = snapshot.attempts.any { it.result.id == selected?.id },
-            history = confirmed.filter { it.resultDate.startsWith(month.toString()) },
+            history = confirmed.filter { it.resultDate.startsWith(month.toString()) }
+                .sortedWith(com.clarity.finance.data.model.TransactionHistoryOrder.crypto),
             unsettled = snapshot.results.filter { it.sync in listOf(CryptoSync.PENDING, CryptoSync.FAILED) },
             unknownOperationCount = unknownOperations.size,
             confirmedPendingIds = snapshot.attempts.filter { it.operationId in confirmedOperations }.map { it.result.id }.toSet(),

@@ -27,6 +27,37 @@ class OrdinaryQueueRepositoryTest {
         override suspend fun apply(uid: String, operation: FinancialOperation) = error("A screen must not submit remote writes")
         override suspend fun fence(uid: String, operation: FinancialOperation) = error("Unused")
     }
+
+    @Test fun `ordinary confirmed history orders immutable creation within actual date without financial writes`() = runTest {
+        val fixture = FinancialRemoteFixture("a")
+        val store = store()
+        val repo = FirestoreExpenseRepository(fixture.db, FinancialQueue(unusedRemote, store), backgroundScope)
+        val old = Expense("a", 10000, categoryId = "transport", paymentChannelId = "cash",
+            spendingType = "committed", expenseDate = "2026-01-31")
+        val newer = old.copy(id = "z")
+        listOf(old to Timestamp(1, 0), newer to Timestamp(2, 0)).forEach { (e, created) ->
+            fixture.documents[fixture.path("expenses", e.id)] = FinancialOperation(e.id, "EXPENSE", "CREATE", e.id, expense = e).payload() +
+                mapOf("createdAt" to created, "updatedAt" to Timestamp(999, 0))
+        }
+        val collection = fixture.db.collection("users").document("a").collection("expenses")
+        var listener: EventListener<QuerySnapshot>? = null
+        val registration = mock(ListenerRegistration::class.java)
+        doAnswer { listener = it.getArgument(1); registration }.`when`(collection)
+            .addSnapshotListener(eq(MetadataChanges.INCLUDE), any<EventListener<QuerySnapshot>>())
+        var latest: List<Expense>? = null
+        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { repo.getExpenses("a").collect { latest = it } }
+        val snapshot = mock(QuerySnapshot::class.java)
+        `when`(snapshot.metadata).thenReturn(mock(SnapshotMetadata::class.java))
+        val documents = listOf(fixture.snapshot(fixture.path("expenses", "a")), fixture.snapshot(fixture.path("expenses", "z")))
+        `when`(snapshot.documents).thenReturn(documents)
+        listener!!.onEvent(snapshot, null)
+        withTimeout(10000) { while (latest == null) yield() }
+        assertEquals(listOf("z", "a"), latest!!.map { it.id })
+        assertEquals(Timestamp(2, 0), latest!!.first().createdAt)
+        assertEquals(20000L, latest!!.sumOf { it.amountMinor })
+        assertTrue(store.getAllRecords("a").isEmpty())
+        job.cancelAndJoin(); verify(registration).remove()
+    }
     @Test fun `retry bookkeeping failures are feedback rather than uncaught process-scope exceptions`() = runTest {
         val disk = mock(SubmissionRecoveryStore::class.java)
         `when`(disk.getAllRecordsFlow("a")).thenReturn(flowOf(emptyList()))
