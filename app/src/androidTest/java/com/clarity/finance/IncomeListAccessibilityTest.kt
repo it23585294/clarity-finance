@@ -58,6 +58,7 @@ class IncomeListAccessibilityTest {
                 }
             } }
             compose.waitUntil(5000) { compose.onAllNodes(hasScrollToIndexAction()).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("By source").performScrollTo().performClick()
             val list = compose.onNode(hasScrollToIndexAction())
             // Fail promptly on the original zero-height list, rather than hanging a scroll-to action.
             assertTrue("Income list must retain a usable viewport below a long summary",

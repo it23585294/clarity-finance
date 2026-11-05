@@ -43,7 +43,7 @@ class CatalogueNavigationTest {
         }
         val graph = isolatedAppGraph(auth, catalogue = data, recovery = recovery)
         compose.setContent { ClarityTheme { IsolatedAppNavigation(graph) } }
-        compose.onNodeWithText("Sources, categories & recovery").performScrollTo().performClick()
+        compose.pilotClick("Sources, categories & recovery")
         compose.onNodeWithText("Add category").performScrollTo().performClick()
         compose.onNodeWithText("Name").performTextInput("Travel extras")
         compose.onNodeWithText("Save proposal").performClick()

@@ -38,16 +38,16 @@ class PaymentNavigationTest {
         val graph = isolatedAppGraph(auth, unused(ExpenseRepository::class.java), unused(IncomeRepository::class.java), payments,
             unused(CryptoRepository::class.java))
         compose.setContent { ClarityTheme { Box(Modifier.width(320.dp)) { IsolatedAppNavigation(graph) } } }
-        compose.onNodeWithText("Pending Payments").performClick()
+        compose.pilotClick("Pending Payments")
         compose.onNodeWithText("Navigation Project").performClick()
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Record Direct"))
-        compose.onNodeWithText("Record Direct").performClick()
-        compose.onNodeWithText("Record Payment").assertIsDisplayed()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Record payment"))
+        compose.onNodeWithText("Record payment").performClick()
+        compose.onNodeWithText("Record payment").assertIsDisplayed()
         compose.onNodeWithText("Payment for: Navigation Project").assertIsDisplayed()
-        compose.onNodeWithText("Back").performClick()
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Record", substring = false))
-        compose.onNodeWithText("Record", substring = false).performClick()
-        compose.onNodeWithText("Record Payment").assertIsDisplayed()
+        compose.pilotClick("Back")
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Record milestone payment", substring = false))
+        compose.onNodeWithText("Record milestone payment", substring = false).performClick()
+        compose.onNodeWithText("Record payment").assertIsDisplayed()
         compose.onNodeWithText("Payment for: Navigation Milestone").assertIsDisplayed()
     }
 
@@ -61,7 +61,7 @@ class PaymentNavigationTest {
         val payments = NavigationPayments()
         val graph = isolatedAppGraph(auth, payment = payments)
         compose.setContent { ClarityTheme { Box(Modifier.width(320.dp)) { IsolatedAppNavigation(graph) } } }
-        compose.onNodeWithText("Pending Payments").performClick()
+        compose.pilotClick("Pending Payments")
         compose.onNodeWithText("Navigation Project").performClick()
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("Edit agreement"))
         compose.onNodeWithText("Edit agreement").performClick()

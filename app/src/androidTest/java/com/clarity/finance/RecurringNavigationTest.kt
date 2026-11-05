@@ -114,7 +114,8 @@ class RecurringNavigationTest {
     }
     private fun visible(node: SemanticsNodeInteraction) { try { node.assertIsDisplayed() } catch (_: AssertionError) { node.performScrollTo() } }
     private fun click(label: String) {
-        val base = hasText(label) and hasClickAction() and hasSetTextAction().not()
+        if (label in listOf("Dashboard", "Recurring Expenses")) { compose.pilotClick(label); return }
+        val base = (hasText(label) or hasContentDescription(label)) and hasClickAction() and hasSetTextAction().not()
         val dialog = base and hasAnyAncestor(isDialog())
         val matcher = if (compose.onAllNodes(dialog).fetchSemanticsNodes().isNotEmpty()) dialog else base
         locate(matcher); val node = compose.onNode(matcher); visible(node); node.performClick()
@@ -125,34 +126,34 @@ class RecurringNavigationTest {
         locate(matcher); val node = compose.onNode(matcher); visible(node); node.assertIsDisplayed()
     }
     private fun create(name: String, amount: String, first: String = Recurrence.today().toString()) {
-        click("Create recurring template")
+        click("Add template")
         compose.onNodeWithText("Template name").performTextReplacement(name)
-        compose.onNodeWithText("Suggested amount (LKR)").performTextReplacement(amount)
-        compose.onNodeWithText("First due date (YYYY-MM-DD)").performTextReplacement(first)
-        if (name == "Utilities") { click("Category: Housing"); click("Utilities") }
+        compose.onNodeWithText("Suggested (LKR)").performTextReplacement(amount)
+        compose.onNodeWithText("First due date").performTextReplacement(first)
+        if (name == "Utilities") { click("Category"); click("Utilities") }
         click("Save template proposal")
     }
     private fun pay(month: String = YearMonth.from(Recurrence.today()).toString(), amount: String? = null) {
-        click("Review $month payment")
-        if (amount != null) compose.onNodeWithText("Actual amount (LKR)").performTextReplacement(amount)
+        click("Review ${com.clarity.finance.ui.pilot.PresentationFormat.month(month)} payment")
+        if (amount != null) compose.onNodeWithText("Actual (LKR)").performTextReplacement(amount)
         click("Confirm payment proposal")
     }
-    private fun back() { compose.onNodeWithContentDescription("Back").performClick() }
+    private fun back() { if (compose.onAllNodesWithContentDescription("Back").fetchSemanticsNodes().isEmpty()) compose.pilotClick("Plans") else compose.onNodeWithContentDescription("Back").performClick() }
     private fun deleteClick() {
         val nodes = compose.onAllNodes(hasText("Delete") and hasClickAction())
         nodes[nodes.fetchSemanticsNodes().size - 1].performClick()
     }
     @Test fun AT09RentIgnoredUtilitiesAndEditedActualUpdateDashboardExactlyOnce() {
         val data = Data(); show(data); click("Recurring Expenses"); create("Rent", "34000"); click("Inspect Rent"); pay()
-        text("Confirmed originally: LKR 34000.00 on ${Recurrence.today()}")
-        compose.onNodeWithText("Review ${YearMonth.from(Recurrence.today())} payment").assertDoesNotExist()
+        text("Confirmed originally: LKR 34,000.00 on ${com.clarity.finance.ui.pilot.PresentationFormat.date(Recurrence.today().toString())}")
+        compose.onNodeWithText("Review ${com.clarity.finance.ui.pilot.PresentationFormat.month(YearMonth.from(Recurrence.today()).toString())} payment").assertDoesNotExist()
         back(); create("Utilities", "5000"); back(); click("Dashboard")
-        compose.onNodeWithText("LKR 34000.00").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("LKR -34000.00").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("LKR 34,000.00").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("LKR -34,000.00").performScrollTo().assertIsDisplayed()
         back(); click("Recurring Expenses"); click("Inspect Utilities"); pay(amount = "6250.50")
         back(); back(); click("Dashboard")
-        compose.onNodeWithText("LKR 40250.50").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("LKR -40250.50").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("LKR 40,250.50").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("LKR -40,250.50").performScrollTo().assertIsDisplayed()
         compose.runOnIdle {
             assertEquals(2, data.expenses.value.size); assertEquals(2, data.confirmations.value.size)
             assertEquals(2, data.operations.values.count { it.kind == "CONFIRM" })
@@ -161,28 +162,28 @@ class RecurringNavigationTest {
     }
     @Test fun actualCorrectionBackdateAndDeletionKeepConfirmationConsumedAndHistoryInspectable() {
         val data = Data(); show(data); click("Recurring Expenses"); create("Rent", "34000"); click("Inspect Rent"); pay()
-        click("Inspect actual expense")
+        click("Inspect actual expense"); click("Edit expense")
         compose.onNodeWithText("Amount (LKR)").performTextReplacement("33000")
         val previous = YearMonth.from(Recurrence.today()).minusMonths(1).atEndOfMonth().toString()
         compose.onNodeWithText("Date (yyyy-MM-dd)").performTextReplacement(previous)
         click("Save Changes")
-        text("Confirmed originally: LKR 34000.00 on ${Recurrence.today()}")
+        text("Confirmed originally: LKR 34,000.00 on ${com.clarity.finance.ui.pilot.PresentationFormat.date(Recurrence.today().toString())}")
         compose.runOnIdle { assertEquals(3300000L, data.expenses.value.single().amountMinor); assertEquals(previous, data.expenses.value.single().expenseDate) }
         click("Inspect actual expense"); deleteClick(); click("Cancel")
         compose.runOnIdle { assertEquals(1, data.expenses.value.size) }
         deleteClick(); deleteClick()
-        text("Confirmed originally: LKR 34000.00 on ${Recurrence.today()}")
-        compose.onNodeWithText("Review ${YearMonth.from(Recurrence.today())} payment").assertDoesNotExist()
-        click("Inspect actual expense"); text("Expense not found or already deleted."); click("Go Back")
+        text("Confirmed originally: LKR 34,000.00 on ${com.clarity.finance.ui.pilot.PresentationFormat.date(Recurrence.today().toString())}")
+        compose.onNodeWithText("Review ${com.clarity.finance.ui.pilot.PresentationFormat.month(YearMonth.from(Recurrence.today()).toString())} payment").assertDoesNotExist()
+        click("Inspect actual expense"); text("Expense not found or already deleted."); click("Back")
         compose.runOnIdle { assertTrue(data.expenses.value.isEmpty()); assertEquals(1, data.confirmations.value.size) }
     }
     @Test fun templateEditingAndCancellationKeepStopDueCandidatesAndRetainActualHistory() {
         val data = Data(); val first = Recurrence.today().minusMonths(2).withDayOfMonth(1)
         show(data); click("Recurring Expenses"); create("Rent", "34000", first.toString()); click("Inspect Rent"); pay(YearMonth.from(first).toString())
-        click("Edit template"); compose.onNodeWithText("First due date (YYYY-MM-DD)").assertIsNotEnabled()
+        click("Edit template"); compose.onNodeWithText("First due date").assertIsNotEnabled()
         compose.onNodeWithText("Template name").performTextReplacement("Edited rent")
-        compose.onNodeWithText("Suggested amount (LKR)").performTextReplacement("35000")
-        compose.onNodeWithText("Monthly day (1–31)").performTextReplacement("31"); click("Save template proposal")
+        compose.onNodeWithText("Suggested (LKR)").performTextReplacement("35000")
+        compose.onNodeWithText("Monthly day").performTextReplacement("31"); click("Save template proposal")
         click("Cancel template"); click("Keep template")
         compose.runOnIdle { assertFalse(data.templates.value.records!!.single().isCancelled) }
         click("Cancel template")
@@ -190,7 +191,7 @@ class RecurringNavigationTest {
         click("Confirm cancellation"); text("Template changed; reopen cancellation."); click("Keep template")
         click("Cancel template"); click("Confirm cancellation")
         text("Cancelled. All unconfirmed occurrences, including already-due items, are stopped. Past expenses and confirmations remain.")
-        click("Inspect actual expense"); text("Edit Expense")
+        click("Inspect actual expense"); text("Expense details")
         compose.runOnIdle { assertTrue(data.templates.value.records!!.single().isCancelled); assertEquals(1, data.expenses.value.size); assertEquals(1, data.confirmations.value.size) }
     }
     @Test fun pendingUncertainRejectedAndAccountSwitchStatesNeverBecomeConfirmedSpending() {

@@ -80,7 +80,7 @@ class AuthAccessibilityTest {
         compose.onNodeWithText("Password").performTextReplacement("sample1")
         click("Sign In")
         text("Invalid email format.")
-        click("Don't have an account? Register")
+        click("Create an account")
         click("Create Account")
         text("Please fill in all fields.")
         compose.onNodeWithText("Email").performTextReplacement("api26-check@example.invalid")
@@ -92,14 +92,14 @@ class AuthAccessibilityTest {
         compose.onNodeWithText("Confirm Password").performTextReplacement("sample2")
         click("Create Account")
         text("Passwords do not match.")
-        click("Already have an account? Login")
+        click("Back to sign in")
         compose.onNodeWithText("Welcome back").assertIsDisplayed()
         compose.runOnIdle { assertEquals(0, backendCalls); assertNull(auth.authState.value) }
     }
 
     @Test fun keyboardKeepsRegistrationFieldsAndBothFormsActionsReachable() {
         show()
-        click("Don't have an account? Register")
+        click("Create an account")
         compose.onNodeWithText("Email").performClick().performTextInput("not-an-email")
         awaitKeyboard()
         val confirm = compose.onNodeWithText("Confirm Password")
@@ -111,7 +111,7 @@ class AuthAccessibilityTest {
         aboveKeyboard(create)
         create.performClick()
         text("Please fill in all fields.")
-        click("Already have an account? Login")
+        click("Back to sign in")
         compose.onNodeWithText("Email").performClick().performTextInput("not-an-email")
         awaitKeyboard()
         val signIn = compose.onNode(hasText("Sign In") and hasClickAction())

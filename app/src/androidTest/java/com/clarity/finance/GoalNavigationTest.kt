@@ -85,20 +85,25 @@ class GoalNavigationTest {
     private fun visible(node: SemanticsNodeInteraction) {
         try { node.assertIsDisplayed() } catch (_: AssertionError) { node.performScrollTo() }
     }
-    private fun click(label: String) { val matcher = hasText(label) and hasClickAction(); locate(matcher); val node = compose.onNode(matcher); visible(node); node.performClick() }
-    private fun text(label: String) { locate(hasText(label)); val node = compose.onNodeWithText(label); visible(node); node.assertIsDisplayed() }
+    private fun click(label: String) { if (label in listOf("Dashboard", "Savings Goal")) { compose.pilotClick(label); return }; val matcher = hasText(label) and hasClickAction(); locate(matcher); val node = compose.onNode(matcher); visible(node); node.performClick() }
+    private fun text(label: String) {
+        val base = hasText(label)
+        val modal = base and hasAnyAncestor(isDialog())
+        val matcher = if (compose.onAllNodes(modal).fetchSemanticsNodes().isNotEmpty()) modal else base
+        locate(matcher); val node = compose.onNode(matcher); visible(node); node.assertIsDisplayed()
+    }
     private fun create() {
         click("Create goal")
         compose.onNodeWithText("Goal name").performTextReplacement("Isolated savings fixture")
         compose.onNodeWithText("Target (LKR)").performTextReplacement("490000")
-        compose.onNodeWithText("Opening allocation (LKR)").performTextReplacement("11200")
-        compose.onNodeWithText("Deadline (YYYY-MM-DD)").performTextReplacement(SavingsMath.today().plusYears(1).toString())
+        compose.onNodeWithText("Opening allocation").performTextReplacement("11200")
+        compose.onNode(hasText("Deadline") and hasSetTextAction()).performTextReplacement(SavingsMath.today().plusYears(1).toString())
         click("Save proposal")
     }
     private fun add(amount: String, withdrawal: Boolean = false) {
         click("Record allocation")
-        if (withdrawal) click("Type: contribution (change)")
-        compose.onNodeWithText("Positive amount (LKR)").performTextReplacement(amount)
+        if (withdrawal) click("Withdrawal")
+        compose.onNodeWithText("Amount (LKR)").performTextReplacement(amount)
         click("Save proposal")
     }
     private fun entryAction(data: Data, kind: String, action: String) {
@@ -109,41 +114,41 @@ class GoalNavigationTest {
     }
     @Test fun createContributeWithdrawScheduleInspectCorrectDeleteAndDashboardUpdate() {
         val data = Data(); show(data); click("Savings Goal"); create()
-        text("Saved: LKR 11200.00"); text("Required per opportunity: LKR 39900.00 (rounded up to the nearest cent)")
+        text("Saved: LKR 11,200.00"); text("Required per opportunity"); text("LKR 39,900.00")
         text("Progress: 2.29%")
-        click("Inspect contribution schedule"); text(SavingsMath.today().plusMonths(1).toString()); click("Close schedule")
-        add("10000"); text("Saved: LKR 21200.00")
-        add("1200", true); text("Saved: LKR 20000.00")
+        click("Inspect contribution schedule"); text(com.clarity.finance.ui.pilot.PresentationFormat.date(SavingsMath.today().plusMonths(1).toString())); click("Close schedule")
+        add("10000"); text("Saved: LKR 21,200.00")
+        add("1200", true); text("Saved: LKR 20,000.00")
         entryAction(data, "withdrawal", "edit")
-        compose.onNodeWithText("Positive amount (LKR)").performTextReplacement("1300")
-        click("Save proposal"); text("Saved: LKR 19900.00")
+        compose.onNodeWithText("Amount (LKR)").performTextReplacement("1300")
+        click("Save proposal"); text("Saved: LKR 19,900.00")
         entryAction(data, "withdrawal", "delete")
         compose.onNodeWithText("Delete allocation entry?").assertIsDisplayed(); click("Keep entry")
-        text("Saved: LKR 19900.00")
+        text("Saved: LKR 19,900.00")
         entryAction(data, "withdrawal", "delete"); click("Confirm deletion")
-        text("Saved: LKR 21200.00")
+        text("Saved: LKR 21,200.00")
         compose.onNodeWithContentDescription("Back").performClick(); click("Dashboard")
-        text("Saved: LKR 21200.00"); compose.onAllNodesWithText("LKR 0.00")[0].performScrollTo().assertIsDisplayed()
-        click("Open Savings Goal"); text("Saved: LKR 21200.00")
+        text("Saved: LKR 21,200.00"); compose.onAllNodesWithText("LKR 0.00")[0].performScrollTo().assertIsDisplayed()
+        click("Open Savings Goal"); text("Saved: LKR 21,200.00")
         compose.runOnIdle { assertEquals(5, data.operations.size); assertEquals(2, data.snapshots.value.entries!!.size) }
     }
     @Test fun pendingRejectedChangesRetainConfirmedContributionAndAccountChangeClearsIt() {
         val data = Data(); show(data); click("Savings Goal"); create(); add("10000")
         data.confirmImmediately = false
         entryAction(data, "contribution", "delete"); click("Confirm deletion")
-        text("Saved: LKR 21200.00"); text("Saved proposal awaiting server confirmation. Confirmed savings are retained.")
+        text("Saved: LKR 21,200.00"); text("Saved proposal awaiting server confirmation. Confirmed savings are retained.")
         compose.runOnIdle {
             val attempt = data.snapshots.value.attempts.single()
             data.snapshots.value = data.snapshots.value.copy(attempts = listOf(attempt.copy(status = "FAILED", error = "Earlier outcome unknown")))
         }
         text("Proposal outcome uncertain: Earlier outcome unknown. Retained until server reconciliation; it cannot be dismissed.")
         compose.onNodeWithText("Dismiss rejected proposal").assertDoesNotExist()
-        text("Saved: LKR 21200.00")
+        text("Saved: LKR 21,200.00")
         compose.runOnIdle {
             val attempt = data.snapshots.value.attempts.single()
             data.snapshots.value = data.snapshots.value.copy(attempts = listOf(attempt.copy(status = "REJECTED", error = "Isolated conflict")))
         }
-        text("Saved: LKR 21200.00"); text("Rejected proposal: Isolated conflict. Confirmed savings are retained.")
+        text("Saved: LKR 21,200.00"); text("Rejected proposal: Isolated conflict. Confirmed savings are retained.")
         click("Dismiss rejected proposal")
         compose.runOnIdle { auth.authState.value = User("other-fixture", "other@example.com") }
         click("Savings Goal"); text("No savings goal recorded. Confirm your own target and opening allocation.")
@@ -162,8 +167,8 @@ class GoalNavigationTest {
         text("Cached savings; may be incomplete or out of date.")
         text("Overdue: no remaining scheduled opportunities. Revise the deadline.")
         click("Edit goal")
-        compose.onNodeWithText("Deadline (YYYY-MM-DD)").performTextReplacement(SavingsMath.today().plusMonths(1).toString())
-        click("Save proposal"); text("Next scheduled date: ${SavingsMath.today()}")
+        compose.onNode(hasText("Deadline") and hasSetTextAction()).performTextReplacement(SavingsMath.today().plusMonths(1).toString())
+        click("Save proposal"); text("Next scheduled date"); text(com.clarity.finance.ui.pilot.PresentationFormat.date(SavingsMath.today().toString()))
     }
     @Test fun serverExpiredCreateCanReviseDeadlineWithoutDiscardingItsSavedValues() {
         val data = Data()
@@ -175,12 +180,12 @@ class GoalNavigationTest {
         show(data); click("Savings Goal"); click("Revise deadline")
         compose.onNodeWithText("Goal name").assertIsNotEnabled()
         compose.onNodeWithText("Target (LKR)").assertIsNotEnabled()
-        compose.onNodeWithText("Opening allocation (LKR)").assertIsNotEnabled()
+        compose.onNodeWithText("Opening allocation").assertIsNotEnabled()
         click("Close form")
         compose.runOnIdle { assertEquals(original, data.snapshots.value.attempts.single().operation); assertTrue(data.operations.isEmpty()) }
         click("Revise deadline")
-        compose.onNodeWithText("Deadline (YYYY-MM-DD)").performTextReplacement(today.plusYears(1).toString())
-        click("Save proposal"); text("Saved: LKR 11200.00")
+        compose.onNode(hasText("Deadline") and hasSetTextAction()).performTextReplacement(today.plusYears(1).toString())
+        click("Save proposal"); text("Saved: LKR 11,200.00")
         compose.runOnIdle {
             val saved = data.snapshots.value.goal!!
             assertEquals(original.goal!!.startDate, saved.config.startDate)

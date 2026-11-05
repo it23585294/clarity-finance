@@ -77,27 +77,27 @@ class DashboardNavigationTest {
                 ClarityTheme { Box(Modifier.width(320.dp)) { IsolatedAppNavigation(graph) } }
             }
         }
-        compose.onNodeWithText("Dashboard").performScrollTo().performClick()
+        compose.pilotClick("Dashboard")
     }
-    private fun click(label: String) = compose.onNode(hasText(label) and hasClickAction()).performScrollTo().performClick()
+    private fun click(label: String) = compose.pilotClick(label)
 
     @Test fun dashboardInsightsCategoryBackdateDeleteAndQuickAddUseProductionNavigation() {
         val data = Data()
         data.expenses.value = listOf(rent, meal)
         data.income.value = listOf(Income("salary", "salary", today.toString(), "LKR", "1000", 100000, "native_lkr", "1", "Reporting fixture income"))
         show(data)
-        compose.onNodeWithText("LKR -49000.00").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("LKR -49,000.00").performScrollTo().assertIsDisplayed()
         click("Spending insights")
-        compose.onNodeWithText("Committed: LKR 40000.00 (80.0%)").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Discretionary: LKR 10000.00 (20.0%)").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Committed: LKR 40,000.00 (80.0%)").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Discretionary: LKR 10,000.00 (20.0%)").performScrollTo().assertIsDisplayed()
         // Tap the exposed left side; the fixed Add Expense FAB can cover the scroll-to edge on a short display.
-        compose.onNodeWithText("Housing: LKR 40000.00").performScrollTo()
+        compose.onNodeWithText("Housing: LKR 40,000.00").performScrollTo()
             .performTouchInput { click(Offset(16.dp.toPx(), center.y)) }
         compose.onNodeWithText("Reporting fixture rent").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Reporting fixture meal").assertDoesNotExist()
         compose.onNodeWithText("Reporting fixture income").assertDoesNotExist()
         click("Inspect / edit expense")
-        compose.onNodeWithText("Edit Expense").assertIsDisplayed()
+        compose.onNodeWithText("Expense details").assertIsDisplayed(); click("Edit expense")
         val previous = YearMonth.from(today).minusMonths(1).atEndOfMonth().toString()
         compose.onNodeWithText("Date (yyyy-MM-dd)").performTextReplacement(previous)
         click("Save Changes")
@@ -110,10 +110,10 @@ class DashboardNavigationTest {
         compose.onNode(hasText("Delete") and hasClickAction() and hasAnyAncestor(isDialog())).performClick()
         compose.onNodeWithText("No matching expenses recorded for this month.").performScrollTo().assertIsDisplayed()
         compose.runOnIdle { assertEquals(listOf("meal"), data.expenses.value.map { it.id }) }
-        compose.onNode(hasText("Add Expense") and hasClickAction()).performClick()
+        compose.pilotClick("Add Expense")
         compose.onNodeWithText("Amount (LKR)").assertIsDisplayed()
         click("Cancel")
-        compose.onNodeWithText("Reporting month: ${YearMonth.from(today).minusMonths(1)}").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(com.clarity.finance.ui.pilot.PresentationFormat.month(YearMonth.from(today).minusMonths(1).toString())).performScrollTo().assertIsDisplayed()
     }
 
     @Test fun enlargedLayoutKeepsIndependentSectionsAndLinkedReceiptProtectionThenClearsOldAccount() {
@@ -124,19 +124,19 @@ class DashboardNavigationTest {
         data.crypto.value = listOf(CryptoResult("gain", "gain", 50000, today.toString(), "Crypto fixture"))
         data.projects.value = listOf(ExpectedPayment("p", "project", "Fixture", "freelance", "USD", today.toString(), 20000))
         show(data, enlarged = true)
-        compose.onNodeWithText("LKR 1000.00").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("LKR 1,000.00").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Expense listener unavailable").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Income and expense data must both be available to calculate surplus.").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("USD 200.00").performScrollTo().assertIsDisplayed()
-        click("Monthly history")
+        click("Monthly history"); click("Income")
         compose.onNodeWithText("Linked receipt: inspect project").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Inspect / edit income").assertDoesNotExist()
-        click("Inspect crypto result")
+        click("Separate crypto history"); click("Inspect crypto result")
         compose.onNodeWithText("Realised crypto result").assertIsDisplayed()
         compose.runOnIdle { auth.authState.value = User("reporting-b", "other@example.com") }
         compose.onNodeWithText("Realised crypto result").assertDoesNotExist()
-        compose.onNodeWithText("Dashboard").performScrollTo().performClick()
-        click("Monthly history")
+        compose.pilotClick("Dashboard")
+        click("Monthly history"); click("Income")
         compose.onNodeWithText("Linked fixture").assertDoesNotExist()
         compose.onNodeWithText("Crypto fixture").assertDoesNotExist()
         compose.onNodeWithText("No received income recorded for this month.").performScrollTo().assertIsDisplayed()
@@ -151,9 +151,9 @@ class DashboardNavigationTest {
         val error = "Total exceeds the supported integer range; inspect individual records."
         compose.onNodeWithText(error).performScrollTo().assertIsDisplayed()
         compose.onAllNodesWithText("Unavailable").assertCountEquals(1)
-        click("Monthly history")
+        click("Monthly history"); click("Separate crypto history")
         compose.onNodeWithText(error).performScrollTo().assertIsDisplayed()
-        for ((note, amount) in listOf("Overflow fixture large" to "+92233720368547758.07", "Overflow fixture small" to "+0.01")) {
+        for ((note, amount) in listOf("Overflow fixture large" to "+92,233,720,368,547,758.07", "Overflow fixture small" to "+0.01")) {
             compose.onNodeWithText(note).performScrollTo().performClick()
             compose.onNodeWithText("Realised crypto result").assertIsDisplayed()
             compose.onNodeWithText("gain: LKR $amount", substring = true).assertIsDisplayed()
@@ -171,7 +171,7 @@ class DashboardNavigationTest {
             CryptoResult("small", "gain", 1, today.toString()),
             CryptoResult("malformed", "invalid", 1, today.toString(), "Malformed fixture"))
         show(data)
-        click("Monthly history")
+        click("Monthly history"); click("Separate crypto history")
         compose.onNodeWithText("Invalid result direction").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Inspect crypto result").assertDoesNotExist()
         compose.onNodeWithText("Malformed fixture").assertDoesNotExist()
