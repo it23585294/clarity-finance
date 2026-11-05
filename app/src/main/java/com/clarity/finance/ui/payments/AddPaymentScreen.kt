@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.clarity.finance.ui.pilot.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarity.finance.viewmodel.AddPaymentViewModel
 
@@ -35,14 +36,7 @@ fun AddPaymentScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Add Pending Payment") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
+            PageHeader("Add agreement", onNavigateBack)
         }
     ) { padding ->
         Column(
@@ -52,8 +46,9 @@ fun AddPaymentScreen(
                 .padding(padding)
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            Text("Record expected income. This does not record a received payment.", style = MaterialTheme.typography.bodySmall)
             if (formState.error != null) {
                 Text(
                     text = formState.error!!,
@@ -66,7 +61,7 @@ fun AddPaymentScreen(
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
 
-            Text("Payment Type", style = MaterialTheme.typography.titleMedium)
+            Text("Agreement type", style = MaterialTheme.typography.titleMedium)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
                     enabled = editable,
@@ -92,30 +87,11 @@ fun AddPaymentScreen(
             )
 
             com.clarity.finance.ui.CatalogueStatus()
-            Text("Source", style = MaterialTheme.typography.titleMedium)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                com.clarity.finance.ui.LocalCatalogue.current.choices("source").forEach { source ->
-                    val src = source.id
-                    FilterChip(
-                        enabled = editable,
-                        selected = formState.sourceId == src,
-                        onClick = { viewModel.updateForm(sourceId = src, currency = source.defaultValue) },
-                        label = { Text(source.name) }
-                    )
-                }
+            SelectionField("Source", catalogue.referenceLabel("source", formState.sourceId),
+                catalogue.choices("source").map { it.id to it.name }, editable) { id ->
+                viewModel.updateForm(sourceId = id, currency = catalogue.defaultValue("source", id) ?: formState.currency)
             }
-
-            Text("Currency", style = MaterialTheme.typography.titleMedium)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("LKR", "USD").forEach { curr ->
-                    FilterChip(
-                        enabled = editable,
-                        selected = formState.currency == curr,
-                        onClick = { viewModel.updateForm(currency = curr) },
-                        label = { Text(curr) }
-                    )
-                }
-            }
+            SelectionField("Currency", formState.currency, listOf("LKR" to "LKR", "USD" to "USD"), editable) { viewModel.updateForm(currency = it) }
 
             OutlinedTextField(
                 enabled = editable,

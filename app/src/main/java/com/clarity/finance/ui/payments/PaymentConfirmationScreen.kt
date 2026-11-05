@@ -6,10 +6,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.clarity.finance.ui.pilot.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarity.finance.viewmodel.PaymentConfirmationViewModel
 
@@ -34,28 +36,30 @@ fun PaymentConfirmationScreen(
     }
 
     if (formState.isLoading) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        LoadingPanel("Loading payment details")
         return
     }
 
-    Column(
+    Column(Modifier.fillMaxSize()) {
+        PageHeader("Record payment", onNavigateBack)
+        Column(
         modifier = Modifier
-            .fillMaxSize()
+            .weight(1f)
+            .fillMaxWidth()
             .imePadding()
             .padding(16.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Record Payment", style = MaterialTheme.typography.headlineMedium)
-            TextButton(onClick = onNavigateBack) { Text("Back") }
-        }
+        Text(if (milestoneId == null) "Direct receipt" else "Milestone receipt", style = MaterialTheme.typography.titleMedium)
+        DetailValue("Inherited source", com.clarity.finance.ui.LocalCatalogue.current.referenceLabel("source", formState.sourceId))
         Spacer(modifier = Modifier.height(16.dp))
 
         Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-            Text(text = "This action requires an active network connection. The payment will be atomically synced with the project balance.", modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Text(text = "Record money already received. A saved proposal changes confirmed income and agreement balances only after confirmation.", modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
         }
 
         OutlinedTextField(
+            enabled = !formState.isSubmitting && !formState.isRetry,
             value = formState.amountStr,
             onValueChange = { viewModel.updateForm(amountStr = it) },
             label = { Text("Amount (${formState.currency})") },
@@ -66,19 +70,14 @@ fun PaymentConfirmationScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         if (formState.currency == "USD") {
-            FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(selected = formState.conversionBasis == "confirmed_rate", onClick = { viewModel.updateForm(conversionBasis = "confirmed_rate") })
-                    Text("Exchange Rate")
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(selected = formState.conversionBasis == "actual_credit", onClick = { viewModel.updateForm(conversionBasis = "actual_credit") })
-                    Text("Actual LKR")
-                }
+            FlowRow(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChoiceOption("Exchange Rate", formState.conversionBasis == "confirmed_rate", !formState.isSubmitting && !formState.isRetry) { viewModel.updateForm(conversionBasis = "confirmed_rate") }
+                ChoiceOption("Actual LKR", formState.conversionBasis == "actual_credit", !formState.isSubmitting && !formState.isRetry) { viewModel.updateForm(conversionBasis = "actual_credit") }
             }
 
             if (formState.conversionBasis == "confirmed_rate") {
                 OutlinedTextField(
+            enabled = !formState.isSubmitting && !formState.isRetry,
                     value = formState.conversionRateStr,
                     onValueChange = { viewModel.updateForm(conversionRateStr = it) },
                     label = { Text("Confirmed LKR per USD") },
@@ -87,6 +86,7 @@ fun PaymentConfirmationScreen(
                 )
             } else if (formState.conversionBasis == "actual_credit") {
                 OutlinedTextField(
+            enabled = !formState.isSubmitting && !formState.isRetry,
                     value = formState.actualLkrCreditStr,
                     onValueChange = { viewModel.updateForm(actualLkrCreditStr = it) },
                     label = { Text("Actual LKR Credited") },
@@ -98,6 +98,7 @@ fun PaymentConfirmationScreen(
         }
 
         OutlinedTextField(
+            enabled = !formState.isSubmitting && !formState.isRetry,
             value = formState.receiptDate,
             onValueChange = { viewModel.updateForm(receiptDate = it) },
             label = { Text("Receipt Date (yyyy-MM-dd)") },
@@ -107,6 +108,7 @@ fun PaymentConfirmationScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         OutlinedTextField(
+            enabled = !formState.isSubmitting && !formState.isRetry,
             value = formState.note,
             onValueChange = { viewModel.updateForm(note = it) },
             label = { Text("Note") },
@@ -115,6 +117,7 @@ fun PaymentConfirmationScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        if (formState.isRetry) StatusPanel("A saved payment is unresolved. Retry checks the same original details; they cannot be edited here.")
         if (formState.error != null) {
             Text(text = formState.error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             Spacer(modifier = Modifier.height(8.dp))
@@ -134,5 +137,6 @@ fun PaymentConfirmationScreen(
         
         Spacer(modifier = Modifier.height(8.dp))
         TextButton(onClick = onNavigateBack, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
+        }
     }
 }
