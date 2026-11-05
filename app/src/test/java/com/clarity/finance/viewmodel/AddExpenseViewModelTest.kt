@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -19,6 +20,25 @@ import org.mockito.Mockito.`when`
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AddExpenseViewModelTest {
+
+    @Test fun `UI draft is owner scoped ignores stale edits and is not restored into a fresh submission owner`() = runTest(testDispatcher) {
+        val session = MutableStateFlow<User?>(User("draft-a", "fictional"))
+        `when`(authRepository.authState).thenReturn(session)
+        val model = AddExpenseViewModel(authRepository, expenseRepository)
+        advanceUntilIdle()
+        model.updateDraft("draft-a", amountStr = "875.25", note = "Unsaved draft")
+        assertEquals("875.25", model.formState.value.draft.amountStr)
+        session.value = User("draft-b", "fictional")
+        advanceUntilIdle()
+        assertEquals("", model.formState.value.draft.amountStr)
+        assertEquals("", model.formState.value.draft.note)
+        model.updateDraft("draft-a", amountStr = "999")
+        assertEquals("", model.formState.value.draft.amountStr)
+        val fresh = AddExpenseViewModel(authRepository, expenseRepository)
+        advanceUntilIdle()
+        assertEquals("", fresh.formState.value.draft.amountStr)
+        org.mockito.Mockito.verifyNoInteractions(expenseRepository)
+    }
 
     private lateinit var viewModel: AddExpenseViewModel
     private val authRepository = mock(AuthRepository::class.java)

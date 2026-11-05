@@ -10,8 +10,11 @@ import kotlinx.coroutines.launch
 import java.time.Clock
 import java.util.UUID
 
+data class ExpenseDraft(val amountStr: String = "", val categoryId: String = "other", val paymentChannelId: String = "cash",
+    val spendingType: String = "discretionary", val expenseDate: String = "", val note: String = "")
+
 data class AddExpenseFormState(val isSubmitting: Boolean = false, val isSuccess: Boolean = false,
-    val error: String? = null, val accountKey: String? = null)
+    val error: String? = null, val accountKey: String? = null, val draft: ExpenseDraft = ExpenseDraft())
 
 class AddExpenseViewModel(private val authRepository: AuthRepository, private val expenseRepository: ExpenseRepository,
     private val clock: Clock = Clock.systemUTC()) : ViewModel() {
@@ -24,11 +27,24 @@ class AddExpenseViewModel(private val authRepository: AuthRepository, private va
         authRepository.authState.distinctUntilChangedBy { it?.uid }.collect { user ->
             if (uid != user?.uid) {
                 generation++; uid = user?.uid; proposal = null
-                mutable.value = AddExpenseFormState(accountKey = uid)
+                mutable.value = freshState()
             }
         }
     } }
-    fun resetState() { proposal = null; mutable.value = AddExpenseFormState(accountKey = uid) }
+    private fun freshState() = AddExpenseFormState(accountKey = uid, draft = ExpenseDraft(expenseDate = getDefaultDate()))
+    fun resetState() { proposal = null; mutable.value = freshState() }
+    /** Retained UI draft only. Never serialized into recovery or restored into a fresh submission owner. */
+    fun updateDraft(owner: String, amountStr: String? = null, categoryId: String? = null, paymentChannelId: String? = null,
+        spendingType: String? = null, expenseDate: String? = null, note: String? = null) {
+        mutable.update { current ->
+            if (current.accountKey != owner || current.isSubmitting || current.isSuccess) current else {
+                val old = current.draft
+                current.copy(draft = old.copy(amountStr = amountStr ?: old.amountStr, categoryId = categoryId ?: old.categoryId,
+                    paymentChannelId = paymentChannelId ?: old.paymentChannelId, spendingType = spendingType ?: old.spendingType,
+                    expenseDate = expenseDate ?: old.expenseDate, note = note ?: old.note))
+            }
+        }
+    }
     fun addExpense(amountStr: String, categoryId: String, paymentChannelId: String, spendingType: String, expenseDate: String, note: String) {
         if (formState.value.isSubmitting || formState.value.isSuccess) return
         val owner = uid ?: run { mutable.value = formState.value.copy(error = "User not authenticated"); return }

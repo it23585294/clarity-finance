@@ -7,124 +7,81 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarity.finance.data.model.Expense
+import com.clarity.finance.ui.pilot.*
 import com.clarity.finance.viewmodel.ExpenseListViewModel
 import com.clarity.finance.viewmodel.ExpensesUiState
 
 @Composable
-fun ExpensesScreen(
-    viewModel: ExpenseListViewModel,
-    onNavigateToAddExpense: () -> Unit,
-    onNavigateToEditExpense: (String) -> Unit,
-    onNavigateBack: () -> Unit,
-    onRecovery: () -> Unit = {}
-) {
+fun ExpensesScreen(viewModel: ExpenseListViewModel, onNavigateToAddExpense: () -> Unit,
+    onNavigateToEditExpense: (String) -> Unit, onNavigateBack: () -> Unit, onRecovery: () -> Unit = {}) {
     val uiState by viewModel.expensesState.collectAsStateWithLifecycle()
-
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(), 
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Clarity Expenses", style = MaterialTheme.typography.headlineMedium)
-            Button(onClick = onNavigateBack) {
-                Text("Back")
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-
-        com.clarity.finance.ui.CatalogueStatus()
-        TextButton(onClick = onRecovery) { Text("Review saved changes") }
-        
-        Button(
-            onClick = onNavigateToAddExpense,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Add Expense")
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-
-        when (val state = uiState) {
-            is ExpensesUiState.Loading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+    var showTimes by remember { mutableStateOf(false) }
+    Scaffold(topBar = { PageHeader("All recorded expenses", onNavigateBack) }) { padding ->
+        LazyColumn(Modifier.fillMaxSize().padding(padding).testTag("all-expenses-list"),
+            contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("All dates · Monthly totals and filters are in History.", style = MaterialTheme.typography.bodyMedium)
+                    InformationAction("Expense dates and times") { showTimes = true }
+                    com.clarity.finance.ui.CatalogueStatus()
+                    Button(onClick = onNavigateToAddExpense, modifier = Modifier.fillMaxWidth()) { Text("Add Expense") }
+                    TextButton(onClick = onRecovery) { Text("Review saved changes") }
                 }
             }
-            is ExpensesUiState.Error -> {
-                Text(text = "Error: ${state.message}", color = MaterialTheme.colorScheme.error)
-            }
-            is ExpensesUiState.SignedOut -> {
-                // Handled by navigation
-            }
-            is ExpensesUiState.Success -> {
-                if (state.expenses.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No expenses recorded")
-                    }
-                } else {
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(state.expenses, key = { it.id }) { expense ->
-                            val isClickable = !expense.isPending && expense.syncError == null && !expense.isConflict && expense.queuedChange == null
-                            ExpenseItem(
-                                expense = expense,
-                                modifier = if (isClickable) Modifier.clickable { onNavigateToEditExpense(expense.id) } else Modifier,
-                                onRetry = { viewModel.retryExpense(expense) }
-                            )
-                            HorizontalDivider()
+            when (val state = uiState) {
+                is ExpensesUiState.Loading -> item { LoadingPanel("Loading expenses") }
+                is ExpensesUiState.Error -> item { StatusPanel(state.message, isError = true) }
+                is ExpensesUiState.SignedOut -> Unit // Navigation owns sign-out.
+                is ExpensesUiState.Success -> {
+                    if (state.expenses.isEmpty()) item {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("No expenses to show.")
+                            Text("Saved data may be incomplete. Check History for period totals and data status.", style = MaterialTheme.typography.bodySmall)
                         }
+                    }
+                    items(state.expenses, key = { it.id }) { expense ->
+                        val isClickable = !expense.isPending && expense.syncError == null && !expense.isConflict && expense.queuedChange == null
+                        ExpenseItem(expense, if (isClickable) Modifier.clickable { onNavigateToEditExpense(expense.id) } else Modifier,
+                            onRetry = { viewModel.retryExpense(expense) })
                     }
                 }
             }
         }
     }
+    if (showTimes) InformationDialog("Expense dates and times", PresentationFormat.expenseTimesExplanation) { showTimes = false }
 }
 
 @Composable
 fun ExpenseItem(expense: Expense, modifier: Modifier = Modifier, onRetry: () -> Unit) {
-    val categoryUiMap = com.clarity.finance.ui.LocalCatalogue.current.labels("category")
-
-    val channelUiMap = mapOf(
-        "cash" to "Cash",
-        "primary_bank_card" to "Primary bank/card",
-        "secondary_bank_card" to "Secondary bank/card",
-        "other" to "Other"
-    )
-    
-    Column(modifier = modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        expense.queuedChange?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(text = "${expense.expenseDate} - ${com.clarity.finance.ui.LocalCatalogue.current.label("category", expense.categoryId)}", style = MaterialTheme.typography.bodyLarge)
-            val amountStr = java.math.BigDecimal.valueOf(expense.amountMinor, 2).toPlainString()
-            Text(text = "${expense.currency} $amountStr", style = MaterialTheme.typography.titleMedium)
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(text = "${channelUiMap[expense.paymentChannelId] ?: expense.paymentChannelId} • ${expense.spendingType}", style = MaterialTheme.typography.bodyMedium)
-            
-            if (expense.isFromCache && !expense.isPending) Text("Cached", style = MaterialTheme.typography.bodySmall)
+    val channel = mapOf("cash" to "Cash", "primary_bank_card" to "Primary bank/card",
+        "secondary_bank_card" to "Secondary bank/card", "other" to "Other")
+    OutlinedCard(modifier.fillMaxWidth(), colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("${expense.currency} ${PresentationFormat.minor(expense.amountMinor)}", style = MaterialTheme.typography.titleLarge)
+            Text(com.clarity.finance.ui.LocalCatalogue.current.referenceLabel("category", expense.categoryId), style = MaterialTheme.typography.titleMedium)
+            Text(PresentationFormat.date(expense.expenseDate), style = MaterialTheme.typography.bodyMedium)
+            Text(PresentationFormat.serverSavedAt(expense.createdAt, expense.isPending), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("${channel[expense.paymentChannelId] ?: "Payment method unavailable"} · ${expense.spendingType.replaceFirstChar { it.uppercase() }}",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            expense.queuedChange?.let { StatusPanel(it) }
+            if (expense.isFromCache && !expense.isPending) Text("Cached · May be out of date", style = MaterialTheme.typography.bodySmall)
             if (expense.syncError != null) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = if (expense.isConflict) "Rejected" else "Awaiting reconciliation", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    TextButton(onClick = onRetry) {
-                        Text("Retry", style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            } else if (expense.isPending) {
-                Text(text = "Pending", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-        if (!expense.note.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(text = "Note: ${expense.note}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                StatusPanel(if (expense.isConflict) "Change rejected. Review the saved proposal." else "Outcome unresolved. Check the original change before trying again.", isError = expense.isConflict)
+                TextButton(onClick = onRetry) { Text("Retry") }
+            } else if (expense.isPending) Text("Pending · Not confirmed", style = MaterialTheme.typography.bodySmall)
+            else if (expense.isConflict) StatusPanel("Changed elsewhere. Review saved changes before editing.", isError = true)
+            if (!expense.note.isNullOrBlank()) Text(expense.note, style = MaterialTheme.typography.bodyMedium)
+            if (!expense.isPending && expense.syncError == null && !expense.isConflict && expense.queuedChange == null)
+                Text("Inspect expense", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         }
     }
 }

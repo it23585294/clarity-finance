@@ -31,7 +31,10 @@ data class EditExpenseFormState(
     val paymentChannelId: String = "cash",
     val spendingType: String = "discretionary",
     val expenseDate: String = "",
-    val note: String = ""
+    val note: String = "",
+    val fromCache: Boolean = false,
+    val savedChange: String? = null,
+    val changeError: String? = null
 )
 
 class EditExpenseViewModel(
@@ -87,6 +90,9 @@ class EditExpenseViewModel(
                     spendingType = expense.spendingType,
                     expenseDate = expense.expenseDate,
                     note = expense.note ?: "",
+                    fromCache = expense.isFromCache,
+                    savedChange = expense.queuedChange ?: if (expense.isPending) "Saved change waiting for confirmation" else null,
+                    changeError = expense.syncError,
                     isStale = false,
                     isMissing = false,
                     error = null

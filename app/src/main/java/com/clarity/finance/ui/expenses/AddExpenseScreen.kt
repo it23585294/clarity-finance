@@ -17,12 +17,8 @@ fun AddExpenseScreen(
 ) {
     val formState by viewModel.formState.collectAsStateWithLifecycle()
 
-    var amountStr by remember(formState.accountKey) { mutableStateOf("") }
-    var categoryId by remember(formState.accountKey) { mutableStateOf("other") }
-    var paymentChannelId by remember(formState.accountKey) { mutableStateOf("cash") }
-    var spendingType by remember(formState.accountKey) { mutableStateOf("discretionary") }
-    var expenseDate by remember(formState.accountKey) { mutableStateOf(viewModel.getDefaultDate()) }
-    var note by remember(formState.accountKey) { mutableStateOf("") }
+    val owner = formState.accountKey ?: return
+    val draft = formState.draft
 
     // Auto-navigate on success
     LaunchedEffect(formState.isSuccess) {
@@ -32,27 +28,30 @@ fun AddExpenseScreen(
         }
     }
 
+    Column(Modifier.fillMaxSize()) {
+    Text("Add Expense", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(16.dp))
     ExpenseFormContent(
-        amountStr = amountStr,
-        onAmountChange = { amountStr = it },
-        categoryId = categoryId,
-        onCategoryChange = { categoryId = it },
-        paymentChannelId = paymentChannelId,
-        onPaymentChannelChange = { paymentChannelId = it },
-        spendingType = spendingType,
-        onSpendingTypeChange = { spendingType = it },
-        expenseDate = expenseDate,
-        onDateChange = { expenseDate = it },
-        note = note,
-        onNoteChange = { note = it },
+        amountStr = draft.amountStr,
+        onAmountChange = { viewModel.updateDraft(owner, amountStr = it) },
+        categoryId = draft.categoryId,
+        onCategoryChange = { viewModel.updateDraft(owner, categoryId = it) },
+        paymentChannelId = draft.paymentChannelId,
+        onPaymentChannelChange = { viewModel.updateDraft(owner, paymentChannelId = it) },
+        spendingType = draft.spendingType,
+        onSpendingTypeChange = { viewModel.updateDraft(owner, spendingType = it) },
+        expenseDate = draft.expenseDate,
+        onDateChange = { viewModel.updateDraft(owner, expenseDate = it) },
+        note = draft.note,
+        onNoteChange = { viewModel.updateDraft(owner, note = it) },
         error = formState.error,
         isSubmitting = formState.isSubmitting,
         onSave = {
             viewModel.addExpense(
-                amountStr, categoryId, paymentChannelId, spendingType, expenseDate, note
+                draft.amountStr, draft.categoryId, draft.paymentChannelId, draft.spendingType, draft.expenseDate, draft.note
             )
         },
         onCancel = onNavigateBack,
         saveButtonText = "Save"
     )
+    }
 }

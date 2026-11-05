@@ -23,6 +23,24 @@ import org.mockito.Mockito.`when`
 @OptIn(ExperimentalCoroutinesApi::class)
 class EditExpenseViewModelTest {
 
+    @Test fun `inspection retains original value and exposes cache and proposal metadata only for its owner`() = runTest(testDispatcher) {
+        mockAuthState.value = User("uid1", "fictional")
+        val original = Expense("e1", 1550, categoryId = "other", paymentChannelId = "cash", spendingType = "discretionary",
+            expenseDate = "2026-01-01", updatedAt = Timestamp(1, 0), isFromCache = true,
+            queuedChange = "UPDATE", syncError = "Confirmation unknown")
+        `when`(expenseRepository.getExpense("uid1", "e1")).thenReturn(Result.success(original))
+        viewModel.loadExpense("e1"); advanceUntilIdle()
+        assertEquals("15.50", viewModel.formState.value.amountStr)
+        assertTrue(viewModel.formState.value.fromCache)
+        assertEquals("UPDATE", viewModel.formState.value.savedChange)
+        assertEquals("Confirmation unknown", viewModel.formState.value.changeError)
+        mockAuthState.value = User("uid2", "fictional")
+        advanceUntilIdle()
+        assertEquals("", viewModel.formState.value.amountStr)
+        assertNull(viewModel.formState.value.savedChange)
+        assertNull(viewModel.formState.value.changeError)
+    }
+
     @Test fun `recurring actual correction rejects future date scientific notation and overlength note before repository writes`() = runTest(testDispatcher) {
         mockAuthState.value = User("uid1", "fixture@example.com")
         val clock = java.time.Clock.fixed(java.time.Instant.parse("2026-01-31T00:00:00Z"), java.time.ZoneOffset.UTC)
