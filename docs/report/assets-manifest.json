@@ -1,0 +1,121 @@
+{
+  "pdf_pages": 17,
+  "application_changes": 0,
+  "report_hashes": {
+    "Clarity_Finance_Report.docx": "995962239B18BB76DD83759C7D60CE800775F54D676E00E9DBF9B31E13719891",
+    "Clarity_Finance_Report.md": "588423E1EC7DAC3419B2DA98A4E87EB9F31EAD22A49716CAAE2479D6990ABF06",
+    "Clarity_Finance_Report.pdf": "9651DE15E7D2438D80323AB6F5B25F5EBF4177CB4FC035F1BCAEE3CCB393141F"
+  },
+  "figure_and_screenshot_files": [
+    {
+      "path": "figures/architecture.png",
+      "size": 134988,
+      "sha256": "0986F38438EA8BCF88AF2B720CF077D91E67A9A8D1969F0C773FEC868A3A1C7B",
+      "kind": "corrected original diagram/mockup source or rendering"
+    },
+    {
+      "path": "figures/architecture.svg",
+      "size": 4199,
+      "sha256": "202A4D5472597B0FBCBEA4291EF9F57F189AD1F27E061BF1E75ED92A451D3016",
+      "kind": "corrected original diagram/mockup source or rendering"
+    },
+    {
+      "path": "figures/protocol.png",
+      "size": 134644,
+      "sha256": "0543CE48917D8970C513706378BA815580AA34F9FBD6996D29AE733AADEE4BE0",
+      "kind": "corrected original diagram/mockup source or rendering"
+    },
+    {
+      "path": "figures/protocol.svg",
+      "size": 3876,
+      "sha256": "8C59FFB0648E992F72BEF14293313CDC8C6A801E2B85AABD8047EF3923219AEA",
+      "kind": "corrected original diagram/mockup source or rendering"
+    },
+    {
+      "path": "figures/schema.png",
+      "size": 112156,
+      "sha256": "805D9C0D4E2934885D3B89BD4AB211A5777C885CF75B5DB8A4AF75E9FE66D551",
+      "kind": "corrected original diagram/mockup source or rendering"
+    },
+    {
+      "path": "figures/schema.svg",
+      "size": 4010,
+      "sha256": "7AEE9B74DB3139EA073D473248B584BA4BC0665ABEA4336C37D145CA77FD8882",
+      "kind": "corrected original diagram/mockup source or rendering"
+    },
+    {
+      "path": "figures/use-cases.png",
+      "size": 138110,
+      "sha256": "C277BC603B7A15ECC8E7FE2A421A4E1E4F01A2BE6387E7B2C88474174449D837",
+      "kind": "corrected original diagram/mockup source or rendering"
+    },
+    {
+      "path": "figures/use-cases.svg",
+      "size": 3290,
+      "sha256": "7F48B289A7A5E5B6C1B8A424F1A77C99E3F89DA6A9861C5835D697E8A791E19D",
+      "kind": "corrected original diagram/mockup source or rendering"
+    },
+    {
+      "path": "figures/wireframe-1.png",
+      "size": 83261,
+      "sha256": "CFBE2D586AEB6F7F39EE25D19F9B615DCDE4C423CFBD380E7BB7C10CD4627794",
+      "kind": "corrected original diagram/mockup source or rendering"
+    },
+    {
+      "path": "figures/wireframe-1.svg",
+      "size": 2483,
+      "sha256": "9A040FEEF08875A11FDE97EBAACD8CBBD3E5A468C9DFCDD5E28328B430D3B81E",
+      "kind": "corrected original diagram/mockup source or rendering"
+    },
+    {
+      "path": "figures/wireframe-2.png",
+      "size": 70389,
+      "sha256": "1768DB59CBC4D95CBD1AB54F7F7935B0347E5522F19C7EA57A93FF572915015E",
+      "kind": "corrected original diagram/mockup source or rendering"
+    },
+    {
+      "path": "figures/wireframe-2.svg",
+      "size": 2320,
+      "sha256": "5ACBD213EDDC871518CA5A8829F0A2F5AED74EEBEF1944A53CE1E2C395FF17F3",
+      "kind": "corrected original diagram/mockup source or rendering"
+    },
+    {
+      "path": "figures/wireframe-3.png",
+      "size": 84112,
+      "sha256": "2C211F8F551CE841F1000E09649CEE059384BAFB0D44DF6A549F2A0ADAAC7CE2",
+      "kind": "corrected original diagram/mockup source or rendering"
+    },
+    {
+      "path": "figures/wireframe-3.svg",
+      "size": 2559,
+      "sha256": "70525FB99734B24E1DEC5B79F3CC5D362BB1249ACA4BB77140A74B3EE535B532",
+      "kind": "corrected original diagram/mockup source or rendering"
+    },
+    {
+      "path": "figures/wireframes.png",
+      "size": 252628,
+      "sha256": "63665DDB56782E13A2FC5785D738030D0DE6226AAC23F8CF1E94BABFE50AA340",
+      "kind": "corrected original diagram/mockup source or rendering"
+    },
+    {
+      "path": "figures/wireframes.svg",
+      "size": 7535,
+      "sha256": "90E9196520A6030CA2C16F6ECAADEED18C7ACE90F34072F3A38959220154D905",
+      "kind": "corrected original diagram/mockup source or rendering"
+    },
+    {
+      "path": "screenshots/overview.png",
+      "sha256": "5F118492B92478D1AF5DC7D84E04674729411872CC0EA6DA55235FDB06743222",
+      "kind": "byte-identical recorded fictional screenshot"
+    },
+    {
+      "path": "screenshots/history.png",
+      "sha256": "8639E6DD696AB057BEFE0A19D95FBCF07C21A5F3FD6CE413BA41394120BA1506",
+      "kind": "byte-identical recorded fictional screenshot"
+    }
+  ],
+  "original_pdf_hashes": {
+    "analysis-and-requirements.pdf": "E1F40377D5B5235F171562228DAE59B19759B72BF498DBB56F15AB5BE54BB024",
+    "assignment-specification.pdf": "9232C022EEF049F4EC27CAED4BE5400F0D3BD0BB34F5B35028353B94355B6D21"
+  }
+}

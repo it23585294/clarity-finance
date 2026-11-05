@@ -1,0 +1,1911 @@
+{
+  "date": "2026-11-05",
+  "tracked_retirements": 316,
+  "tracked_replacement": "README.md",
+  "application_changes": 0,
+  "tests_rules_build_dependencies_and_guarded_launcher_retained": true,
+  "entries": [
+    {
+      "retired_path": "API26_VERIFICATION.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "D34CD4A7E41FED1E301951CA6B28EDBF85290981476BBD7AACBE24AF029B3AA0"
+    },
+    {
+      "retired_path": "COLOUR_REVIEW.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "91017F2167DCCB88D6A5DB7401983020E92E7399BAC0D723683813612EE7A2BE"
+    },
+    {
+      "retired_path": "CRYPTO_RESULTS.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "13C3BAF809019D3B5BF00246E59108F6D4245AD5A0D35D4BACA4F450F1D21CB0"
+    },
+    {
+      "retired_path": "DI_MIGRATION.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "8B37D52FD0513A5B5BD094BEEDBC9B3153625D64A59509BF522BA40501357F04"
+    },
+    {
+      "retired_path": "FINAL_APP_ACCEPTANCE.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "9412E848759141FB42991EC9AD0D6842AFFB6F0A91557493DA72F570BB2AFE9C"
+    },
+    {
+      "retired_path": "FINAL_APP_ACCEPTANCE_MANIFEST.json",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "08ABB8E79C1069140D6A857A7F1A32C7B8733C285F314EB2B3971E0848B5EF97"
+    },
+    {
+      "retired_path": "FINAL_PROTOCOL_LIVE_ACCEPTANCE.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "95048760BF1D14CE371BAFA72E7DE5918C35BEF97713E06BD825E77F91A4B4E6"
+    },
+    {
+      "retired_path": "FINAL_PROTOCOL_PUBLICATION_REVIEW.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "5D56C17188225E05B218DD5848924F057836D7E1330AF31D29AA65C497DE45B8"
+    },
+    {
+      "retired_path": "FINAL_REQUIREMENTS_AUDIT.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "6E38CF644479E63B0C464544FB3AF8B00EDAD312E26AC88CC14A42E96B0D4B75"
+    },
+    {
+      "retired_path": "FR07_LIVE_ACCEPTANCE.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "0E5B054E0B478EBE8B87B4896C6133A680C171FC862E16194AA9EFB08E239952"
+    },
+    {
+      "retired_path": "FR07_LIVE_RESULTS.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "DA944EDFA6FEAB8B9D16024D763FA73B7485CEFC486A7786CB6DB5734689E67A"
+    },
+    {
+      "retired_path": "HUMAN_ACCEPTANCE.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "B9575DCD9274ACA2ADD1491A19310C9E96295199436E0044FEBA6836FC51FDA1"
+    },
+    {
+      "retired_path": "LIVE_VERIFICATION.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "3E27FBD884F33F4C3926009FC691E0AB056938B59BB06D594136691B3B93704A"
+    },
+    {
+      "retired_path": "MONTHLY_REPORTING.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "B03CED94475CB7C11EC786CA48D2FBFA20FBF157035AA3C92EF940838105B883"
+    },
+    {
+      "retired_path": "MONTHLY_REPORTING_LIVE_RESULTS.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "52701CC7D0B4FD86FDF311EB2FDD05A7736EB0C7C5B9151D1D318624152BBFCD"
+    },
+    {
+      "retired_path": "OFFLINE_SYNC_MATRIX.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "73FBC3B7318A0DFBFAF3053F379670DCDFB9CC3DABDAF7517C318685237A1BA0"
+    },
+    {
+      "retired_path": "PHASE_B_UI_UX_IMPLEMENTATION.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "DA4D31C4C69178E8DA51367C76611D088B7A373135482D0B3582336244596A93"
+    },
+    {
+      "retired_path": "PHASE_B_UI_UX_REVIEW_MANIFEST.json",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "DDD7CB77CEF322193E0C3CAAAADB9B491D32D768BB8C425912A2E67EF356A233"
+    },
+    {
+      "retired_path": "PHASE_C_UI_UX_IMPLEMENTATION.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "587D2A6761063796CB8B43C1420CC2F4FD58E7AC18B03A37268C17397C0CC429"
+    },
+    {
+      "retired_path": "PHASE_C_UI_UX_REVIEW_MANIFEST.json",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "A21EE396909C07C21B1597CFE670F4A0086F1F14FB3A9E290B567EA3E45D07E6"
+    },
+    {
+      "retired_path": "PHASE_D_UI_UX_IMPLEMENTATION.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "DE6CCEDE4963EC6F8CC3779E99A00CAEF4FB9EFB71173F13A7D5D51708FCA163"
+    },
+    {
+      "retired_path": "PHASE_D_UI_UX_REVIEW_MANIFEST.json",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "928CE4EBFCAACD5AC2783FA89D37DA2070F7BDE5FDAAE656100F0B4BBE726064"
+    },
+    {
+      "retired_path": "PILOT_UI_UX_IMPLEMENTATION.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "C641E18C7165A4C0133A36D87FCE85B732260D8056C9489A882258CEC3841E39"
+    },
+    {
+      "retired_path": "PILOT_UI_UX_REVIEW_MANIFEST.json",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "333ADB503039AED2845DCE360F5EEF44F7F5BA6FC2578C58B973495195708E8E"
+    },
+    {
+      "retired_path": "README.md",
+      "action": "replace",
+      "reason": "Consolidate into the one authoritative root project README.",
+      "original_sha256": "3495B742BD05E92C383E816BCE26B602092A460C05B6D6D1F3D7B8EA99C064A5"
+    },
+    {
+      "retired_path": "RECURRING_EXPENSES.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "1733ACC7BA8247A3EA7FE1057A3B71AA1A26C5EDE1C2B459F92F98D09C772503"
+    },
+    {
+      "retired_path": "RECURRING_EXPENSES_LIVE_RESULTS.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "BEC545B633D469F67614E2B2261B582B8E5479C7084C29271AECCBC52EB07A00"
+    },
+    {
+      "retired_path": "REPAIR_VERIFICATION.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "AA9832F5548A2D649E64BDFC85A8995211BBD7D3CE39BEDD094D42C5629456FA"
+    },
+    {
+      "retired_path": "RULES_PUBLICATION_REVIEW.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "9B1476A99E88A869F24EBA4D398DEF795420F8E3303D6B73AC41DE7371697FBD"
+    },
+    {
+      "retired_path": "SAVINGS_GOALS.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "1420AE5924FA45E3E27C138F7276075CEDFD6EE5EC616D35AA6DC92CD87A6C84"
+    },
+    {
+      "retired_path": "SAVINGS_GOALS_LIVE_RESULTS.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "B5EDEB748ACE102BCB88E5CA22E2DAC5F93CBEA536029B9C0FBF2184801D1CA4"
+    },
+    {
+      "retired_path": "UI_UX_AUDIT_AND_PLAN.md",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "D893757A9287A7C9242E396245D3A412352C2A3A002C8D62BA7A9E95E3BD1B7A"
+    },
+    {
+      "retired_path": "UI_UX_REVIEW_MANIFEST.json",
+      "action": "delete",
+      "reason": "Superseded report/review draft or manifest; preserve meaningful evidence in final report, requirements map and consolidated verification record.",
+      "original_sha256": "5114EC247AF2BEC472AF785C6622594D429ADAD3D865C3350046220AD3A76768"
+    },
+    {
+      "retired_path": "design/colour-review/colour-current-dark-categories.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "BBF7947B21D70D2B6A206CB49A7A6AD7560246B64D23E428D96F29862369D330"
+    },
+    {
+      "retired_path": "design/colour-review/colour-current-dark-income-form.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "9D039D3FF04267269F700EA06F734D8E52E2D3C783B3EC12D9BD20249A23A29F"
+    },
+    {
+      "retired_path": "design/colour-review/colour-current-dark-overview.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "BD6BDD0AB5A979D0BC5A7F05309DE1090E6DFCD27AB9D2448DA629D9ECCF4670"
+    },
+    {
+      "retired_path": "design/colour-review/colour-current-dark-saved-changes.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "76EBF427915463645717D06C26778B4C81A41E9056115B8F700DC3A542AB6C31"
+    },
+    {
+      "retired_path": "design/colour-review/colour-current-light-categories.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "CD5C913FAB2E6B3541803D57043E259391C410BEA5F032CE4C749804A7CB2EFA"
+    },
+    {
+      "retired_path": "design/colour-review/colour-current-light-income-form.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "0430E0863A22D48AC70DC2D0A7530A42CF5BB0BCF5FE080E39925FD24C42AAB2"
+    },
+    {
+      "retired_path": "design/colour-review/colour-current-light-overview.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "E0D666F3779E6682D54848E035C80FAA1C2FDB2BB0DC65FB40237110BD607E45"
+    },
+    {
+      "retired_path": "design/colour-review/colour-current-light-saved-changes.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "33B55855717D98FA02B7058759D3D236D39844C060ED0101B72C3C39D6A4E637"
+    },
+    {
+      "retired_path": "design/colour-review/colour-proposed-dark-categories.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "9F692E3E28FDA0D05A59A24D16B4773C002684BE88E8829D1280A6884C3DC7E2"
+    },
+    {
+      "retired_path": "design/colour-review/colour-proposed-dark-income-form.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "A49BD577474587952E1C2DA0095BDD8408721B25A9E76B07C835E7C51436208B"
+    },
+    {
+      "retired_path": "design/colour-review/colour-proposed-dark-overview.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "D6B1E72092A21DEFC97EDA2E26A00EDDF2C0A1BFD0C83BDE236C14C7D84B7985"
+    },
+    {
+      "retired_path": "design/colour-review/colour-proposed-dark-saved-changes.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "88C7D5A61A847149058DC6949EE33A2D88341155F72F7EA45FB920E36DF4E1C2"
+    },
+    {
+      "retired_path": "design/colour-review/colour-proposed-light-categories.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "D64A66F76BA2A3DF1242D9FA6CB4FBAC00B6D00630CF3F2F6C94486A78EA62D3"
+    },
+    {
+      "retired_path": "design/colour-review/colour-proposed-light-income-form.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "FBF766C8DF070D1B0B476D424F5B57919D502D199E9BD00E701ABF4AF4896EE4"
+    },
+    {
+      "retired_path": "design/colour-review/colour-proposed-light-overview.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "5F118492B92478D1AF5DC7D84E04674729411872CC0EA6DA55235FDB06743222"
+    },
+    {
+      "retired_path": "design/colour-review/colour-proposed-light-saved-changes.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "C3657640F66C3D383F6329B7E42CC84362BFAC5724636F9AE4903399ED4436A8"
+    },
+    {
+      "retired_path": "design/colour-review/contrast.json",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "205FE89F03D5F1866FD6A49607B406E5EEF43EE2B7C08DDEEF412B390EF8AAD2"
+    },
+    {
+      "retired_path": "design/colour-review/index.html",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "2578F14564C103C6E31A75364E91A69884536097F40B3263D8471DE898ACBC5C"
+    },
+    {
+      "retired_path": "design/colour-review/manifest.json",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "E90E029FD7FA61A99132FABBB7857D22A8354C8E3B36438304E9E2769BEEDF51"
+    },
+    {
+      "retired_path": "design/final-acceptance/README.md",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "4E5031C3F755496A9A4E6C4E48020278D6CD8B51477BAE911FDD12242486E242"
+    },
+    {
+      "retired_path": "design/final-acceptance/history/history-metadata-known-time-history-320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "B328F9AA1DA59FE6DBB82EF6FD4C64EFB435AA26F9017192E30854959FDE948E"
+    },
+    {
+      "retired_path": "design/final-acceptance/history/history-metadata-known-time-history-320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "B21A9A830CA81E79D4166ECEBDA780FE0C66E0F095287D638ADDB6223ED00B23"
+    },
+    {
+      "retired_path": "design/final-acceptance/history/history-metadata-known-time-history-normal-light-layout.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "8639E6DD696AB057BEFE0A19D95FBCF07C21A5F3FD6CE413BA41394120BA1506"
+    },
+    {
+      "retired_path": "design/final-acceptance/history/history-metadata-pending-and-unknown-history-320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "5F746123999BF84C643B03C79926B2A9C299ABC5B8801AD69FFAF2222F3E69BC"
+    },
+    {
+      "retired_path": "design/final-acceptance/history/history-metadata-pending-and-unknown-history-320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "1725C1DE877C2E36D0F2C43556B6DA0B798A2786FE3FB803CB789FF455226AB1"
+    },
+    {
+      "retired_path": "design/final-acceptance/history/history-metadata-pending-and-unknown-history-normal-light-layout.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "55DE600BCD411A9C3DF4061E71571AC9077BD744FFDE13E7C1A980E2B5A52E9F"
+    },
+    {
+      "retired_path": "design/final-acceptance/history/history-metadata-time-information-history-320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "FBF68606B494FF3CD2BED00BAA9D90BB1171C339EC4F1CEA5A11FC50BBDB7F50"
+    },
+    {
+      "retired_path": "design/final-acceptance/history/history-metadata-time-information-history-320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "0DE9C4395726806EFC5AC794AF19428ECE4D63C9E1C9797BA1BC6F614B8C03B0"
+    },
+    {
+      "retired_path": "design/final-acceptance/history/history-metadata-time-information-history-normal-light-layout.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "BACA55541375B9886C8A826796E9B2521E4EAA885DBAB8A44FB71FDCF65DFE2E"
+    },
+    {
+      "retired_path": "design/phase-a/CONVENTIONS.md",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "18C20B6F692BD27DF99286FCC00B333473BFFEBFA1A432EE1334E1AF9C05E818"
+    },
+    {
+      "retired_path": "design/phase-a/index.html",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "BC5E8C7CCAE7B2E751E60B680218A0F6222A6A10A954C48C3D7D9123277FCCF2"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-after-form-320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "3EA5560DF268CE06496AB1917A87827CF2B909327694100F6B6809E0C0C016E0"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-after-form-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "66435DD9B9A142583097A69ABDE021FDE49F06E227DD4B4CD1785AD515679C5D"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-after-form.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "4E4E22A2BFF5B69CB0E56C533C5DC6B4D1CB539905E3DEB05D73896D7717046C"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-after-history-initial-320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "4490C62A742C7DCC00B500F1F0FDF74073204A8263329B8AC1320066024F44F6"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-after-history-initial-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "5BABF58E40358EEB3C4F7A99C7D296328C8E15659E44258A95587807CF129BE8"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-after-history-initial.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "533D2FEF3E213B58FF00E749F4906376B1FCD8B505A345D02AF7CA9D0E2B0B37"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-after-inspection-320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "A97B85FBCE49BD294E84B100C397BDE3954973F05F7F6DF841829A3EE6652AEE"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-after-inspection-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "035D6719659DF8B6F75024BF4D160A29BE7BE8DDE8DF2DDC5F0DC4C7EBC5E555"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-after-inspection.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "282938D0DEEDF47283AA1E94ABD32B4E2BE240C75D1BE7E027DC5C8FC0E27509"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-after-overview-initial-320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "3791086E5B86BDE0AE5E6E47C4D21BC2D0F57ABD8B767548A6284276E7FFB352"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-after-overview-initial-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "BD6BDD0AB5A979D0BC5A7F05309DE1090E6DFCD27AB9D2448DA629D9ECCF4670"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-after-overview-initial.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "E0D666F3779E6682D54848E035C80FAA1C2FDB2BB0DC65FB40237110BD607E45"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-before-form.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "3EC1C7A7E4F53F1830972DA8B506265896099892FD2E108630ADA7F734D81B7B"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-before-history-initial.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "D88D45C614A0071DA86AC7BC3C0F4130A34A66EC91903E68F2CDADCA7D5DDD01"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-before-inspection.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "CAF83548CC33330A0C40BB6FFE4201B6847F4056F2BBA2FB09BF0D58CAE102D3"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-before-overview-initial.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "F4CA74893170C0784252E2E7865BD58CBBF0FC55583007B70C022F5AB70BB16C"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-cached-unavailable.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "5977D80B03D908D0D7C2BFDA30D7ADCDD92410F9FCA1667B33CA07F73C09F4F4"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-large-name-amount-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "3C95A1AA10D2398781E49BE056784F62C8AD9405F0B6B0320CAD3C724A798A4A"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-large-name-amount-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "616E075FF05AD79CC93DCF72EDBBFF668C1EC9412BC11969C2107E5D7C77FAFF"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-real-keyboard-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "6D1EB08B89EB2D953E2B82D5BFDE94B423979636A4A0B709DB177729ECDFBC97"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-saved-proposal-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "872BE6BF67EFE0396E1E43B50F6111F08D2F3F725203407DA2EAD523A38EACA5"
+    },
+    {
+      "retired_path": "design/phase-a/phase-a-saved-proposal.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "24D0227462DDDAA779C676E503DA8B8412EEEB25D05CCA25EBEBBE9265044882"
+    },
+    {
+      "retired_path": "design/phase-b/index.html",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "1E1F9D586C26E4323CBD3CD41DFE6770E20CC2905C2BE9C3BA29C20294CE50B2"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-agreement-form-320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "EA12945D217A3CF2E6A178BC8951C972F41972854A363686E94A9C81CF42D649"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-agreement-form-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "96877AC9B584EB78C66E901E0D0051FCCEF7093ABCA86BFAB0D465960B7661D7"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-agreement-form-device320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "EA12945D217A3CF2E6A178BC8951C972F41972854A363686E94A9C81CF42D649"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-agreement-form.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "CB187D61C7014EB3D0F22DEB0C58FFB7C8F2B6F54650C7B4FD4639D631F9A8A2"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-agreements-initial-320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "A3D2143E1839C1F27C4CAEDE963470B4EA40A06498B7463BA0053AFCE05EBFFC"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-agreements-initial-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "36CE97A6E5D65E098C22C5A7C3C65A9DA5F3CDBD995054C68D74F99CCD9E4AED"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-agreements-initial-device320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "A3D2143E1839C1F27C4CAEDE963470B4EA40A06498B7463BA0053AFCE05EBFFC"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-agreements-initial.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "474DF3509F2693148F09F02910419ABA9766796293370AE90C38D72E23F98C8E"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-cached-pending-income.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "8EAE0664F6D2A3CB6AE1A01F3A0F3C398B0BDA2B2706E29C0F94A33FAA3EB5F7"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-catalogue-initial-320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "581EBB121C2DD70F4AECE6339B0D22050AF45BCA71FA39D29203560433BAD1DF"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-catalogue-initial-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "E36E603487FFC8CEE5848CB05039D393D1930F2D78BA8485C41A726C852EDC02"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-catalogue-initial-device320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "581EBB121C2DD70F4AECE6339B0D22050AF45BCA71FA39D29203560433BAD1DF"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-catalogue-initial.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "F3DCE82145BDBFC5CAEA1CEC4A37CC8AEFCBC98BD4CD92083C7FC0661E683C81"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-direct-receipt-320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "E5E514AB407B7B4B58922C98B779E0A175BF89778C2432A29649646CA80BE917"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-direct-receipt-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "ACF6FB4011BA0B3274C6B657069A71F6CD27BA258BB58C3262F5E59EE9612DAD"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-direct-receipt-device320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "E5E514AB407B7B4B58922C98B779E0A175BF89778C2432A29649646CA80BE917"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-direct-receipt.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "7CEE7E7FA578A453CEC9568EC596A335325ABC0078E6614D9BD5C1C01F696515"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-enlarged-milestone.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "86D8D7D4356FEAF10630B32231467576158B164F839AA9D12E02E77216C3693A"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-income-archived-320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "8E5C6988C6776A30AF0A78CAB164D9B5984194A632BB3ED001D4AA3123FB0BA5"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-income-archived-choice-320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "C13BAFF6E949C289D5130F84AC08B5A161E2D2B03EC67890A49F9FBA83C1DEC6"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-income-archived-choice-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "65D522D87151AF3347933317065FE94598A74BB3480A40CB102DE27740CA5C5E"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-income-archived-choice-device320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "8FAF6131FCEEC995CF5551B712FC97B0527BC6D0AD19BBD9E1998336719AD97E"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-income-archived-choice.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "4DDDB80B04A63160A1B568231C1EBD01138CF8CF8AE5214DC8DB0CC68F9A4FAD"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-income-archived-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "94204B83EC361B65CAA444D65BC92CF4A4A78C25C8A1260E826CB41A505F04C6"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-income-archived-device320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "8E5C6988C6776A30AF0A78CAB164D9B5984194A632BB3ED001D4AA3123FB0BA5"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-income-archived.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "6B97863B6F0C00DDA576F91CA855BD749603BFEDFE7BF556A30E25528B1E636A"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-income-form-320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "912FB712E70D6BD80DB727C87B49FB6BD4618A33699EB9F4D90C4943E89D561C"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-income-form-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "FCF90F65EEC774E0EBB8B5FCD75981138D72D926BDFDD4B1571B962EB71AB66F"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-income-form-device320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "7F1B7B10C4FC23C5D2A72E8DE99B5D0991ADF4521D4F57C643FB555346CC18C3"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-income-form.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "8B22DDF75EF772803DC53B52D874E605149A8B04EAB4F6E89CA62B2B8C059ECE"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-income-initial-320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "BEC0D48DD90751B92596D57756475E15CA24D24A43634682E86BCE500D72BBAD"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-income-initial-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "AB6124CACBD9F71F139A4BF9926107CC3C32677F9388553C1BF3232FCF36BCAF"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-income-initial-device320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "BEC0D48DD90751B92596D57756475E15CA24D24A43634682E86BCE500D72BBAD"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-income-initial.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "BB7534E72E42F06B18E35965E2044BCD7EB3EB7F5B0517B702A87D7CE341353F"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-income-keyboard-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "7CBCA3251F61F53BA502C9A2637478916E0A5ED1B4819C5DDC071DBDC7FE1B0B"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-locked-receipt.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "819C47423D5D99311C65A273A7116165A270787B537A10C8A86872FBCAA6F6F8"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-milestone-form-320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "6CD432338964A7F796382C5C88067FF01C54D1A6CD046C4104682A92AFE45853"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-milestone-form-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "F735E244B2B41846B6FEF12513DFA239B5C1F53801A3CE3881473C068259BD05"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-milestone-form-device320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "0259F9F0DF83035AEA2BB785E042CFC245C980E5B83E69F6FBB4BC013CBFE0FF"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-milestone-form.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "ED22AC8A4E5BAFE8A38C138A9EFD340251C493B270304127D9E011C4CE5F2717"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-pending-missing-catalogue.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "A966A908235E9D5E0BC17754E2B28D6FCF3802367EE0C83B9E28DBD27FC5CA55"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-project-initial-320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "F25CD13A4AF392D033DFD9046B65C33E80C118A038B07F2861AF7627D74CFE67"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-project-initial-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "64570591CDC3DC67F7D076A19143B488B104F52168A7782835F41B27C593D76B"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-project-initial-device320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "F25CD13A4AF392D033DFD9046B65C33E80C118A038B07F2861AF7627D74CFE67"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-project-initial.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "5E1930D973AE88DC694F46DE6E499EBCBE89F0A12C626AAC5533B4851683FF88"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-receipt-keyboard-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "2E320B862D6EBDAA633A11BFB6A92C6C5C0710540D57368FCEB4B68C3BD0A564"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-recovery-eligibility.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "EFC01ACB989865D0933422D7677498605AD197DFF2E8D21DFA8A27BAE46091F7"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-uncertain-agreement.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "EC81A1ABA82FCE762F68263DC9F94FA6B5B6F6497451455DEF85AB1282987A7D"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-uncertain-recovery-320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "C6BC4D540DA15D4729D791F1368F72CA41F0AC4F80B7C35FB99B76E675FC3762"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-uncertain-recovery-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "636814C931969C2AA00F154F9AADDD1A457CCDF28C9CC967D902BB8B0B2A9815"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-uncertain-recovery-device320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "0218D784B3196A92E395D25AECF92E7A724A7F406E9BC5AD98370113F8F5EF04"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-after-uncertain-recovery.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "E2D0207A96D523ED2717C682DBE0E1234581B003CAC55FF567E0F8ED512A9685"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-before-agreement-form.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "27AB939BCB71414F7AEB038134A493DEBD3A02D25915FD9182E68FBCBE1DE29F"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-before-agreements-initial.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "DC86450B1F8FCE7D31031A9161074D091D75588E13047565B60F0029F45BE0A3"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-before-catalogue-initial.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "DA187F4272B5B76684EF27652B0AF803D8BF9679A832481C3423122CCD1AAA1D"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-before-direct-receipt.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "3DCEB3E21E1E08F438C437322A248A8288B89A723CBE9EC29CA2CEA5F89D4D17"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-before-income-archived.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "6B56560762340A8A01FB1886D9FD22058E2A0E6D3311C2A6729A0E9F9C039A0C"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-before-income-form.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "B64281B8E2A8CF25003F4C5314BC2D1B20362F908255C38308F52AA5FDE3A364"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-before-income-initial.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "5C8F9E57EB1543BCC6A34A2CB8B56BF67F4A05EA59528EE468C06BAC82271A31"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-before-milestone-form.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "67092B5CE60F5BC6BE81ED9A8C54D86584AF630ABF1818C9856CC474728EE6D8"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-before-project-initial.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "3028654C36419670F40ECF23462AB29207641B0F82E2D77C88DE3D9750A85EF7"
+    },
+    {
+      "retired_path": "design/phase-b/phase-b-before-uncertain-recovery.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "E96E178016CA12EFA6604132739071EA69A02580BEBC9AE912397D1D3F8841A3"
+    },
+    {
+      "retired_path": "design/phase-c/index.html",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "9DEDF551A72DECD94850462AE021381F2A1A1CF1C5EB52E7B852053A8636A963"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-allocation-keyboard-2x-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "926A611A647E5DB5B3DE03802DD36410575CE1487911B4AB733B53C154A85B2B"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-allocation-keyboard-2x-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "866F713494494D8B3EDC88E397EECCF885A10F2E7A64C3BEB76F0DBB46BF4992"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-delete-confirmation-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "239055E24A4B025FD6706F7DCCA5A0A42EF6AF2BDFBC82103DF63DB587EE6031"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-delete-confirmation-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "A7A2CFB8251CF5454DEBBADE95F248C215EFCCC07D54E3866B5ED5685BF26B22"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-delete-confirmation-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "95B704DE26F362954480E7E1ACF8CC589D11D885119FBC2EB6F8D8AAFFD7EE63"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-delete-confirmation-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "7A9E9A95A28908466497CCDD3D6573C6FB65B9F57A62E8AFE5265E47AD506B53"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-form-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "3C9F76A27D5ABAD2C928A5E8BFACDD4FA6DC11D924EB71E2879CA6FE866E5397"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-form-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "4C18EE4B15FDF5E7330AA67C3A9FAD41FE5DDCD41739E64429C35FED3907CC6F"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-form-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "3872F940DF0026C69970B05DDAA619B3BB7E30DB9D7C229F3C732B1934B0F315"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-form-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "1674EE7393BD08542876876E8FD7A67D8DF9526C226BAD5950AC47C8EE03635E"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-initial-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "0085A06BCE13E00320B5B9B3680141C7AEEE03BC456FB015E1C27C1A9F44D364"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-initial-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "31849DA17B836A412441E4B23D3E47109076407179E8369633DCDD523EE12E29"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-initial-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "34939AB91DA777DE6C73F0CB5B4B8D7BA575004A9B14CCB76B114BC9E3BC731A"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-initial-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "BA560F4D12AFBCFF0307104EE6F289D198FFCC42933DADCB1D04ACF47DEA5430"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-inspection-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "032A6D97660C56FCE4D00CBC288F51CEA7A4AFC9D54D23BF5472DF6730002A32"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-inspection-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "15410430606693D74BC4306A158AB38A0EF91193C2DF8CEC7D74DF2B61FF7549"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-inspection-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "6576FE0D8DD5E283D8621B711099CFE17B541EC890963302F2898648A4083638"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-inspection-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "6212305E114554B5D5317B3E8B13DE8603A3FAEA4EEBC53248EEB8211420578D"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-keyboard-2x-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "A6A2EE2B9A657B610C4B9C5396F46CD34C943CE5890C59EF4024D2356E061FDB"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-keyboard-2x-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "FBFC19DCB1BE570A9EFA793FF93C9DAB2EA8066EE5F312C954EDDDCE7FB1C5BC"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-pending-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "0D223AED6080DFB422CAF3F58F384860A2D85F07DB32EC6D9101008618CACAFC"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-pending-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "95F7ABD9F2C69AA5FD5DC4BE389B91752203C5BF85DA341773812E850B36508A"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-pending-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "C3EE80EE0144934BA96723CD5C5C5FDCD3C956B9B24B0036A0CD1BCD3578DB10"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-crypto-pending-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "4D658010A209F45ED1BBC91F455F4D941653DAE08B2DE9CCD3CAB9DB273ED91F"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-allocation-form-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "CB74DF4B390BBCAF4021FBB05CC28448F0328C73C5067106732952311E83DEC2"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-allocation-form-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "80395EB7AEA16FE9E9DE1987844099BDF1FCA4E078E80EDDD74B4A881A5593E8"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-allocation-form-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "D8F6310C863AF84A35077358661EAAF935CC48595F71EA968103221087BC024E"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-allocation-form-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "1064ACC0D585D8C555060D6C01B442A96DF90BCEC954CCAC634968185277C339"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-delete-confirmation-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "C41C345C17D9B58C946469BDEBFA3A5402C08B13132053193DEF9F550D3E83B3"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-delete-confirmation-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "F5CBB9A0B18BA5F8AFAC49633895B9719700ACEAB0FD10A0CA634FB1F65ADCCE"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-delete-confirmation-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "C471D8A7B1B63CDC478431FDF57EEDF023A68A3F7ECC7C0144DA2F4FD39EE6D3"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-delete-confirmation-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "52B9A638A5A67905ABC944A30BB1A28CA4F690A556992966896A5880F3E72456"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-form-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "C988880FBAA7A27B761EC9991266E2E4A21E12D63D0FE0DEEEAFC38C3DBC6816"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-form-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "148C2AC55AAD45E99CB21DC309AE9EB9FCCACABE02163B4B60A71F86E3334098"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-form-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "25FDD624FDF59652D28798AF342D2D83FEDEBE21B8FA77D5228F420B79163CDA"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-form-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "590C13E26471FB07F60BB9377A78E74CBC40842948F8B7D3BAB060C80D80374D"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-history-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "F6CA5BDF90082D62ED69AFCD45116CE320A9B1FB189A67E4FA788F0385A5CEC6"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-history-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "5AAE599A8A81A6AF3C0C915CA751869DB84B34E4F03AA09DFE39AFE795D11172"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-history-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "F76B6B331394DA7390594D773EBDDB0121588CA65BDC254C843C835ADD70A8DB"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-history-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "453CC2ECC0F1345088A84B9B26AC842510326F188281500D9018E67B5AFF31A9"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-initial-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "0E4C166BE48F0959ACB0B08A59184103F2D1289AB35BCCFF225F315262A0DF5E"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-initial-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "5B5A57240471CC890AAD566B7F38C37A5165A5D9BE046F43F1B2CB1D2DEBE0FA"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-initial-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "BD58EB7D5A74C98D19F93B77E757D9A38AFAFCAE1872FC32B6A2F652D21AEC77"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-initial-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "36ED3F771AB7E758BA66A6C1253EC92C6814F6FCCFD701352DCCE7BD9DB417F9"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-schedule-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "E70887B40D6380A81DA9CA1B007336883BB59AFBAB6154901AB6CAEF1E18C31D"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-schedule-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "00BB2A52B6C81B2109F2DC3CD99CE917975C5C78F515FE1C2592CAB8F46EFA51"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-schedule-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "E8F5AD389242EC20131072DFCA739809E250E328446E4F3DA20C33575B1C4034"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-schedule-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "83BA7253D34AAE1D09B1828F6C8580301FA99FEC45D7AFF88405A08A820525C8"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-uncertain-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "252F9F6AF4E2CCCE6D6D48DFCB416784F10D3C394BEEF9127943ED84254188A4"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-uncertain-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "21661D2F596B0D5D232F0AE12802CC5D85171145CD40141551AB1BE5449CED47"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-uncertain-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "83790486ECF87B25AC557AD66C8A69DF45D75D3E6775887FD24C38B32A73FB0D"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-goal-uncertain-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "A269D802A3890178740E8A641CDE94804C89DBD629E6852A7385F53CD813ABE0"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-large-goal-device320-2x-long.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "7CE60D42EB74148162262E166025E73879811E8FF9B5B48D550086B985DDA421"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-large-recurring-device320-2x-long.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "636E2AA3FAAA900604F4BDDAADCE5FD8A96DD7CE3248C130723EC577D0C50834"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-actual-form-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "9A4DEDD08D2E37E6D09614018FD956EFD9D52BB4971111790B41CCA76FF9DCFC"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-actual-form-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "98F76A40906BB5627C2E20C261BED010AC47D50E8D92F27E4E92BFBF8531435C"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-actual-form-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "60AA226FEACD1229E598EDC07A0FF839258489453F807270227717338468B008"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-actual-form-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "5811FB498BD33AE93F5201A1BE6D2F9F8F608E921C26DFE2A653BD87606CA442"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-cancel-confirmation-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "1BEC232F680F1DFA72340DA330EDEAA802E5DD0D8EB0C474E34D4CA95C4CC28C"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-cancel-confirmation-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "F31CDC64B7E2ECE2FFE3088E51B50DF1C6453099302164238EBC5F420F9DD206"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-cancel-confirmation-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "0CB6E68D0659B8474C2FAFE42356A122AF072BFBE09F7ADDF55F176CB11D6F8D"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-cancel-confirmation-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "FC52E20B6F9014E2781B08E64F711E82ACA0ED7163E00D6D0567AEA9D721C026"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-detail-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "5BFE4D9307007311899C050D13E02EB3C5B9BCA4D45AE32A32A1E1E1BBF58C62"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-detail-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "72BD0966F6D3FFA4E84382699B4BC796F1E29552C258CA243AC307C8E79DBC64"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-detail-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "57D751BF1094B0F7621E97CE6987ABD6ADB3E6151DE951CFDD16B5273E97E8FF"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-detail-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "9567CAF198AD698C81257154CF8BCE1CE257F90DC99F4F340733C8F51C6E6F3B"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-history-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "7106F903CC93EC27A140D40257B0600AC81A7EC6026E88184C3B1FFB96BEA99F"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-history-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "08F1127EC22CCE488B0E01908F178883912C4520A9F64DE8EBA65F6C098F09D6"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-history-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "A801A5585C97D0F641734C67BD8A3ED58C56F961138FAD02EE85A08D0242DE65"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-history-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "2C8A3BFD294976270AC455F6A28494311483F091936FCE1741444626A6287085"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-initial-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "ABA709E0CC08EF2A47726FF06351EDEFB0CF8D8AAE8B5B8266704D21C81B321E"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-initial-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "F328FBC558B2582855B379B1896706E4F5E0EAE91A509E4AF3E7A88C96686AFD"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-initial-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "C4883D8A3191108AB995567EA7F2165845A8491D81800417C4E6D1DBF49E9F38"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-initial-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "951D65D756F45A15B6D09B38590B5205A11307B61676D8CC8343AAAB99535D0F"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-keyboard-2x-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "1393B983D0B65A5FC20BBE9378210AD23C1C8366DD7231F320E6C8D79DC82589"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-keyboard-2x-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "EACB2C5998B1BAE743D7159B6AD99A56E50C3C4EC7F1FCFC0306F915DB68F3D1"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-rejected-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "8504B1374B0546B4A7834FBA40D658642DDB5CF9BF9ECE1DFE37E81EEAC0474B"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-rejected-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "81EDC36BA404926322031C715C5F9128886DBBBA566FB4980E37E1A5560E5E6C"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-rejected-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "917F4C5D64B7B086AF26E35954BFCAAD1059DA3456311797B50E1C7875FFDEA7"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-rejected-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "D54EB6624B8175BEDFDE1D8028726DDB528077A2D2B914C95FA00DEEF77FB664"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-template-form-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "FAED5FBA8DEA499D55F446E3489526C9449D1ECE7A1681C94D968DD297B51DAD"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-template-form-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "FF844329D18F717B82621483D555402733171C252EC5928DF23E9BDC92F1118B"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-template-form-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "3CD0C394C048DA56DDB70636F22FB8039606ABD9CE73DEDF57B8A6CD250D643E"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-after-recurring-template-form-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "F68AAB19D4C22D44555294581DCF53707F51BA87F182FB61701FF71D6E9EE339"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-before-crypto-form.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "66276401167523722123ED5DA8276B78890B7706D405C9E733C6AF33A01F7682"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-before-crypto-initial.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "BCE334A9D855B71A3BACB5AA32559904E1E3FDCA055268528319D0406A2FC983"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-before-crypto-inspection.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "AA760D45C80F871BB8158105CD5315CCC87FC6C716C70B11ACFF5B586DD813DB"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-before-crypto-pending.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "653E43BEE485786E9217E0357858CE147A644A2441C10811449636C7E8D63785"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-before-goal-allocation-form.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "45DF7E850CE3B2B876D8F9BE87017EB790A39B302E63F28700AC0573B31C4DD8"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-before-goal-form.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "F767E410C8107F911BE1B67E1EC2F2F562290CCF2D884F8F679A569462703084"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-before-goal-history.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "3C8989BF72CAA65D0F826BAD9C3C1D4325E3F10B99EFCE647A81007EA12D1AB3"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-before-goal-initial.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "B3E463A55CFF9282A9C642BD607F81C98715A76DCD9CBFABAC4BD68F432DBB9B"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-before-goal-schedule.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "7759D90FE7826CF219201DC084D3D5DE3DE5EF1D75053DE6006A2DD1B1C53F4B"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-before-goal-uncertain.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "157CEC9A53FD21BE7E8B163E72DD7F129A86857181512E668311712ED4F53CE6"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-before-recurring-actual-form.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "3A4659553735830ED22A88DC8CB84ECBEA7A48313709B0284DE2701FB89BA113"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-before-recurring-detail.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "53AD03EB809F02A314449CB4BDACFF92CC34CACC429504FD288E346A34413CA7"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-before-recurring-history.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "69AA587216A8B72613187B91B9664C72437CDF8C80D075823465F0868D17E64F"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-before-recurring-initial.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "2747065C7EDB70C34EF3E258A11A6FC2C2E262635996C1D463401A526358AFDC"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-before-recurring-rejected.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "A9C7400860A94EC384C18345EB449D6781473ECC1D414ED857D9B17AF2DCD513"
+    },
+    {
+      "retired_path": "design/phase-c/screenshots/phase-c-before-recurring-template-form.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "0229A5F30A0234C04BE4412F5B7E6E91EB20426BFFE058557E88B107E14E4470"
+    },
+    {
+      "retired_path": "design/phase-d/index.html",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "AD5551F0F0A8268EBB0B30ADB4595E3694D498B75EACB97757974E48F3663796"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-all-expenses-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "AFF687B8181C27AB421796844A633C72B85C5AD72BEF77BEF47086FC0C43DF78"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-all-expenses-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "5B196EF379CB6C52A0EE79A1C7B73BE27648FFA3B997D5BAECBC9B2437256BD1"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-all-expenses-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "7BC269ED8B082DBD8069523167BB4D698969D70580F0345F190E669AE8AC011C"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-all-expenses-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "40EF7D02E2CA8C918747989AF4424E7CAF4C49F0A49E02B3F784A0091AF50468"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-inspection-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "8EBA2BAEE660639EEB977768121F460669512EA9F6FD213CE92DFAC8D240472A"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-inspection-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "465A8DA41BF7F8C6EA3DEE301190C918BD2FCF3E6CD0B595432E15F82C445484"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-large-goal-device320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "7CE60D42EB74148162262E166025E73879811E8FF9B5B48D550086B985DDA421"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-large-recurring-device320-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "636E2AA3FAAA900604F4BDDAADCE5FD8A96DD7CE3248C130723EC577D0C50834"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-list-error-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "1721E570D5FE3A3F4414C210DA9C95073FAFC8B06A05D5BC6A9C28679ACF292A"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-list-error-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "BB01AA7023F1E3EB3B059FD3C4ADF0BE1D0D8B22D90B1C06992A33EFEB587D89"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-list-error-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "4DD012D7501033DAD783FFC626E258D6A73A0F5D52647E0FAAF89E0398F4DBB3"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-list-error-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "B5AF884F6BE8ECDDCBDB8FD2809B837FEE9C04C823DFD9CAE36D538C84542976"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-login-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "510EFEFDBC72B35EB1410A87479DDD4FAA78C1FB42B7C02CBF3E57100FC87336"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-login-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "3809C9F501C3E9A41659208613124B3FE74A06130286DB7FC5B2F45BBC46B077"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-login-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "EBE70975E3234BA1814E73A637E487D0494348E048ADECB3BDBD616614747996"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-login-error-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "B43F96CB467C14432B3CF8BF090FB0F6318C7629F5E17FE8FA13D8A49FBDBB05"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-login-error-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "AD2B605F59896D99A236A8FB7AB1B1CA176C48B172878DD594617B5EEEDF0BA1"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-login-keyboard-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "983A97AD4265831226C8C5A697F8C10B29AB1C02CFC52010B464F55CDF3FD1A4"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-login-keyboard-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "2303303E6A90BC7E6195D96D838DA3E918BAF398DA10D3FC74659EAD0B28D3CC"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-login-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "12DDEF04D404F85AD3097F29C5719051A883A440351E2E323B528D23D8A324FE"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-more-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "4B88F1C2E0D8BA0C0D28BC57B1C905E95F5CD0803AAF32B6AE632DE9E2910514"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-more-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "C8AA7DDA9EADC94E233EC2F0E3C78D6E3A20FCC0305FB78420B52C61C9B40A73"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-plans-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "AACA266FACCCB40528791F0C488CE3D766332CEC71A3488FB80CEEFA92E4A257"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-plans-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "C6B8F32758FAC19BCC27CC1E4DB5120591C47D1EB23A423ED4FABF289A8B5A29"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-register-error-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "F43625962DC142889595AD6575F46373844362FFE6CFC2B90AD455B16932410B"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-register-error-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "3B5886D5138E9684E79149543E07B87968FE53EDDB9CF1DD988DAB82860285E2"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-register-error-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "4499E8EEE3E6470B9EEA02F4E8D95C1703B400C0F944CBEF3184AFB4D16BC3CD"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-register-error-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "AB8D7EE4E2E36474DF6599889CB3226E6F2D5AD8B40716C341A31E910F4F4109"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-register-keyboard-device320-2x-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "71E84527ACCB2D455E67B7BC924E8FF30C582DD308535A3B9C65BF608C5CB28F"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-after-register-keyboard-device320-2x-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "7DFD89D42D128B882566F4E44484BBBC4EF0DC209A3990069FCA00D9E5E335E5"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-before-all-expenses-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "54F30161891B1A259DB455D2C21D417D2327A1EA5D0BDBAC3280C22F947840AB"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-before-inspection-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "FB22774F05B9B7319F1FD845F223B9750EDC983DA9FE7F6DAC043FAE70A18FC2"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-before-list-error-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "3C34611BA61F56B294FDA0D8CF7DB3101263C9CA0A171E151D83CB73BF6A510E"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-before-login-error-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "48D360796382A52187EBEF5954D8DED453D69EA6D4A164C77551BD3F19106F78"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-before-login-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "3EA17125E77D75C8413AEEABCE8FC02DBC2625319EE14035419902215B716E30"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-before-more-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "A900BE8CDEA19A2776AB524EE5AA777CE2C56160033F9A27B50030D8B05028C8"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-before-plans-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "5D7BD4DB92AA29DE521356E29501B2904E7EA1B9786C3341E7263AA5A744A3DF"
+    },
+    {
+      "retired_path": "design/phase-d/screenshots/phase-d-before-register-error-light.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "2C7CCCE44ED815713105CE3D1A37A2F205B2B3721C9A31D6ABFDE59E5CB05C97"
+    },
+    {
+      "retired_path": "design/pilot-ui/after-add-expense-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "4BD4278BB89583157142C295E6C178788BBE184F24514253DD4B25612124E594"
+    },
+    {
+      "retired_path": "design/pilot-ui/after-add-expense.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "3EC1C7A7E4F53F1830972DA8B506265896099892FD2E108630ADA7F734D81B7B"
+    },
+    {
+      "retired_path": "design/pilot-ui/after-history-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "83D8EED895C28DC3C5C81F2D7B5DF195744802386EEA1AC7B9B9B321CE701059"
+    },
+    {
+      "retired_path": "design/pilot-ui/after-history.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "CB816DF403AFB071D0193048EE75B881F23B21397F144B60EE4029A4B35717FC"
+    },
+    {
+      "retired_path": "design/pilot-ui/after-inspection-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "1DBD507F75B3E2F085DAA7ED505749AFC8D82746BF00FA875C19C44DBA1D60F7"
+    },
+    {
+      "retired_path": "design/pilot-ui/after-inspection.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "CAF83548CC33330A0C40BB6FFE4201B6847F4056F2BBA2FB09BF0D58CAE102D3"
+    },
+    {
+      "retired_path": "design/pilot-ui/after-keyboard-2x.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "923D1D0FE048891827D1EC0AFA878B5E36C8E06F21F6EC91C1A30AC6C912ECEF"
+    },
+    {
+      "retired_path": "design/pilot-ui/after-narrow-2x-form.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "B4952DA64B5988B52C18B130BCC1EF303BD4A29535AC1FE3BAA6204AA16C121F"
+    },
+    {
+      "retired_path": "design/pilot-ui/after-narrow-2x-inspection.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "FA07277A2C2F394600CA299CA03A9FC92A991510DA55B7BCAE9D0BD46A2D4868"
+    },
+    {
+      "retired_path": "design/pilot-ui/after-overview-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "E7DA8E34AACD657C6A1AD32B8B172184EBA5478A4BF6B0EBAE83BCF421127EF0"
+    },
+    {
+      "retired_path": "design/pilot-ui/after-overview.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "F4CA74893170C0784252E2E7865BD58CBBF0FC55583007B70C022F5AB70BB16C"
+    },
+    {
+      "retired_path": "design/pilot-ui/after-pending-dark.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "C5CA3F4F6EEC6565032C13AF7F086627E65BCC413C0A14AEC8DCDE9D8D779580"
+    },
+    {
+      "retired_path": "design/pilot-ui/after-pending.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "E59FC7363BA206817AEE8EBE575AF109C1D3658040A468A9B3202CDA6A7ECFE0"
+    },
+    {
+      "retired_path": "design/pilot-ui/after-unavailable-cached.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "5821BE40A7FCB32FBED3B1E3F7EEB5D205EA3D5B0FD584F71F26AD276BF7875A"
+    },
+    {
+      "retired_path": "design/pilot-ui/before-history.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "9536A5A3CED1F8E071F5E8E8856347541B7F5CC829D2A9C06EED8584BD006856"
+    },
+    {
+      "retired_path": "design/pilot-ui/before-inspection.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "68D759EA820E53251E11ACF1F6B32807F3938FB7E72CD0C9A294F9DE6B38571B"
+    },
+    {
+      "retired_path": "design/pilot-ui/before-overview.png",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "E9719A58127B06ABA35CCE5DB8D2EDFEBA91CC2044E396C54E13EA98BE8EE7CE"
+    },
+    {
+      "retired_path": "design/pilot-ui/index.html",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "355DAF2D1A675D19569681F849604BE9C16F3F07F57D48B51FA315534F7DBB71"
+    },
+    {
+      "retired_path": "design/ui-ux/01-overview.svg",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "48E18B4E1F836C82FD745429329C1513584F84A38C405A5D44EA82A02DAA3D04"
+    },
+    {
+      "retired_path": "design/ui-ux/02-add-expense.svg",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "2E2B8DB47ED5194E6B4D6129B9E8BEBDA22937F80B95BE8683605565EE07E7B6"
+    },
+    {
+      "retired_path": "design/ui-ux/03-history.svg",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "29CEA329A6658F7CD0CF053DA698E45C6F38B0352ABE3980B46718414808F0E7"
+    },
+    {
+      "retired_path": "design/ui-ux/04-expense-inspection.svg",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "5F4BBF12F9BB8C76717D6B11037E87823833D841852B3E270B1BDE9425F4ACD4"
+    },
+    {
+      "retired_path": "design/ui-ux/05-pending-cached.svg",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "70DDADFBE69112C5D76EFC6B465B1941AB140AA275E01F1126ED8F5A46B7D293"
+    },
+    {
+      "retired_path": "design/ui-ux/06-overview-dark.svg",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "DFEE0096B1EEDA87B9F02E6D0E6AC31785DA6D684AD2C2683FA32D1A5C7C7E5E"
+    },
+    {
+      "retired_path": "design/ui-ux/07-narrow-enlarged.svg",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "CE8D2628E3A514028354A07EDB141ABDE8F51AA77F3963A7EBDFF6F50B996392"
+    },
+    {
+      "retired_path": "design/ui-ux/08-change-state-variants.svg",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "31A0709D037B36498F4A5BF9835D7AFE6C19AD85B437A1A6A9F4E182F076C1D3"
+    },
+    {
+      "retired_path": "design/ui-ux/index.html",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "9C4C926C37647937D0D3C13AEDDD27E29C62D664A90B98FF6B244941F08F4470"
+    },
+    {
+      "retired_path": "design/ui-ux/visual-tokens.json",
+      "action": "delete",
+      "reason": "Historical review gallery/design-stage artifact; retain selected final screenshots and regenerate readable editable report figures under docs/report.",
+      "original_sha256": "9991BD0653F66746AFAEAEF7C45C81902E698065707164EED0761D23EA2F09D6"
+    }
+  ]
+}
