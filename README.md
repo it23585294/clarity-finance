@@ -1,67 +1,121 @@
 # Clarity Finance
 
-A manual personal-finance application for received income, expenses, pending agreements and milestones, realised crypto results, one explicit savings goal, and user-confirmed recurring expenses. Built with Kotlin, Jetpack Compose, Koin and Firebase.
+Clarity Finance is a manual personal-finance Android app for recording what was received, spent and explicitly set aside. It combines everyday expense capture with monthly reporting, pending freelance agreements, realised crypto results, one savings goal and reviewed recurring expenses.
 
-## Current application and evidence
+## Final interface
 
-The signed-in landing is Overview, with History / Plans / More navigation and a prominent Add Expense action. The shared teal design follows the system light/dark setting. Cash surplus, crypto, current pending balances and recorded savings remain separate; the app does not transfer money or verify a bank balance.
+<p>
+  <img src="docs/report/screenshots/overview.png" width="300" alt="Fictional Overview: Add Expense, income, expenses and recorded surplus" />
+  <img src="docs/report/screenshots/history.png" width="300" alt="Fictional History: same-day expenses ordered by immutable server creation time" />
+</p>
 
-- [Final FR01-FR21 acceptance assessment and limitations](FINAL_APP_ACCEPTANCE.md)
-- [Completed human capture feedback and isolated review procedure](HUMAN_ACCEPTANCE.md)
-- [Design conventions and rollout checkpoints](design/phase-a/CONVENTIONS.md)
-- [Phase B](PHASE_B_UI_UX_IMPLEMENTATION.md), [Phase C](PHASE_C_UI_UX_IMPLEMENTATION.md), [Phase D](PHASE_D_UI_UX_IMPLEMENTATION.md), and [approved colours](COLOUR_REVIEW.md)
+These are selected recorded production-screen captures with fictional isolated data, not live accounts. Their fixtures are independent. Source/provenance is in [report assets](docs/report/ASSETS.md).
 
-History sorts actual transaction dates descending, then immutable server creation time descending, with a stable ID fallback for equal/unknown times. Filters preserve that order. Server-saved time can differ from original offline-entry order. App-wide sync runs for an eligible signed-in process/session; it resumes after reopening and is not guaranteed while force-stopped. Pending proposals never silently become confirmed totals.
+## Features and financial meaning
 
-Production source uses Firebase; isolated Android tests and the opt-in debug human-review activity use fictional repositories. Before starting any debug/instrumentation build on an existing device, inspect saved default auth/recovery: Application starts synchronization before a test body. The guarded local launcher is documented in HUMAN_ACCEPTANCE.md. Never treat fixture acknowledgement as cloud evidence. Credentials/configuration, build outputs and review archives are excluded from source finalization.
+- Email/password registration, sign-in/out and UID-scoped records/recovery.
+- Received-income capture, inspection, editing, deletion and backdating. LKR/USD receipts retain original values and a fixed conversion basis/rate or actual credited LKR.
+- Pending standalone/project agreements, milestones, direct/partial receipts, edits and cancellation. Linked income routes to the agreement and cannot be independently detached from payment accounting.
+- Amount-first expenses with category, channel, committed/discretionary type, actual date and optional note; editing/deletion retain confirmation safeguards.
+- Overview, monthly History/category drill-down and spending insights. Cash surplus is **ordinary received income minus recorded expenses**, not a bank balance, safe-to-spend amount or automatic saving.
+- Signed realised crypto/month/YTD results, separate from ordinary income and expenses.
+- One explicit savings goal with opening allocation, contributions/withdrawals, corrections, history and anchored monthly schedule. The app records allocations; it does not transfer or verify funds.
+- Monthly recurring templates with due/overdue review and user-confirmed actual expenses. Unconfirmed suggestions do not count as spending; consumed history prevents reconfirmation after actual deletion.
+- Custom category/source add, rename and archive. Stable IDs preserve history and permitted inherited references.
 
-Human five-capture correctness is verified, but timing was approximate clock observation, not a measured stopwatch pass. TalkBack remains unexecuted and API35 instability remains documented. Original assignment PDFs remain the authority for submission/report requirements; phase reports retain actual failures and corrected reruns.
+Navigation is **Overview / History / Plans / More**, with Add Expense prominent and focused forms outside the shell. One shared teal/mint light/dark theme follows the system setting. Pending, cached, rejected and uncertain states remain explicit; unknown data is not fabricated as zero. Current collectible pending is grouped by original currency, excludes cancelled parents and counts the parent once rather than adding milestones again.
 
-## Setup Instructions
+## Technology and architecture
 
-1. **Clone the repository**
-2. **Add Firebase Configuration**: Obtain `google-services.json` from the Firebase Console (for the Android app `com.clarity.finance`) and place it in the `app/` directory. (This file is ignored by git for security).
-3. **Build the Project**: Run `./gradlew assembleDebug` to build.
+Kotlin application source, Jetpack Compose Material3, Navigation Compose, ViewModels, read-only StateFlow, coroutines, **Koin 4.1.1**, Firebase Authentication/Cloud Firestore and DataStore. There are no Java application files or XML layouts; standard JVM/Android/Firebase APIs are used. Room is not a project dependency.
 
-## Expense Data Schema (Firestore)
+Current build declarations: AGP 9.3.3, Kotlin 2.2.10, Gradle 9.5.0, Compose BOM 2026.02.01, Firebase BOM 34.2.0, minSdk 26, targetSdk 36 and compileSdk 37 minor 1. The [version catalog](gradle/libs.versions.toml), [app build](app/build.gradle.kts) and [wrapper](gradle/wrapper/gradle-wrapper.properties) are authoritative; do not upgrade to prepare a demonstration.
 
-Expenses are stored at `/users/{userId}/expenses/{expenseId}`.
+```text
+Compose / Navigation
+  -> owning ViewModel (read-only StateFlow, UI actions)
+  -> repository + exact domain calculations
+  -> Firebase remote adapters / one DataStore recovery store
 
-- `amountMinor` (Number): The amount in LKR cents (strictly positive). E.g., `1000` means 10.00 LKR.
-- `currency` (String): Must be `"LKR"`.
-- `categoryId` (String): Stable catalogue ID, e.g. `"food_dining"`, `"transport"`, `"other"`, or an owner-scoped custom ID; labels can be renamed/archived.
-- `paymentChannelId` (String): E.g., `"cash"`, `"primary_bank_card"`.
-- `spendingType` (String): `"committed"` or `"discretionary"`.
-- `expenseDate` (String): Date of expense in `yyyy-MM-dd` ISO format.
-- `note` (String, Optional): Max 500 characters.
-- `createdAt` (Timestamp): Server timestamp of creation.
-- `updatedAt` (Timestamp): Server timestamp of last update.
-
-*Pending proposals are persisted in the UID-scoped durable recovery queue before submission. SDK pending-write/cache metadata is also inspected; it does not by itself establish confirmation. Read-only creation timestamps are not transaction dates or new write fields.*
-
-## Security Rules Deployment
-
-To enforce the strict data model above, deploy the security rules:
-```bash
-firebase deploy --only firestore:rules
+Application -> one UID/session synchronization coordinator -> repository workers
 ```
 
-## Pending Payments and Project Milestones
+The [Koin modules](app/src/main/java/com/clarity/finance/di/AppModules.kt) provide process-singleton clients, stores and repositories retaining in-flight Tasks. Android's owning ViewModelStore controls ViewModel reuse/clearing; Koin creation extras preserve SavedStateHandle where applicable. Screens do not instantiate manual ViewModels or call Firebase directly. Business money uses checked Long minor units and BigDecimal, not Double totals.
 
-Pending payments support standalone agreements, project milestones, direct receipts, and cancellation that retains payment history. Amounts use exact integer minor units, and linked income receipts are protected from independent edits and deletion.
+## Prerequisites and authorized configuration
 
-- [Repair behavior and maintenance checks](REPAIR_VERIFICATION.md)
-- [Reviewed security rules and publication procedure](RULES_PUBLICATION_REVIEW.md)
-- [Sanitized live acceptance results and opt-in read-only audit](LIVE_VERIFICATION.md)
+1. Obtain access to this existing private repository and use its Gradle wrapper.
+2. Install Android Studio/SDK components matching the project, including compile SDK37 minor 1 and platform/build tools. [Daemon criteria](gradle/gradle-daemon-jvm.properties) select Java 21; configure a compatible Gradle JDK. App Java 11 source compatibility is not the build-daemon JDK.
+3. Obtain authorized Firebase Android configuration for package `com.clarity.finance` and the existing approved Firebase project. Place `google-services.json` in `app/`; keep it ignored. Enable/configure email/password Auth through the project's authorized process. Never add service-account credentials, signing passwords or tokens to source.
+4. Set the local Android SDK path through Android Studio/local.properties. These machine-specific files are not committed.
+5. Review [complete Firestore rules](firestore.rules), [indexes](firestore.indexes.json) and [Firebase tooling](firebase.json). The recurring-history composite index is COLLECTION `recurringOccurrences`: `templateId ASC`, `month ASC`. Preserve unrelated deployed indexes. **Publication is a separate authorized action**, not part of build/run instructions.
 
-The accepted online checklist does not establish live network-interruption or account-switch behavior. Those scenarios have separate coroutine unit coverage. The live audit is skipped unless explicitly opted in and requires an existing signed-in session.
+The production app uses the existing live Firebase target. Local `demo-*` projects are for isolated tests; do not silently redirect production. The submitted APK must connect to live Firebase under the assignment brief.
 
-## Realised crypto results
+## Build and run
 
-Authenticated Home includes Crypto Results for separate LKR gains/losses, backdated edits/deletion, and labelled monthly/YTD reporting. See [FR07 behavior, recovery, rules, verification and manual checks](CRYPTO_RESULTS.md). The reviewed rules were manually published by the user before the accepted [live checklist](FR07_LIVE_ACCEPTANCE.md) and [sanitized live results](FR07_LIVE_RESULTS.md). The later operation-feedback correction has separate automated verification; no additional live samples were created for it.
+From the repository root on Windows:
 
-## Monthly dashboard, history and spending insights
+```powershell
+.\gradlew.bat :app:assembleDebug
+```
 
-Home → Dashboard shows monthly recorded income, expenses and cash surplus, separate realised crypto, and current pending balances by currency. Monthly history reuses existing editors; category drill-down and spending insights update through Firestore listeners. See [FR11–13/FR18 behavior, queries, verification and manual checks](MONTHLY_REPORTING.md). Cached/unavailable data and unsynchronised proposals are labelled explicitly. Goals and recurring expenses remain outside this milestone.
+Application APK: `app/build/outputs/apk/debug/app-debug.apk`. The Android test APK is a different artifact. A debug or release-signed app APK is permitted by the specification; record its version/hash/source for submission. For normal operation launch MainActivity through the app icon, not the fictional acceptance host.
 
-The [sanitized read-only live results](MONTHLY_REPORTING_LIVE_RESULTS.md) record server/UI comparisons and cached restart/reconnection separately from the later optional-note/crypto-overflow corrections and their 142 unit/four isolated dashboard Android checks.
+**Inspect the intended test device's saved auth/recovery before installing-and-running or launching instrumentation. Application starts app-wide sync before a test body.** Do not use Pixel_6a or an unreviewed live session. Do not clear app/emulator storage, uninstall, retry unrelated proposals or change the DNS workaround. Installation/launch is deliberately not scripted here for an arbitrary connected device.
+
+## Tests and safe execution
+
+Unit/build/lint checks use the existing project:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest :app:assembleDebugAndroidTest :app:lintDebug
+```
+
+Rules tests use the checked-in Node package/lock in `firestore-tests/`, existing compatible Firebase CLI/Java/Node and a local demo emulator:
+
+```powershell
+npm --prefix firestore-tests ci
+firebase.cmd emulators:exec --only firestore --project demo-clarity-protocol-review "npm --prefix firestore-tests test"
+```
+
+These commands do not authorize a rules deployment or live financial writes. Never use a real project ID as a substitute for the demo-test context. Do not expose private emulator snapshots or credentials in logs/source.
+
+Android tests use isolated fake-repository graphs and production screens. **Do not run connected instrumentation blindly against every device.** Inspect saved default auth/recovery first, select an approved separate device explicitly and use the intended isolated graph. Existing opt-in live audit tests are read-only/skipped by default; do not enable them without separate authorization.
+
+The retained [guarded human-review launcher](tools/acceptance/isolated_review.py) is standard-library-only and whitelists the previously inspected `Clarity_UI_Pilot_API26` / `emulator-5564`:
+
+```powershell
+python -B tools/acceptance/isolated_review.py --serial emulator-5564
+```
+
+It verifies AVD identity and saved auth/recovery **before** launch and stops on unexpected data. It does not install, sign in, clear storage or change settings. Do not replace its serial/guard to bypass a stop. Require the **ISOLATED ACCEPTANCE** banner; the fixture is process-memory-only. Its simulated acknowledgement proves no Firebase persistence, offline durability or production authentication. No additional timed human run is requested.
+
+## Offline behaviour and history
+
+Financial proposals are durably persisted before submission with UID/type/record scope, stable IDs and immutable payloads. Matching server proofs reconcile before another mutation. Expected versions expose conflicts; fences prevent an uncertain operation from later committing before safe replacement. Timeout, cancelled await or later access error does not prove a prior write failed. Local cleanup failure cannot authorize another financial mutation. Confirmed contributions remain during pending/rejected edits/deletions.
+
+One application-owned session coordinator resumes eligible feature workers without reopening their screens. It retries while the process/session is alive and resumes saved work after a later eligible restart. **No guaranteed immediate background execution while stopped or force-stopped is claimed.** Authentication remains online; previously cached records can be shown with truthful labels, while uncached offline data is unavailable rather than confirmed zero. Account switches clear old screen/feedback state and keep proposals with their originating UID.
+
+History order is actual transaction/expense/result date descending, then immutable server `createdAt` descending, then ID ascending for equal/missing times. Known times precede unknown ones within a date. Filters preserve relative order. Changing amount/note/category does not reorder by `updatedAt`; backdating moves the group/month. Server-saved time can be later than original offline entry and is labelled accordingly. Missing legacy times are never invented.
+
+## Report and verified evidence
+
+- [Canonical 17-page report PDF](docs/report/Clarity_Finance_Report.pdf), [editable DOCX](docs/report/Clarity_Finance_Report.docx) and [Markdown source](docs/report/Clarity_Finance_Report.md).
+- [Requirements/rubric coverage and submission handoff](docs/report/REQUIREMENTS_MAP.md), [original specification](docs/requirements/assignment-specification.pdf) and [original derived requirements](docs/requirements/analysis-and-requirements.pdf).
+- [Consolidated verification and offline-action matrix](docs/VERIFICATION.md), [figure sources/provenance](docs/report/ASSETS.md) and [cleanup/preservation record](docs/REPOSITORY_CLEANUP.md).
+
+Latest recorded application evidence: **292 unit tests**, final **8 isolated API26 Android cases**, successful app/test builds and lint **0 errors/16 warnings**. **147 rules tests** are reused unchanged evidence. Focused/earlier counts overlap and must not be added. These are recorded application checks, not reruns performed for documentation cleanup.
+
+Five human captures were correct with approximate clock-based feedback, not exact stopwatch measurements. Actual TalkBack remains unexecuted. Historical API35 native/system instability is unresolved; a later boot was disk-blocked, so there is no clean final full-suite API35 claim. Final-render performance, deployed-source byte equality and broader live migration/in-flight races have explicit limits in the verification record. No blanket crash-free, security or release-certification claim is made.
+
+## Editing the report
+
+The only canonical report is under `docs/report/`; do not add final-v2/draft copies. Edit its Markdown and SVG-generating source in [tools/report/figures.py](tools/report/figures.py). The [document renderer](tools/report/render_report.py) uses existing python-docx, Markdown, lxml and PyMuPDF report tools; they are not Android dependencies. Its optional `--python-tools` points to an already installed local report-library directory. On Windows with Microsoft Word available:
+
+```powershell
+python -B tools/report/render_report.py --python-tools <existing-report-library-directory> --export-pdf
+python -B tools/report/verify_report.py --python-tools <existing-report-library-directory> --inspection-output <private-directory-outside-repository>
+```
+
+Figure labels are ASCII in explicit UTF-8 sources; arrows are vector shapes. Regenerate embedded PNGs as well as DOCX/PDF after a figure edit. Inspect every rendered page and keep the minimum 15 pages without padding/tiny diagrams. Administrative unknowns and truthful AI assistance are recorded once on the cover; complete/review them before submission.
