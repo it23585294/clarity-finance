@@ -1,0 +1,315 @@
+diff --git a/app/src/main/java/com/clarity/finance/data/repository/FirestoreReportingRepository.kt b/app/src/main/java/com/clarity/finance/data/repository/FirestoreReportingRepository.kt
+--- a/app/src/main/java/com/clarity/finance/data/repository/FirestoreReportingRepository.kt
++++ b/app/src/main/java/com/clarity/finance/data/repository/FirestoreReportingRepository.kt
+@@ -43,7 +43,7 @@
+         doc.timestamps()
+         Expense(doc.id, doc.requiredLong("amountMinor"), doc.requiredString("currency"),
+             doc.requiredString("categoryId"), doc.requiredString("paymentChannelId"), doc.requiredString("spendingType"),
+-            doc.requiredString("expenseDate"), doc.requiredString("note"), doc.getTimestamp("updatedAt"))
++            doc.requiredString("expenseDate"), doc.expenseNote(), doc.getTimestamp("updatedAt"))
+     }
+ 
+     override fun income(uid: String, month: ReportingMonth) = listen(month(uid, "incomeReceipts", "receiptDate", month)) { doc ->
+@@ -78,6 +78,12 @@
+     }
+ 
+     private fun DocumentSnapshot.requiredString(field: String) = getString(field) ?: error("Missing $field.")
++    private fun DocumentSnapshot.expenseNote(): String {
++        if (!contains("note")) return ""
++        val note = get("note")
++        check(note is String && note.length <= 500) { "Invalid expense note." }
++        return note
++    }
+     private fun DocumentSnapshot.requiredLong(field: String): Long {
+         // getLong can coerce a floating Firestore number. Reporting must not silently truncate corrupt money.
+         return get(field) as? Long ?: error("Invalid integer $field.")
+diff --git a/app/src/main/java/com/clarity/finance/data/model/MonthlyReporting.kt b/app/src/main/java/com/clarity/finance/data/model/MonthlyReporting.kt
+--- a/app/src/main/java/com/clarity/finance/data/model/MonthlyReporting.kt
++++ b/app/src/main/java/com/clarity/finance/data/model/MonthlyReporting.kt
+@@ -70,10 +70,15 @@
+         Math.addExact(sum, row.lkrAmountMinor)
+     }
+ 
+-    fun crypto(rows: List<CryptoResult>, period: ReportingMonth): Long = rows.fold(0L) { sum, row ->
++    /** Validate every row before summing, so overflow cannot mask a later malformed record. */
++    fun cryptoHistory(rows: List<CryptoResult>, period: ReportingMonth): List<CryptoResult> = rows.onEach { row ->
+         require(row.sync in setOf(CryptoSync.CONFIRMED, CryptoSync.CACHED)) { "Unconfirmed crypto proposal in reporting data." }
+         date(row.resultDate)
+         require(period.contains(row.resultDate) && row.amountMinor > 0)
++        require(row.direction in setOf("gain", "loss")) { "Invalid result direction" }
++    }
++
++    fun crypto(rows: List<CryptoResult>, period: ReportingMonth): Long = cryptoHistory(rows, period).fold(0L) { sum, row ->
+         Math.addExact(sum, row.signedMinor)
+     }
+ 
+diff --git a/app/src/main/java/com/clarity/finance/viewmodel/DashboardViewModel.kt b/app/src/main/java/com/clarity/finance/viewmodel/DashboardViewModel.kt
+--- a/app/src/main/java/com/clarity/finance/viewmodel/DashboardViewModel.kt
++++ b/app/src/main/java/com/clarity/finance/viewmodel/DashboardViewModel.kt
+@@ -33,6 +33,7 @@
+     val pendingAmounts: Map<String, String>? = null,
+     val expenseHistory: List<Expense> = emptyList(),
+     val incomeHistory: List<Income> = emptyList(),
++    val cryptoHistory: List<CryptoResult> = emptyList(),
+     val recovery: ReportingRecovery? = null,
+     val recoveryError: String? = null
+ )
+@@ -139,7 +140,14 @@
+         }
+         val (expenses, spending) = calculate(old.expenses) { MonthlyReporting.expenses(it, period) }
+         val (income, received) = calculate(old.income) { MonthlyReporting.income(it, period) }
+-        val (crypto, cryptoNet) = calculate(old.crypto) { MonthlyReporting.crypto(it, period) }
++        // Row validity is independent of the aggregate and remains checked after an overflow error.
++        var cryptoHistory = emptyList<CryptoResult>()
++        val cryptoInput = try {
++            cryptoHistory = MonthlyReporting.cryptoHistory(old.crypto.records.orEmpty(), period)
++            old.crypto
++        } catch (e: CancellationException) { throw e }
++        catch (e: Exception) { old.crypto.copy(error = e.message ?: "Invalid crypto reporting data.") }
++        val (crypto, cryptoNet) = calculate(cryptoInput) { MonthlyReporting.crypto(it, period) }
+         val (projects, pending) = calculate(old.projects, MonthlyReporting::pending)
+         var surplusError: String? = null
+         val surplus = if (received == null || spending == null) null else try {
+@@ -152,6 +160,7 @@
+             cryptoText = cryptoNet?.let(CryptoReporting::money), pendingAmounts = pending?.mapValues { MonthlyReporting.money(it.value) },
+             expenseHistory = expenses.records.orEmpty().filter { old.selectedCategory == null || it.categoryId == old.selectedCategory }
+                 .sortedWith(compareByDescending<Expense> { it.expenseDate }.thenBy { it.id }),
+-            incomeHistory = income.records.orEmpty().sortedWith(compareByDescending<Income> { it.receiptDate }.thenBy { it.id }))
++            incomeHistory = income.records.orEmpty().sortedWith(compareByDescending<Income> { it.receiptDate }.thenBy { it.id }),
++            cryptoHistory = cryptoHistory)
+     }
+ }
+diff --git a/app/src/main/java/com/clarity/finance/ui/dashboard/DashboardScreen.kt b/app/src/main/java/com/clarity/finance/ui/dashboard/DashboardScreen.kt
+--- a/app/src/main/java/com/clarity/finance/ui/dashboard/DashboardScreen.kt
++++ b/app/src/main/java/com/clarity/finance/ui/dashboard/DashboardScreen.kt
+@@ -142,7 +142,7 @@
+                         Text("Realised crypto results (separate from cash transactions)", style = MaterialTheme.typography.titleLarge)
+                         BatchStatus(state.crypto)
+                         if (state.crypto.records != null && state.crypto.records!!.isEmpty()) Text("No realised crypto results recorded for this month.")
+-                        if (state.cryptoText != null) state.crypto.records.orEmpty().forEach { row ->
++                        state.cryptoHistory.forEach { row ->
+                             HistoryCard("${row.direction} • ${row.resultDate}", "LKR ${CryptoReporting.money(row.signedMinor)}", row.note,
+                                 "Inspect crypto result", { cryptoDetailId = row.id })
+                         }
+@@ -158,7 +158,7 @@
+             }
+         }
+     }
+-    state.crypto.records.orEmpty().firstOrNull { it.id == cryptoDetailId }?.let { result ->
++    state.cryptoHistory.firstOrNull { it.id == cryptoDetailId }?.let { result ->
+         AlertDialog(onDismissRequest = { cryptoDetailId = null }, title = { Text("Realised crypto result") }, text = {
+             Text("${result.resultDate}\n${result.direction}: LKR ${CryptoReporting.money(result.signedMinor)}\n${result.note}\nManage changes in Crypto Results.")
+         }, confirmButton = { TextButton(onClick = { cryptoDetailId = null }) { Text("Close") } })
+diff --git a/app/src/test/java/com/clarity/finance/data/repository/FirestoreReportingRepositoryTest.kt b/app/src/test/java/com/clarity/finance/data/repository/FirestoreReportingRepositoryTest.kt
+--- a/app/src/test/java/com/clarity/finance/data/repository/FirestoreReportingRepositoryTest.kt
++++ b/app/src/test/java/com/clarity/finance/data/repository/FirestoreReportingRepositoryTest.kt
+@@ -60,7 +60,7 @@
+         `when`(metadata.hasPendingWrites()).thenReturn(pending)
+         return mock(QuerySnapshot::class.java).also { `when`(it.documents).thenReturn(documents); `when`(it.metadata).thenReturn(metadata) }
+     }
+-    private fun doc(fields: Map<String, Any> = emptyMap()): DocumentSnapshot {
++    private fun doc(fields: Map<String, Any?> = emptyMap()): DocumentSnapshot {
+         val result = mock(DocumentSnapshot::class.java)
+         `when`(result.id).thenReturn("fixture")
+         `when`(result.metadata).thenReturn(mock(SnapshotMetadata::class.java))
+@@ -69,6 +69,7 @@
+         `when`(result.getTimestamp("createdAt")).thenReturn(Timestamp(1, 0))
+         `when`(result.getTimestamp("updatedAt")).thenReturn(Timestamp(2, 0))
+         fields.forEach { (field, value) ->
++            `when`(result.contains(field)).thenReturn(true)
+             `when`(result.get(field)).thenReturn(value)
+             if (value is String) `when`(result.getString(field)).thenReturn(value)
+             if (value is Boolean) `when`(result.getBoolean(field)).thenReturn(value)
+@@ -77,6 +78,55 @@
+     }
+     private val expenseFields = mapOf("amountMinor" to 150000L, "currency" to "LKR", "categoryId" to "transport",
+         "paymentChannelId" to "cash", "spendingType" to "committed", "expenseDate" to "2026-01-01", "note" to "Fixture")
++
++    @Test fun `omitted optional expense note decodes as empty and contributes to reporting`() = runTest {
++        val listener = setup("expenses", "expenseDate")
++        var latest = ReportingBatch<Expense>()
++        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { repository.expenses("owner", period).collect { latest = it } }
++        runCurrent()
++        listener.onEvent(snapshot(listOf(doc(expenseFields - "note"))), null); runCurrent()
++        assertEquals("", latest.records!!.single().note)
++        val spending = MonthlyReporting.expenses(latest.records!!, period)
++        assertEquals(150000L, spending.totalMinor)
++        assertEquals(150000L, spending.committedMinor)
++        assertEquals("Transport", spending.categories.single().label)
++        for (note in listOf("", "x".repeat(500))) {
++            listener.onEvent(snapshot(listOf(doc(expenseFields + ("note" to note)))), null); runCurrent()
++            assertEquals(note, latest.records!!.single().note)
++        }
++        job.cancelAndJoin()
++    }
++
++    @Test fun `present null nonstring and overlength expense notes remain invalid`() = runTest {
++        for (note in listOf(null, 42L, true, listOf("note"), "x".repeat(501))) {
++            val listener = setup("expenses", "expenseDate")
++            var failure: Throwable? = null
++            var latest = ReportingBatch<Expense>()
++            val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
++                repository.expenses("owner", period).catch { failure = it }.collect { latest = it }
++            }
++            runCurrent()
++            listener.onEvent(snapshot(listOf(doc(expenseFields + ("note" to note)))), null); runCurrent()
++            assertNull(latest.records)
++            assertTrue(failure!!.message!!.contains("Invalid expense note"))
++            job.cancelAndJoin()
++            clearInvocations(query, registration)
++        }
++    }
++
++    @Test fun `optional expense note does not relax required expense fields`() = runTest {
++        val listener = setup("expenses", "expenseDate")
++        var failure: Throwable? = null
++        var latest = ReportingBatch<Expense>()
++        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
++            repository.expenses("owner", period).catch { failure = it }.collect { latest = it }
++        }
++        runCurrent()
++        listener.onEvent(snapshot(listOf(doc(expenseFields - "note" - "currency"))), null); runCurrent()
++        assertNull(latest.records)
++        assertTrue(failure!!.message!!.contains("Missing currency"))
++        job.cancelAndJoin()
++    }
+ 
+     @Test fun `reporting recovery reads only the owner and supports legacy types without changing saved payloads`() = runTest {
+         val store = SubmissionRecoveryStore(PreferenceDataStoreFactory.create(scope = backgroundScope,
+diff --git a/app/src/test/java/com/clarity/finance/viewmodel/DashboardViewModelTest.kt b/app/src/test/java/com/clarity/finance/viewmodel/DashboardViewModelTest.kt
+--- a/app/src/test/java/com/clarity/finance/viewmodel/DashboardViewModelTest.kt
++++ b/app/src/test/java/com/clarity/finance/viewmodel/DashboardViewModelTest.kt
+@@ -142,6 +142,36 @@
+         expenseFlow().value = ReportingBatch(emptyList(), false); runCurrent()
+         assertNull(vm.state.value.expenses.error)
+         assertEquals("1000.00", vm.state.value.surplusText)
++    }
++
++    @Test fun `crypto overflow retains valid inspectable rows across renders with an unavailable aggregate`() = runTest(dispatcher) {
++        runCurrent()
++        val rows = listOf(CryptoResult("large", "gain", Long.MAX_VALUE, "2026-01-01"),
++            CryptoResult("small", "gain", 1, "2026-01-01"))
++        repo.cryptos.value = rows; runCurrent()
++        assertNull(vm.state.value.cryptoText)
++        assertTrue(vm.state.value.crypto.error!!.contains("integer range"))
++        assertEquals(rows, vm.state.value.cryptoHistory)
++        vm.selectCategory(null) // Switching to history renders again while the aggregate error remains.
++        assertEquals(rows, vm.state.value.cryptoHistory)
++        assertNull(vm.state.value.cryptoText)
++        assertEquals("0.00", vm.state.value.surplusText)
++        repo.cryptos.value = listOf(rows.last()); runCurrent()
++        assertEquals("+0.01", vm.state.value.cryptoText)
++        assertNull(vm.state.value.crypto.error)
++    }
++
++    @Test fun `malformed crypto after otherwise overflowing rows remains an explicit validation error`() = runTest(dispatcher) {
++        runCurrent()
++        val large = CryptoResult("large", "gain", Long.MAX_VALUE, "2026-01-01")
++        repo.cryptos.value = listOf(large, large.copy(id = "small", amountMinor = 1), large.copy(id = "bad", direction = "invalid"))
++        runCurrent()
++        assertNull(vm.state.value.cryptoText)
++        assertEquals("Invalid result direction", vm.state.value.crypto.error)
++        assertTrue(vm.state.value.cryptoHistory.isEmpty())
++        vm.selectCategory(null)
++        assertEquals("Invalid result direction", vm.state.value.crypto.error)
++        assertTrue(vm.state.value.cryptoHistory.isEmpty())
+     }
+ 
+     @Test fun `account switch clears category history recovery and rejects delayed old listener results`() = runTest(dispatcher) {
+diff --git a/app/src/androidTest/java/com/clarity/finance/DashboardNavigationTest.kt b/app/src/androidTest/java/com/clarity/finance/DashboardNavigationTest.kt
+--- a/app/src/androidTest/java/com/clarity/finance/DashboardNavigationTest.kt
++++ b/app/src/androidTest/java/com/clarity/finance/DashboardNavigationTest.kt
+@@ -141,6 +141,41 @@
+         compose.onNodeWithText("No received income recorded for this month.").performScrollTo().assertIsDisplayed()
+     }
+ 
++    @Test fun cryptoAggregateOverflowKeepsBothValidRowsInspectableWithUnavailableTotal() {
++        val data = Data()
++        data.crypto.value = listOf(
++            CryptoResult("large", "gain", Long.MAX_VALUE, today.toString(), "Overflow fixture large"),
++            CryptoResult("small", "gain", 1, today.toString(), "Overflow fixture small"))
++        show(data)
++        val error = "Total exceeds the supported integer range; inspect individual records."
++        compose.onNodeWithText(error).performScrollTo().assertIsDisplayed()
++        compose.onAllNodesWithText("Unavailable").assertCountEquals(1)
++        click("Monthly history")
++        compose.onNodeWithText(error).performScrollTo().assertIsDisplayed()
++        for ((note, amount) in listOf("Overflow fixture large" to "+92233720368547758.07", "Overflow fixture small" to "+0.01")) {
++            compose.onNodeWithText(note).performScrollTo().performClick()
++            compose.onNodeWithText("Realised crypto result").assertIsDisplayed()
++            compose.onNodeWithText("gain: LKR $amount", substring = true).assertIsDisplayed()
++            compose.onNode(hasText("Close") and hasClickAction()).performClick()
++        }
++        click("Overview")
++        compose.onNodeWithText(error).performScrollTo().assertIsDisplayed()
++        compose.onAllNodesWithText("Unavailable").assertCountEquals(1)
++    }
++
++    @Test fun malformedCryptoAfterOverflowStillShowsValidationErrorAndNoUnsafeInspection() {
++        val data = Data()
++        data.crypto.value = listOf(
++            CryptoResult("large", "gain", Long.MAX_VALUE, today.toString()),
++            CryptoResult("small", "gain", 1, today.toString()),
++            CryptoResult("malformed", "invalid", 1, today.toString(), "Malformed fixture"))
++        show(data)
++        click("Monthly history")
++        compose.onNodeWithText("Invalid result direction").performScrollTo().assertIsDisplayed()
++        compose.onNodeWithText("Inspect crypto result").assertDoesNotExist()
++        compose.onNodeWithText("Malformed fixture").assertDoesNotExist()
++    }
++
+     @Suppress("UNCHECKED_CAST")
+     private fun <T> unused(type: Class<T>): T = Proxy.newProxyInstance(type.classLoader, arrayOf(type)) { _, method, _ ->
+         error("Unexpected repository access: ${method.name}")
+diff --git a/MONTHLY_REPORTING.md b/MONTHLY_REPORTING.md
+--- a/MONTHLY_REPORTING.md
++++ b/MONTHLY_REPORTING.md
+@@ -68,7 +68,7 @@
+ | Check | Actual result |
+ | --- | --- |
+ | Focused arithmetic/repository/ViewModel tests | Passed; initially 23 new tests, followed by the added scoped-recovery and exact editor-value regressions |
+-| Full Android unit suite | 137 passed, zero failures/errors/skips (previous 111 retained, 26 added) |
++| Initial full Android unit suite | 137 passed, zero failures/errors/skips (previous 111 retained, 26 added); subsequent review-correction results below |
+ | assembleDebug / assembleDebugAndroidTest | Passed |
+ | lintDebug | 0 errors, 20 existing warnings; no reporting-specific warning |
+ | Focused Firestore reporting queries | 3 passed |
+@@ -80,6 +80,39 @@
+ Coverage includes AT14 negative surplus, crypto/pending isolation, AT06 category sums and 80%/20%, rounding/zero states, uncached/unavailable data, correction/backdating/edit/delete, original contributions during pending/rejected changes, owner-scoped legacy recovery, cancelled projects, parent-only mixed-currency pending totals, overflow and genuinely suspending delayed old-account/month callbacks. Repository tests assert bounds, metadata inclusion, strict decoding, linked-receipt identities and listener cleanup.
+ 
+ Preliminary Android runs identified the reused expense form's missing scroll support and a test selector matching both Delete buttons in the form/dialog. The form and selectors were corrected. Full unchanged suites are not repeated for a test-only selector correction. Logs, XML and raw diagnostic output remain in ignored build directories. These tests do not use live financial records.
++
++## Independent review corrections
++
++Two demonstrated defects were corrected after the read-only live run. No live records were needed for these regressions, and the earlier live acceptance does not establish these edge cases.
++
++1. **Optional expense notes:** the serializer and existing rules permit an omitted expense `note`. Reporting now decodes absence as empty text. A present value must still be a string of at most 500 characters; explicit null, nonstring values and overlength strings are rejected. All other required fields and the security rules remain unchanged. Repository regressions prove that an omitted note contributes the exact expense/category/type amounts, allow valid empty/500-character notes, reject invalid present notes and retain required-field checks. The new omitted-note regression failed against the previous decoder before this correction.
++2. **Crypto history during aggregate overflow:** individual row validation is separate from summation, and all rows are validated before checked addition. Valid rows remain visible and inspectable when the total overflows; the total stays unavailable with the explicit overflow error. The same validated rows supply the detail dialog. Malformed records retain an explicit validation error and cannot cause unsafe inspection or be masked by an earlier would-be overflow. ViewModel regressions cover repeated renders/recovery and malformed data after otherwise overflowing rows; Android regressions open both individually valid rows and check the malformed-data feedback.
++
++This correction changes only `FirestoreReportingRepository.kt`, `MonthlyReporting.kt`, `DashboardViewModel.kt`, `DashboardScreen.kt`, their repository/ViewModel/Android regression tests, and this report. Existing financial write/recovery behavior, rules, dependencies, Firebase targets, unrelated changes and `.vscode/settings.json` were preserved.
++
++Actual correction checks:
++
++```powershell
++.\gradlew.bat :app:testDebugUnitTest --tests com.clarity.finance.data.repository.FirestoreReportingRepositoryTest --tests com.clarity.finance.data.model.MonthlyReportingTest --tests com.clarity.finance.viewmodel.DashboardViewModelTest :app:assembleDebug :app:assembleDebugAndroidTest --console=plain
++.\gradlew.bat :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --console=plain
++```
++
++After installing the debug app/test APKs with `adb install -r`, preserving storage:
++
++```text
++adb -s emulator-5554 shell am instrument -w -r -e class com.clarity.finance.DashboardNavigationTest com.clarity.finance.test/androidx.test.runner.AndroidJUnitRunner
++```
++
++| Review-correction check | Actual result |
++| --- | --- |
++| Affected repository/domain/ViewModel tests | 26 passed |
++| Full Android unit suite | 142 passed, zero failures/errors/skips: earlier 137 plus five new unit regressions |
++| assembleDebug / assembleDebugAndroidTest | Passed |
++| lintDebug | 0 errors, 20 warnings |
++| Isolated dashboard Android tests, API 37 / 320 dp | 4 passed: two existing navigation/layout scenarios plus overflow inspection and malformed-crypto regressions |
++| git diff --check and preservation checks | Passed |
++
++The unchanged rules/query patterns retain the earlier 87-test Firestore emulator evidence; that suite was not rerun for Android decoding and presentation corrections. No new rules/index publication is required. No live acceptance was repeated, and no live records, commits, pushes or deployments were made.
+ 
+ ## Exact changed files
+ 

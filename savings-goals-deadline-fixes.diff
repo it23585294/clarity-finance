@@ -1,0 +1,1037 @@
+diff --git a/SAVINGS_GOALS.md b/SAVINGS_GOALS.md
+--- a/SAVINGS_GOALS.md
++++ b/SAVINGS_GOALS.md
+@@ -10,7 +10,7 @@
+ 
+ Rule arithmetic checks integer representation bounds before computing opposite-sign deltas; it must not rely on overflowing addition. Client calculations use checked integer/BigInteger intermediate arithmetic and BigDecimal display. Rules enforce owner, exact allowed fields, types, real calendar/leap dates, Colombo date boundaries, server timestamps and immutable creation/start dates. Client-only checks include typed decimal syntax, schedule/progress presentation and UI feedback.
+ 
+-Recovery reuses SubmissionRecoveryStore with UID, goal operation type and record ID. Payloads and operation IDs are immutable. One unresolved mutation per owner/goal prevents independently queued stale versions from being silently rebased. A timeout retains an uncertain outcome; an acknowledged atomic transaction or exact matching receipt establishes success. Only a successful server transaction verifying a permanent invariant contradiction establishes dismissible rejection; exception classes and authentication/access errors do not. Pending/rejected proposals never replace confirmed savings or ledger history. Dashboard observation is read-only; synchronisation runs only in the savings feature. Account/target changes invalidate old jobs and callbacks. No ordinary income/expense/crypto/project writes are involved.
++Recovery reuses SubmissionRecoveryStore with UID, goal operation type and record ID. Payloads and operation IDs are immutable. One unresolved mutation per owner/goal prevents independently queued stale versions from being silently rebased. A timeout retains an uncertain outcome; an acknowledged atomic transaction or exact matching receipt establishes success. Only a successful server transaction verifying a permanent invariant contradiction or acknowledging an immutable expiry fence establishes dismissible rejection; exception classes, local-clock validation and authentication/access errors do not. Pending/rejected proposals never replace confirmed savings or ledger history. Dashboard observation is read-only; synchronisation runs only in the savings feature. Account/target changes invalidate old jobs and callbacks. No ordinary income/expense/crypto/project writes are involved.
+ 
+ Dates use Asia/Colombo. Each monthly date is derived from the original start-day anchor, with month-end clamping. The deadline is included once; no later date is offered. The inspectable schedule is computed, not stored as a growing document. Remaining/overfunding/progress and required contribution are derived; only the visual bar is capped. A reached goal requires zero further contribution; an overdue goal never divides by zero.
+ 
+@@ -33,12 +33,13 @@
+ - `users/{uid}/savingsGoals/active`: `name`, `targetMinor`, `openingMinor`, `startDate`, `deadline`, `savedMinor`, `version`, `lastOperationId`, `lastEntryId`, `createdAt`, `updatedAt`.
+ - Its `entries/{entryId}`: `kind` (`contribution`/`withdrawal`), positive `amountMinor`, `entryDate`, `note`, `deleted`, `version`, `lastOperationId`, `createdAt`, `updatedAt`.
+ - Its `operations/{operationId}`: immutable `kind`, `entryId`, resulting parent `version`, exact user-field `payload`, `createdAt`.
++- Its `rejections/{operationId}`: immutable `kind` (CREATE/EDIT), resulting `version`, exact original goal `payload`, server `createdAt`. This expiry fence has no savings effect and is mutually exclusive with an accepted receipt for that operation.
+ 
+ All money is LKR integer minor units, bounded only by the existing signed 64-bit representation. BigInteger intermediates avoid order-dependent overflow while checking the resulting ledger balance; explicit bounds conversion is compatible with API 26. Decimal input and BigDecimal display reuse the existing exact-money conventions. No redundant direction/signed total, goal-progress total or schedule array is stored. Timestamps use server values; updates preserve createdAt. Notes follow the existing 500-character convention and goal names allow up to 100 characters. Client date parsing and rule calendar arithmetic both validate real dates, including Gregorian century/leap rules; regex alone is not treated as calendar validation. Rules compare transaction dates with request.time shifted to Colombo and require future deadlines for creation/revision. Client-only behavior includes decimal input syntax, form conflict feedback and schedule calculations.
+ 
+-Reads are the fixed active document plus the complete owner-scoped entries collection, with metadata included and no query limit. The ledger query deliberately has no orderBy: malformed documents missing entryDate must reach validation rather than disappear from the query. Display ordering occurs after decoding. The coherent ledger sum is checked against the protected parent counter. Operation receipts are read individually inside transactions. No composite index or firestore.indexes.json change is required. Ledger and receipt collections may grow, but individual documents stay bounded; complete-history reads can become costly for very large histories and are never silently truncated.
++Reads are the fixed active document plus the complete owner-scoped entries collection, with metadata included and no query limit. The ledger query deliberately has no orderBy: malformed documents missing entryDate must reach validation rather than disappear from the query. Display ordering occurs after decoding. The coherent ledger sum is checked against the protected parent counter. Operation receipts and expiry fences are read individually inside transactions. No composite index or firestore.indexes.json change is required. Ledger, receipt and fence collections may grow, but individual documents stay bounded; complete-history reads can become costly for very large histories and are never silently truncated.
+ 
+-The existing expense, income, linked receipt, project/milestone and crypto rule blocks are unchanged (text comparison with baseline after removing the savings block). The entire reviewed local firestore.rules needs later publication after review; nothing has been deployed. SHA-256 of that local file: `8DAEDA5AAB408DB4716D16306DC4CF508D0CE56E0A1CB1AA196BDA524A520584`.
++The existing expense, income, linked receipt, project/milestone and crypto rule blocks are unchanged (text comparison with baseline after removing the savings block). Savings rules now additionally enforce expiry fences; those restrictive additions require later review/publication for deadline recovery to work. Nothing has been deployed. SHA-256 of the current complete local firestore.rules: `45A13EE4E81717FFBC198D54744DAFA7A6322C4FBD5379105287BE8922285A0A`.
+ 
+ ## Initial milestone verification — 26 October 2026 (before focused recovery correction)
+ 
+@@ -109,7 +110,44 @@
+ 
+ A local pre-correction snapshot was taken before editing, including existing uncommitted milestone files. The exported correction-only diff compares against that snapshot, not HEAD, and is verified by applying it to a separate snapshot copy and comparing resulting file SHA-256 values. Correction files are FirestoreGoalRepository.kt, FirestoreGoalRemote.kt, GoalRepository.kt, GoalViewModel.kt, GoalScreen.kt, their three unit-test files, GoalNavigationTest.kt, firestore-tests/savings-tests.js and this report. Other milestone/source files, firestore.rules, dependencies, Firebase targets, unrelated IDE settings and reporting-review-fixes.diff remain unchanged. No publication, live write, commit or push occurred.
+ 
++## Deadline-expiry correction — 26 October 2026
++
++The earlier recovery correction remains intact. A separate dead end existed when an offline CREATE or deadline-changing EDIT expired before synchronisation: local date validation could only retain UNCERTAIN, leaving no way to revise its immutable proposal. The fix establishes a server-authoritative, permanent barrier before offering deadline revision.
++
++FirestoreGoalRemote still checks the exact accepted receipt first, even if the deadline has passed. If it matches, the operation is confirmed and no replacement is allowed. Otherwise an expired client date merely proposes creation of `savingsGoals/active/rejections/{operationId}`. Its exact fields are kind, next version, original five-field goal payload and server createdAt. The server rules must independently verify a real calendar deadline on or before request.time's Asia/Colombo day, strict schema/owner/types, no accepted receipt after the commit, and an unchanged parent. CREATE requires no parent before or after; EDIT requires the original expected parent version and a proposed deadline different from its confirmed deadline. An unchanged overdue deadline remains editable normally.
++
++Both parent/new-receipt guards and accepted-receipt creation forbid a matching expiry fence after the transaction. Accepted receipt and fence therefore cannot coexist through permitted writes; the fence cannot be edited or deleted. This also blocks an older client transaction that never read the new fence. Only acknowledgement of the fence transaction, or reconciliation of its exact immutable marker, yields EXPIRED. A callback choosing expiry, a local-clock exception, server refusal, timeout, access error or cancelled await alone never does. A client clock ahead of the server cannot create an authoritative fence. No counters, ledger entries or ordinary financial records change when a fence is created.
++
++Ordinary retries continue sharing the outstanding Firebase Task. A finance-free expiry-check transaction may run alongside an outstanding old Task to settle it safely; these expiry-check Tasks are also reused, including after the old financial Task completes. If the old operation wins, receipt reconciliation preserves its savings. If the fence wins, the old operation cannot subsequently commit. Only then can the user replace it. This is a narrowly scoped new rejection mechanism, not a weakening of the existing uncertainty policy.
++
++The UI offers **Revise deadline** only for server-established EXPIRED CREATE/EDIT proposals. It preserves name, target, opening allocation, start date and expected version, and makes only the deadline editable. Closing the form retains the old durable proposal. Save validates a genuinely future deadline and uses a fresh operation ID; a conditional DataStore edit atomically replaces the old EXPIRED recovery row with the new PENDING row. There is never a delete-then-save gap. The old operation and its payload remain immutable in the server fence. Idempotent local retries retain the same replacement identity, including a timeout after persistence. A local write failure retains the original row; account changes still clear old-user forms and messages. If the confirmed goal changed version meanwhile, the UI asks the user to inspect/edit the latest goal instead of silently rebasing the proposal. The atomic replacement helper is restricted to goal CREATE/EDIT recovery types; legacy recovery behavior is unchanged.
++
++Fresh verification commands:
++
++```powershell
++.\gradlew.bat :app:testDebugUnitTest --tests '*FirestoreGoal*Test' --tests '*GoalViewModelTest' --console=plain
++.\gradlew.bat :app:testDebugUnitTest --tests '*FirestoreGoalRemoteTest' --console=plain
++.\gradlew.bat :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --console=plain
++# From firestore-tests:
++npm.cmd test -- --grep 'expiry fence|expiry fences|accepted receipt wins'
++npm.cmd test
++```
++
++The focused recovery run passed all **38 tests**; the strengthened Task-reuse run passed all **12 remote tests**. Final full verification passed **186 unit tests, zero failures/errors/skips**, both APK builds and lint **0 errors / 20 warnings**. All prior premature-dismissal regressions are retained. Deterministic clock tests save a valid proposal on 2026-01-31 with deadline 2026-02-28, advance to 2026-03-01 before any commit, establish expiry, persist a revised deadline, reopen repository recovery and acknowledge exactly one creation with the same opening allocation and start date. EDIT coverage preserves the confirmed contribution ledger and applies its opening-allocation delta once. Earlier committed CREATE and EDIT operations reconcile their receipts after expiry and cannot be replaced. Other tests cover a still-outstanding old Task, an outstanding expiry-check Task, server refusal of a client-proposed fence, mismatched markers, local persistence failure, cancelled post-persistence awaits and stable replacement identity after closing the form.
++
++The five focused expiry emulator tests passed, then the full suite passed **106 tests** with all previous 101 retained. They use the actual local rule file and demo project, including server request.time/Colombo date validation. Coverage includes CREATE and EDIT revision, unchanged overdue editing, strict schema and owner isolation, immutable fences, accepted-receipt exclusion, receipt-plus-fence batch denial, and an outstanding legacy transaction denied after fencing even when its altered payload uses a future deadline. Revised CREATE saved exactly 11,200; revised EDIT retained the 10,000 contribution and changed the opening allocation from 11,200 to 12,000, yielding exactly 22,000. No financial counter changes during fencing.
++
++After both APKs were installed with `adb install -r`, fresh isolated API 37 execution of `com.clarity.finance.GoalNavigationTest` passed **4 tests** at 320 dp/1.3 font scale. The new UI case opens Revise deadline, checks that the other fields are disabled, closes/reopens without losing the stored proposal, saves the revised deadline and observes exactly one goal with the original 11,200 opening and start date. These tests use isolated repositories, not live data. The earlier four dashboard Android checks were reused and not rerun in this focused pass. App storage and the DNS workaround were preserved.
++
++Logs: `build/savings-deadline-focused.log`, `build/savings-deadline-task-final.log`, `build/savings-deadline-final-checks.log`, `build/savings-deadline-rules-focused.log`, `build/savings-deadline-rules-full.log`, `build/savings-deadline-android-ui.log`. The previous 175-unit/101-emulator recovery results above remain historical. This pass includes fresh full runs rather than substituting that evidence. No live expiry, network interruption or actual Firebase account-switch acceptance was executed. Hilt/Koin and API 26 runtime verification remain outstanding.
++
++A separate pre-deadline-correction snapshot was created before edits. The new correction-only diff is against that snapshot, not HEAD and not the original milestone baseline. It is verified by applying it to a separate snapshot copy and comparing every resulting changed file by SHA-256. The earlier review ZIP and recovery diff are preserved unchanged. This correction changes 13 saved files: the recovery store, goal interface/remote/repository/ViewModel/screen, their three unit-test files, Android goal test, savings emulator tests, local firestore.rules and this report. There are no dependency, Firebase target, live-data, commit, push or deployment changes. Only savings rules changed; other financial policy blocks match the pre-correction snapshot exactly. The current complete rules file must be reviewed and published later before the expiry-marker path can be accepted live; refused/unavailable marker writes remain uncertain. No new indexes are required.
++
++Manual check after that later publication and explicit live-write authorization: queue a valid offline goal proposal; let its proposed deadline expire; reconnect; wait for server-established expiry; tap Revise deadline; enter a future date; Save proposal. Verify the preserved name/target/opening/start, one accepted replacement and no duplicate savings. Repeat for a deadline-changing EDIT with existing contributions. If an earlier attempt committed, expect receipt reconciliation and the original goal/ledger, with no replacement prompt. Do not alter live rules to manufacture outcomes.
++
+ ## Exact milestone files
++
++The current full milestone contains **22 files**: the original 21 plus the existing SubmissionRecoveryStore.kt needed for atomic deadline-only replacement. The earlier 21-file ZIP is historical and has not been overwritten.
+ 
+ New:
+ 
+@@ -132,6 +170,7 @@
+ Modified:
+ 
+ ```text
++app/src/main/java/com/clarity/finance/data/local/SubmissionRecoveryStore.kt
+ app/src/main/java/com/clarity/finance/MainActivity.kt
+ app/src/main/java/com/clarity/finance/di/AppContainer.kt
+ app/src/main/java/com/clarity/finance/di/ViewModelFactory.kt
+diff --git a/app/src/androidTest/java/com/clarity/finance/GoalNavigationTest.kt b/app/src/androidTest/java/com/clarity/finance/GoalNavigationTest.kt
+--- a/app/src/androidTest/java/com/clarity/finance/GoalNavigationTest.kt
++++ b/app/src/androidTest/java/com/clarity/finance/GoalNavigationTest.kt
+@@ -56,6 +56,10 @@
+         }
+         override suspend fun retry(uid: String, operation: GoalOperation) { error("No retry in isolated UI check") }
+         override suspend fun dismissRejected(uid: String, operation: GoalOperation) { snapshots.value = snapshots.value.copy(attempts = emptyList()) }
++        override suspend fun reviseExpired(uid: String, original: GoalOperation, replacement: GoalOperation) {
++            check(snapshots.value.attempts.single().operation == original && snapshots.value.attempts.single().canReviseDeadline)
++            submit(uid, replacement)
++        }
+     }
+     private val reporting = object : ReportingRepository {
+         override fun expenses(uid: String, month: ReportingMonth) = MutableStateFlow(ReportingBatch<Expense>(emptyList(), false))
+@@ -161,6 +165,29 @@
+         compose.onNodeWithText("Deadline (YYYY-MM-DD)").performTextReplacement(SavingsMath.today().plusMonths(1).toString())
+         click("Save proposal"); text("Next scheduled date: ${SavingsMath.today()}")
+     }
++    @Test fun serverExpiredCreateCanReviseDeadlineWithoutDiscardingItsSavedValues() {
++        val data = Data()
++        val today = SavingsMath.today()
++        val original = GoalOperation("expired-ui", "CREATE", goal = GoalConfig("Expired fixture", 49000000, 1120000,
++            today.minusMonths(2).toString(), today.minusDays(1).toString()))
++        data.snapshots.value = GoalSnapshot(known = true, entries = emptyList(), fromCache = false,
++            attempts = listOf(GoalAttempt(original, "EXPIRED", "Server expiry marker confirmed")))
++        show(data); click("Savings Goal"); click("Revise deadline")
++        compose.onNodeWithText("Goal name").assertIsNotEnabled()
++        compose.onNodeWithText("Target (LKR)").assertIsNotEnabled()
++        compose.onNodeWithText("Opening allocation (LKR)").assertIsNotEnabled()
++        click("Close form")
++        compose.runOnIdle { assertEquals(original, data.snapshots.value.attempts.single().operation); assertTrue(data.operations.isEmpty()) }
++        click("Revise deadline")
++        compose.onNodeWithText("Deadline (YYYY-MM-DD)").performTextReplacement(today.plusYears(1).toString())
++        click("Save proposal"); text("Saved: LKR 11200.00")
++        compose.runOnIdle {
++            val saved = data.snapshots.value.goal!!
++            assertEquals(original.goal!!.startDate, saved.config.startDate)
++            assertEquals(1, data.operations.size); assertNotEquals(original.operationId, saved.lastOperationId)
++            assertTrue(data.snapshots.value.attempts.isEmpty())
++        }
++    }
+     @Suppress("UNCHECKED_CAST") private fun <T> unused(type: Class<T>): T = Proxy.newProxyInstance(type.classLoader, arrayOf(type)) { _, method, _ ->
+         error("Unexpected ordinary repository access: ${method.name}")
+     } as T
+diff --git a/app/src/main/java/com/clarity/finance/data/local/SubmissionRecoveryStore.kt b/app/src/main/java/com/clarity/finance/data/local/SubmissionRecoveryStore.kt
+--- a/app/src/main/java/com/clarity/finance/data/local/SubmissionRecoveryStore.kt
++++ b/app/src/main/java/com/clarity/finance/data/local/SubmissionRecoveryStore.kt
+@@ -96,6 +96,24 @@
+         }
+     }
+ 
++    /** Atomically replace a server-fenced expired proposal; ordinary retry payloads remain immutable. */
++    suspend fun replaceExpiredOperation(expected: SubmissionRecord, replacement: SubmissionRecord) {
++        require(expected.status == "EXPIRED" && replacement.status == "PENDING")
++        require(expected.resolvedType in setOf("GOAL_CREATE", "GOAL_EDIT"))
++        require(expected.uid == replacement.uid && expected.recordId == replacement.recordId && expected.resolvedType == replacement.resolvedType)
++        require(expected.payloadJson != replacement.payloadJson)
++        dataStore.edit { preferences ->
++            val current: MutableList<SubmissionRecord> = gson.fromJson(preferences[recordsKey] ?: "[]", typeToken) ?: mutableListOf()
++            val index = current.indexOfFirst { it.uid == expected.uid && it.recordId == expected.recordId && it.resolvedType == expected.resolvedType }
++            check(index >= 0) { "Expired proposal no longer exists." }
++            if (current[index].payloadJson != replacement.payloadJson) {
++                check(current[index].status == "EXPIRED" && current[index].payloadJson == expected.payloadJson) { "Expired proposal changed; reopen recovery." }
++                current[index] = replacement
++                preferences[recordsKey] = gson.toJson(current)
++            } // Idempotent if persistence succeeded before its await timed out.
++        }
++    }
++
+     suspend fun removeRecord(uid: String, recordId: String, type: String) {
+         dataStore.edit { preferences ->
+             val json = preferences[recordsKey] ?: "[]"
+diff --git a/app/src/main/java/com/clarity/finance/data/repository/FirestoreGoalRemote.kt b/app/src/main/java/com/clarity/finance/data/repository/FirestoreGoalRemote.kt
+--- a/app/src/main/java/com/clarity/finance/data/repository/FirestoreGoalRemote.kt
++++ b/app/src/main/java/com/clarity/finance/data/repository/FirestoreGoalRemote.kt
+@@ -8,13 +8,15 @@
+ import kotlinx.coroutines.channels.awaitClose
+ import kotlinx.coroutines.flow.*
+ import kotlinx.coroutines.tasks.await
++import java.time.Clock
+ 
+ private data class GoalDocument(val goal: SavingsGoal?, val cached: Boolean, val pending: Boolean)
+ private data class GoalEntries(val entries: List<SavingsEntry>, val cached: Boolean, val pending: Boolean)
+ 
+-class FirestoreGoalRemote(private val firestore: FirebaseFirestore, private val activeUid: () -> String?) : GoalRemote {
++class FirestoreGoalRemote(private val firestore: FirebaseFirestore, private val clock: Clock = Clock.systemUTC(), private val activeUid: () -> String?) : GoalRemote {
+     private data class Running(val operation: GoalOperation, val task: Task<GoalRemoteOutcome>)
+     private val running = mutableMapOf<Pair<String, String>, Running>()
++    private val expiryChecks = mutableMapOf<Pair<String, String>, Running>()
+     private fun parent(uid: String) = firestore.collection("users").document(uid).collection("savingsGoals").document("active")
+     private fun goalFlow(uid: String): Flow<GoalDocument> = callbackFlow {
+         val listener = parent(uid).addSnapshotListener(MetadataChanges.INCLUDE) { doc, error ->
+@@ -67,18 +69,26 @@
+         operation.validate(temporal = false)
+         check(activeUid() == uid) { "Account changed. Saved goal operation belongs to the original account." }
+         val key = uid to operation.operationId
+-        val task = synchronized(running) {
+-            running[key]?.also { check(it.operation == operation) { "Running operation payload cannot change." } }?.task
+-                ?: transaction(uid, operation).also { running[key] = Running(operation, it) }
++        val (attempts, task) = synchronized(running) {
++            val old = running[key]?.also { check(it.operation == operation) { "Running operation payload cannot change." } }
++            // A financial retry shares the old Task. A finance-free expiry check may fence it safely.
++            val fenceOnly = old != null && !old.task.isComplete && operation.goal?.let { SavingsMath.date(it.deadline) <= SavingsMath.today(clock) } == true
++            val tasks = if (fenceOnly || expiryChecks.containsKey(key)) expiryChecks else running
++            val current = tasks[key]?.also { check(it.operation == operation) { "Running operation payload cannot change." } }?.task
++                ?: transaction(uid, operation, tasks === expiryChecks).also { tasks[key] = Running(operation, it) }
++            tasks to current
++        }
++        task.addOnCompleteListener(java.util.concurrent.Executor { it.run() }) {
++            synchronized(running) { if (attempts[key]?.task === task) attempts.remove(key) }
+         }
+         try { return task.await() }
+         finally {
+             // Await cancellation does not cancel Firebase. Keep an outstanding Task for the next waiter.
+-            if (task.isComplete) synchronized(running) { if (running[key]?.task === task) running.remove(key) }
++            if (task.isComplete) synchronized(running) { if (attempts[key]?.task === task) attempts.remove(key) }
+         }
+     }
+ 
+-    private fun transaction(uid: String, operation: GoalOperation): Task<GoalRemoteOutcome> {
++    private fun transaction(uid: String, operation: GoalOperation, fenceOnly: Boolean = false): Task<GoalRemoteOutcome> {
+         val goalRef = parent(uid)
+         val receiptRef = goalRef.collection("operations").document(operation.operationId)
+         return firestore.runTransaction<GoalRemoteOutcome> { tx ->
+@@ -90,6 +100,13 @@
+                     receipt.getTimestamp("createdAt") != null) { "Operation identity conflict. Keep the saved payload for inspection." }
+                 check(activeUid() == uid) { "Account changed." }
+                 return@runTransaction GoalRemoteOutcome.Confirmed
++            }
++            val expiryRef = operation.goal?.let { goalRef.collection("rejections").document(operation.operationId) }
++            val expiry = expiryRef?.let { tx.get(it) }
++            if (expiry?.exists() == true) {
++                check(expiry.getString("kind") == operation.kind && expiry.getLong("version") == operation.nextVersion &&
++                    expiry.get("payload") == operation.payload() && expiry.getTimestamp("createdAt") != null) { "Expiry marker identity conflict. Keep the original proposal." }
++                return@runTransaction expiredDeadline()
+             }
+             val goalDoc = tx.get(goalRef)
+             val before = if (goalDoc.exists()) goalDoc.goal() else null
+@@ -112,11 +129,21 @@
+             catch (e: IllegalStateException) { return@runTransaction GoalRemoteOutcome.Rejected(e.message ?: "Entry conflicts with the confirmed ledger.") }
+             if (operation.goal != null && before != null && operation.goal.startDate != before.config.startDate)
+                 return@runTransaction GoalRemoteOutcome.Rejected("Goal start date cannot change.")
++            if (operation.goal != null && SavingsMath.date(operation.goal.deadline) <= SavingsMath.today(clock) &&
++                (operation.kind == "CREATE" || operation.goal.deadline != before?.config?.deadline)) {
++                check(activeUid() == uid) { "Account changed. Reopen Savings Goal." }
++                // The clock only proposes this fence. Rules must establish expiry using request.time,
++                // exclude an accepted receipt, and permanently block this operation before we return EXPIRED.
++                tx.set(expiryRef!!, mapOf("kind" to operation.kind, "version" to operation.nextVersion,
++                    "payload" to operation.payload(), "createdAt" to FieldValue.serverTimestamp()))
++                return@runTransaction expiredDeadline()
++            }
++            if (fenceOnly) return@runTransaction GoalRemoteOutcome.Uncertain("An earlier transaction is outstanding; no expired deadline was established.")
+             // Reconcile first: an acknowledged create remains acknowledged even after its deadline passes.
+-            operation.validate()
++            operation.validate(today = SavingsMath.today(clock))
+             if (operation.goal != null && before != null) {
+                 check(operation.goal.startDate == before.config.startDate) { "Goal start date cannot change." }
+-                SavingsMath.validate(operation.goal, SavingsMath.today(), before.config.deadline)
++                SavingsMath.validate(operation.goal, SavingsMath.today(clock), before.config.deadline)
+             }
+             check(activeUid() == uid) { "Account changed. Reopen Savings Goal." }
+             val configuration = operation.goal ?: before!!.config
+@@ -140,18 +167,19 @@
+             GoalRemoteOutcome.Confirmed
+         }
+     }
++    private fun expiredDeadline() = GoalRemoteOutcome.Rejected("The proposed deadline expired. Revise the deadline; the original operation is blocked by its server expiry marker.", deadlineExpired = true)
+     private fun DocumentSnapshot.string(field: String) = get(field) as? String ?: error("Missing or invalid $field.")
+     private fun DocumentSnapshot.long(field: String) = get(field) as? Long ?: error("Missing or invalid integer $field.")
+     private fun DocumentSnapshot.timestamp(field: String) = get(field) as? Timestamp ?: error("Missing resolved $field.")
+     private fun DocumentSnapshot.goal(): SavingsGoal {
+         val config = GoalConfig(string("name"), long("targetMinor"), long("openingMinor"), string("startDate"), string("deadline"))
+-        SavingsMath.validate(config, SavingsMath.today(), config.deadline)
++        SavingsMath.validate(config, SavingsMath.today(clock), config.deadline)
+         return SavingsGoal(config, long("savedMinor"), long("version"), string("lastOperationId"), string("lastEntryId"),
+             timestamp("createdAt"), timestamp("updatedAt")).also { check(it.savedMinor >= 0 && it.version >= 0) { "Invalid saved goal balance/version." } }
+     }
+     private fun DocumentSnapshot.entry(): SavingsEntry = SavingsEntry(id, string("kind"), long("amountMinor"), string("entryDate"),
+         string("note"), get("deleted") as? Boolean ?: error("Invalid deletion state."), long("version"), string("lastOperationId"),
+-        timestamp("createdAt"), timestamp("updatedAt")).also { SavingsMath.validate(it, SavingsMath.today()); check(it.version > 0) }
++        timestamp("createdAt"), timestamp("updatedAt")).also { SavingsMath.validate(it, SavingsMath.today(clock)); check(it.version > 0) }
+ }
+ 
+ internal fun checkGoalVersion(operation: GoalOperation, before: SavingsGoal?) {
+diff --git a/app/src/main/java/com/clarity/finance/data/repository/FirestoreGoalRepository.kt b/app/src/main/java/com/clarity/finance/data/repository/FirestoreGoalRepository.kt
+--- a/app/src/main/java/com/clarity/finance/data/repository/FirestoreGoalRepository.kt
++++ b/app/src/main/java/com/clarity/finance/data/repository/FirestoreGoalRepository.kt
+@@ -2,13 +2,15 @@
+ 
+ import com.clarity.finance.data.local.SubmissionRecord
+ import com.clarity.finance.data.local.SubmissionRecoveryStore
++import com.clarity.finance.data.model.SavingsMath
++import java.time.Clock
+ import com.google.gson.Gson
+ import kotlinx.coroutines.*
+ import kotlinx.coroutines.flow.*
+ import kotlinx.coroutines.sync.Mutex
+ import kotlinx.coroutines.sync.withLock
+ 
+-class FirestoreGoalRepository(private val remote: GoalRemote, private val store: SubmissionRecoveryStore) : GoalRepository {
++class FirestoreGoalRepository(private val remote: GoalRemote, private val store: SubmissionRecoveryStore, private val clock: Clock = Clock.systemUTC()) : GoalRepository {
+     private val gson = Gson()
+     private val mutex = Mutex()
+     private val synchronization = Mutex()
+@@ -28,12 +30,24 @@
+     override suspend fun retry(uid: String, operation: GoalOperation) = mutex.withLock {
+         val saved = store.getRecords(uid, operation.type).singleOrNull { it.recordId == operation.recordId } ?: error("Saved operation no longer exists.")
+         check(saved.payloadJson == record(uid, operation).payloadJson) { "Retry must use the immutable saved payload." }
+-        store.updateOperationStatus(saved.copy(status = if (saved.status in setOf("PENDING", "REJECTED")) "PENDING" else "UNCERTAIN", errorReason = null))
++        store.updateOperationStatus(saved.copy(status = if (saved.status in setOf("PENDING", "REJECTED", "EXPIRED")) "PENDING" else "UNCERTAIN", errorReason = null))
+     }
+     override suspend fun dismissRejected(uid: String, operation: GoalOperation) = mutex.withLock {
+         val saved = store.getRecords(uid, operation.type).singleOrNull { it.recordId == operation.recordId } ?: error("Saved operation no longer exists.")
+-        check(saved.status == "REJECTED" && saved.payloadJson == record(uid, operation).payloadJson) { "Only a server-established rejection can be dismissed; uncertain and legacy failed operations must be reconciled." }
++        check(saved.status in setOf("REJECTED", "EXPIRED") && saved.payloadJson == record(uid, operation).payloadJson) { "Only a server-established rejection can be dismissed; uncertain and legacy failed operations must be reconciled." }
+         store.removeRecord(uid, saved.recordId, saved.resolvedType)
++    }
++    override suspend fun reviseExpired(uid: String, original: GoalOperation, replacement: GoalOperation) = mutex.withLock {
++        original.validate(false); replacement.validate(today = SavingsMath.today(clock))
++        require(original.goal != null && replacement.goal != null && original.kind in setOf("CREATE", "EDIT"))
++        require(replacement.operationId != original.operationId && replacement.kind == original.kind && replacement.expectedVersion == original.expectedVersion &&
++            replacement.previousDeadline == original.previousDeadline && replacement.goalId == original.goalId && replacement.entry == null &&
++            replacement.goal.copy(deadline = original.goal.deadline) == original.goal) { "Deadline revision must preserve every other original proposal value." }
++        require(SavingsMath.date(replacement.goal.deadline) > SavingsMath.today(clock)) { "Choose a future deadline." }
++        val saved = types.flatMap { store.getRecords(uid, it) }
++        check(saved.size == 1 && saved.single().recordId == original.recordId && saved.single().resolvedType == original.type) { "Resolve the saved proposal before revising it." }
++        val old = record(uid, original).copy(status = "EXPIRED")
++        store.replaceExpiredOperation(old, record(uid, replacement))
+     }
+     override fun observe(uid: String): Flow<GoalSnapshot> = flow {
+         var last = GoalSnapshot()
+@@ -63,7 +77,7 @@
+             try {
+                 synchronization.withLock {
+                     // Multiple savings ViewModels may be alive; only one recovery sweep submits at a time.
+-                    val pending = types.flatMap { store.getRecords(uid, it) }.filter { it.status != "REJECTED" }
++                    val pending = types.flatMap { store.getRecords(uid, it) }.filter { it.status !in setOf("REJECTED", "EXPIRED") }
+                     for (saved in pending) synchronizeRecord(uid, saved)
+                 }
+                 if (bookkeepingError.value?.first == uid) bookkeepingError.value = null
+@@ -80,7 +94,7 @@
+         val current = mutex.withLock {
+             val row = store.getRecords(uid, saved.resolvedType).singleOrNull { it.recordId == saved.recordId } ?: return
+             check(row.payloadJson == saved.payloadJson) { "Saved operation changed. Reopen recovery." }
+-            if (row.status == "REJECTED") return
++            if (row.status in setOf("REJECTED", "EXPIRED")) return
+             // Persist uncertainty BEFORE starting a Firebase Task, including across process death/cancelled awaits.
+             row.copy(status = "UNCERTAIN", errorReason = "Awaiting server reconciliation; an earlier transaction may still complete.")
+                 .also { store.updateOperationStatus(it) }
+@@ -100,7 +114,7 @@
+                     acknowledged.value = uid to operation.operationId
+                     store.removeRecord(uid, saved.recordId, saved.resolvedType)
+                 }
+-                is GoalRemoteOutcome.Rejected -> store.updateOperationStatus(current.copy(status = "REJECTED", errorReason = result.reason))
++                is GoalRemoteOutcome.Rejected -> store.updateOperationStatus(current.copy(status = if (result.deadlineExpired) "EXPIRED" else "REJECTED", errorReason = result.reason))
+                 is GoalRemoteOutcome.Uncertain -> store.updateOperationStatus(current.copy(errorReason = result.reason))
+             }
+         }
+diff --git a/app/src/main/java/com/clarity/finance/data/repository/GoalRepository.kt b/app/src/main/java/com/clarity/finance/data/repository/GoalRepository.kt
+--- a/app/src/main/java/com/clarity/finance/data/repository/GoalRepository.kt
++++ b/app/src/main/java/com/clarity/finance/data/repository/GoalRepository.kt
+@@ -9,24 +9,25 @@
+     val recordId: String get() = entry?.id ?: goalId
+     val nextVersion: Long get() = expectedVersion?.let { Math.addExact(it, 1L) } ?: 0L
+     fun payload(): Map<String, Any> = goal?.values() ?: entry!!.values()
+-    fun validate(temporal: Boolean = true) {
++    fun validate(temporal: Boolean = true, today: java.time.LocalDate = SavingsMath.today()) {
+         require(goalId == "active" && operationId.matches(Regex("[A-Za-z0-9_-]{1,128}"))) { "Invalid goal operation identity." }
+         require(kind in setOf("CREATE", "EDIT", "ENTRY_CREATE", "ENTRY_UPDATE", "ENTRY_DELETE"))
+         require((kind == "CREATE" && expectedVersion == null) || (kind != "CREATE" && expectedVersion != null && expectedVersion >= 0))
+         require(expectedVersion != Long.MAX_VALUE) { "Goal version has reached the supported integer limit; it cannot be incremented safely." }
+         if (kind in setOf("CREATE", "EDIT")) {
+             require(goal != null && entry == null)
+-            SavingsMath.validate(goal, if (temporal) SavingsMath.today() else java.time.LocalDate.MAX,
++            SavingsMath.validate(goal, if (temporal) today else java.time.LocalDate.MAX,
+                 if (!temporal) goal.deadline else if (kind == "EDIT") previousDeadline else null)
+         } else {
+             require(goal == null && entry != null && entry.deleted == (kind == "ENTRY_DELETE"))
+-            SavingsMath.validate(entry, if (temporal) SavingsMath.today() else java.time.LocalDate.MAX)
++            SavingsMath.validate(entry, if (temporal) today else java.time.LocalDate.MAX)
+         }
+     }
+ }
+ data class GoalAttempt(val operation: GoalOperation, val status: String, val error: String? = null) {
+     // Legacy FAILED records did not establish logical rejection and must be reconciled again.
+-    val isRejected get() = status == "REJECTED"
++    val isRejected get() = status in setOf("REJECTED", "EXPIRED")
++    val canReviseDeadline get() = status == "EXPIRED" && operation.goal != null
+     val isUncertain get() = status in setOf("UNCERTAIN", "FAILED", "CONFLICT")
+ }
+ data class GoalSnapshot(val goal: SavingsGoal? = null, val entries: List<SavingsEntry>? = null,
+@@ -39,6 +40,7 @@
+     suspend fun submit(uid: String, operation: GoalOperation)
+     suspend fun retry(uid: String, operation: GoalOperation)
+     suspend fun dismissRejected(uid: String, operation: GoalOperation)
++    suspend fun reviseExpired(uid: String, original: GoalOperation, replacement: GoalOperation)
+     suspend fun synchronize(uid: String)
+ }
+ 
+@@ -50,7 +52,7 @@
+ sealed interface GoalRemoteOutcome {
+     /** The atomic write was acknowledged, or its exact immutable receipt was reconciled. */
+     data object Confirmed : GoalRemoteOutcome
+-    /** A successful server transaction verified receipt absence and an invariant preventing this logical operation. */
+-    data class Rejected(val reason: String) : GoalRemoteOutcome
++    /** Successful server verification of a permanent contradiction, or acknowledgement of an immutable expiry fence. */
++    data class Rejected(val reason: String, val deadlineExpired: Boolean = false) : GoalRemoteOutcome
+     data class Uncertain(val reason: String) : GoalRemoteOutcome
+ }
+diff --git a/app/src/main/java/com/clarity/finance/ui/goals/GoalScreen.kt b/app/src/main/java/com/clarity/finance/ui/goals/GoalScreen.kt
+--- a/app/src/main/java/com/clarity/finance/ui/goals/GoalScreen.kt
++++ b/app/src/main/java/com/clarity/finance/ui/goals/GoalScreen.kt
+@@ -83,6 +83,7 @@
+                         if (it.note.isNotBlank()) Text("Proposed note: ${it.note}")
+                     }
+                     if (attempt.isRejected) {
++                        if (attempt.canReviseDeadline) OutlinedButton(onClick = { viewModel.reviseDeadline(attempt) }, enabled = !state.busy) { Text("Revise deadline") }
+                         Text("Dismiss a rejected proposal to reopen the latest details and correct them. Retrying keeps the original payload and version.")
+                         OutlinedButton(onClick = { viewModel.retry(attempt) }, enabled = !state.busy) { Text("Retry original proposal") }
+                         OutlinedButton(onClick = { viewModel.dismiss(attempt) }, enabled = !state.busy) { Text("Dismiss rejected proposal") }
+@@ -152,17 +153,18 @@
+                     val isGoal = state.formKind == "goal"
+                     Text(if (isGoal) "Goal details" else "Allocation details", style = MaterialTheme.typography.titleLarge)
+                     fun change(next: GoalForm) = viewModel.update(next)
+-                    @Composable fun field(label: String, value: String, decimal: Boolean = false, set: (String) -> Unit) {
++                    @Composable fun field(label: String, value: String, decimal: Boolean = false, editable: Boolean = true, set: (String) -> Unit) {
+                         OutlinedTextField(value, set, label = { Text(label) }, modifier = Modifier.fillMaxWidth(),
+-                            enabled = !state.busy && state.unknown == null, singleLine = true,
++                            enabled = !state.busy && state.unknown == null && editable, singleLine = true,
+                             keyboardOptions = KeyboardOptions(keyboardType = if (decimal) KeyboardType.Decimal else KeyboardType.Text))
+                     }
+                     if (isGoal) {
+-                        Text("Start date: ${state.snapshot.goal?.config?.startDate ?: SavingsMath.today()} (Asia/Colombo)")
++                        Text("Start date: ${form.startDate ?: state.snapshot.goal?.config?.startDate ?: SavingsMath.today()} (Asia/Colombo)")
++                        if (form.revising != null) Text("Only the deadline changes. Your name, target, opening allocation and original start date are retained. The expired proposal remains saved until its replacement is durably queued.")
+                         Text("Confirm only money you have already allocated as the opening allocation.")
+-                        field("Goal name", form.name) { change(form.copy(name = it)) }
+-                        field("Target (LKR)", form.target, true) { change(form.copy(target = it)) }
+-                        field("Opening allocation (LKR)", form.opening, true) { change(form.copy(opening = it)) }
++                        field("Goal name", form.name, editable = form.revising == null) { change(form.copy(name = it)) }
++                        field("Target (LKR)", form.target, true, editable = form.revising == null) { change(form.copy(target = it)) }
++                        field("Opening allocation (LKR)", form.opening, true, editable = form.revising == null) { change(form.copy(opening = it)) }
+                         field("Deadline (YYYY-MM-DD)", form.deadline) { change(form.copy(deadline = it)) }
+                     } else {
+                         OutlinedButton(onClick = { change(form.copy(kind = if (form.kind == "contribution") "withdrawal" else "contribution")) },
+@@ -173,7 +175,7 @@
+                             modifier = Modifier.fillMaxWidth(), enabled = !state.busy && state.unknown == null)
+                     }
+                     state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+-                    Button(onClick = viewModel::save, enabled = state.canChange) { Text("Save proposal") }
++                    Button(onClick = viewModel::save, enabled = state.canSaveForm) { Text("Save proposal") }
+                     OutlinedButton(onClick = viewModel::closeForm, enabled = !state.busy) { Text("Close form") }
+                 }
+             }
+diff --git a/app/src/main/java/com/clarity/finance/viewmodel/GoalViewModel.kt b/app/src/main/java/com/clarity/finance/viewmodel/GoalViewModel.kt
+--- a/app/src/main/java/com/clarity/finance/viewmodel/GoalViewModel.kt
++++ b/app/src/main/java/com/clarity/finance/viewmodel/GoalViewModel.kt
+@@ -11,12 +11,17 @@
+ 
+ data class GoalForm(val name: String = "", val target: String = "", val opening: String = "0.00", val deadline: String = "",
+     val entryId: String? = null, val kind: String = "contribution", val amount: String = "", val date: String = "", val note: String = "",
+-    val baseVersion: Long? = null)
++    val baseVersion: Long? = null, val startDate: String? = null, val revising: GoalOperation? = null)
+ data class GoalUiState(val signedIn: Boolean = false, val snapshot: GoalSnapshot = GoalSnapshot(), val progress: GoalProgress? = null,
+     val form: GoalForm? = null, val formKind: String? = null, val deleteEntry: SavingsEntry? = null, val deleteVersion: Long? = null,
+-    val busy: Boolean = false, val error: String? = null, val unknown: GoalOperation? = null, val localPending: GoalOperation? = null) {
++    val busy: Boolean = false, val error: String? = null, val unknown: GoalOperation? = null, val localPending: GoalOperation? = null,
++    val replacementSource: GoalOperation? = null) {
+     val blocked get() = busy || unknown != null || localPending != null || snapshot.attempts.isNotEmpty() || snapshot.recoveryError != null
+     val canChange get() = signedIn && snapshot.known && snapshot.error == null && snapshot.entries != null && !blocked
++    val canSaveForm get() = canChange || (form?.revising != null && signedIn && snapshot.known && snapshot.error == null && snapshot.entries != null &&
++        !busy && unknown == null && localPending == null && snapshot.recoveryError == null && snapshot.attempts.singleOrNull()?.let {
++            it.canReviseDeadline && it.operation == form.revising
++        } == true)
+ }
+ 
+ /** Dashboard observes only. Synchronization is deliberately started only by the allocation screen. */
+@@ -41,7 +46,8 @@
+                                 if (valid(owner, token)) {
+                                     mutable.value = mutable.value.copy(snapshot = snapshot,
+                                         unknown = mutable.value.unknown?.takeUnless { observed(snapshot, it) },
+-                                        localPending = mutable.value.localPending?.takeUnless { observed(snapshot, it) })
++                                        localPending = mutable.value.localPending?.takeUnless { observed(snapshot, it) },
++                                        replacementSource = mutable.value.replacementSource?.takeUnless { mutable.value.unknown?.let { observed(snapshot, it) } == true })
+                                     refreshDate()
+                                 }
+                             } } catch (e: CancellationException) { throw e }
+@@ -92,6 +98,18 @@
+             kind = entry?.kind ?: "contribution", amount = entry?.let { SavingsMath.money(it.amountMinor) } ?: "",
+             date = entry?.entryDate ?: SavingsMath.today(clock).toString(), note = entry?.note ?: "", baseVersion = state.value.snapshot.goal?.version), error = null)
+     }
++    fun reviseDeadline(attempt: GoalAttempt) {
++        val current = state.value
++        if (!attempt.canReviseDeadline || current.snapshot.attempts.singleOrNull() != attempt || current.busy || current.unknown != null ||
++            current.localPending != null || current.snapshot.recoveryError != null || !current.snapshot.known || current.snapshot.error != null) return
++        val original = attempt.operation
++        val config = original.goal ?: return
++        if (current.snapshot.goal?.version != original.expectedVersion) {
++            mutable.value = current.copy(error = "Goal changed. Dismiss the rejected proposal and edit the latest goal instead."); return
++        }
++        mutable.value = current.copy(formKind = "goal", form = GoalForm(config.name, SavingsMath.money(config.targetMinor), SavingsMath.money(config.openingMinor),
++            config.deadline, baseVersion = original.expectedVersion, startDate = config.startDate, revising = original), error = null)
++    }
+     fun update(form: GoalForm) { if (!state.value.busy && state.value.unknown == null) mutable.value = state.value.copy(form = form, error = null) }
+     fun closeForm() { if (!state.value.busy) mutable.value = state.value.copy(form = null, formKind = null, error = null) }
+     fun requestDelete(entry: SavingsEntry) {
+@@ -100,12 +118,16 @@
+     }
+     fun cancelDelete() { if (!state.value.busy) mutable.value = state.value.copy(deleteEntry = null) }
+     fun save() {
+-        if (!state.value.canChange) return
++        if (!state.value.canSaveForm) return
+         val form = state.value.form ?: return
+         try {
+             val goal = state.value.snapshot.goal
+             check(goal?.version == form.baseVersion) { "Goal changed while this form was open. Close it and reopen the latest version." }
+-            val op = if (state.value.formKind == "goal") {
++            val op = if (form.revising != null) {
++                val config = form.revising.goal!!.copy(deadline = form.deadline)
++                SavingsMath.validate(config, SavingsMath.today(clock))
++                form.revising.copy(operationId = UUID.randomUUID().toString(), goal = config)
++            } else if (state.value.formKind == "goal") {
+                 val config = GoalConfig(form.name.trim(), SavingsMath.amount(form.target), SavingsMath.amount(form.opening, true),
+                     goal?.config?.startDate ?: SavingsMath.today(clock).toString(), form.deadline)
+                 SavingsMath.validate(config, SavingsMath.today(clock), goal?.config?.deadline)
+@@ -120,7 +142,7 @@
+                 SavingsMath.balance(goal.savedMinor, before, entry)
+                 GoalOperation(UUID.randomUUID().toString(), if (before == null) "ENTRY_CREATE" else "ENTRY_UPDATE", goal.version, entry = entry)
+             }
+-            submit(op)
++            submit(op, form.revising)
+         } catch (e: CancellationException) { throw e }
+         catch (e: Exception) { mutable.value = state.value.copy(error = e.message ?: "Check the entered values.") }
+     }
+@@ -135,19 +157,23 @@
+         } catch (e: CancellationException) { throw e }
+         catch (e: Exception) { mutable.value = state.value.copy(error = e.message) }
+     }
+-    private fun submit(operation: GoalOperation) = action {
++    private fun submit(operation: GoalOperation, replaces: GoalOperation? = null) = action {
+         val token = generation
+         // Retain identity even if the local persistence await times out or is cancelled.
+-        mutable.value = state.value.copy(unknown = operation)
+-        val persisted = withTimeoutOrNull(10000) { repository.submit(it, operation); true } ?: false
++        mutable.value = state.value.copy(unknown = operation, replacementSource = replaces)
++        val persisted = withTimeoutOrNull(10000) {
++            if (replaces == null) repository.submit(it, operation) else repository.reviseExpired(it, replaces, operation)
++            true
++        } ?: false
+         if (!valid(it, token)) return@action
+         val seen = observed(state.value.snapshot, operation)
+         mutable.value = state.value.copy(unknown = if (persisted || seen) null else operation,
+             localPending = if (persisted && !seen) operation else null,
++            replacementSource = if (persisted || seen) null else replaces,
+             form = if (persisted) null else state.value.form, formKind = if (persisted) null else state.value.formKind,
+             deleteEntry = if (persisted) null else state.value.deleteEntry)
+     }
+-    fun retryUnknown() { state.value.unknown?.let { submit(it) } }
++    fun retryUnknown() { state.value.unknown?.let { submit(it, state.value.replacementSource) } }
+     fun retry(attempt: GoalAttempt) { if (state.value.snapshot.attempts.contains(attempt)) action { repository.retry(it, attempt.operation) } }
+     fun dismiss(attempt: GoalAttempt) { if (attempt.isRejected && state.value.snapshot.attempts.contains(attempt)) action { repository.dismissRejected(it, attempt.operation) } }
+     private fun action(block: suspend (String) -> Unit) {
+diff --git a/app/src/test/java/com/clarity/finance/data/repository/FirestoreGoalRemoteTest.kt b/app/src/test/java/com/clarity/finance/data/repository/FirestoreGoalRemoteTest.kt
+--- a/app/src/test/java/com/clarity/finance/data/repository/FirestoreGoalRemoteTest.kt
++++ b/app/src/test/java/com/clarity/finance/data/repository/FirestoreGoalRemoteTest.kt
+@@ -13,6 +13,7 @@
+ import org.mockito.kotlin.any
+ import org.mockito.kotlin.argumentCaptor
+ import org.mockito.kotlin.eq
++import java.time.*
+ 
+ @OptIn(ExperimentalCoroutinesApi::class)
+ class FirestoreGoalRemoteTest {
+@@ -25,6 +26,9 @@
+     private val entryRef = mock(DocumentReference::class.java)
+     private val receipts = mock(CollectionReference::class.java)
+     private val receiptRef = mock(DocumentReference::class.java)
++    private val rejections = mock(CollectionReference::class.java)
++    private val rejectionRef = mock(DocumentReference::class.java)
++    private val rejectionDoc = mock(DocumentSnapshot::class.java)
+     private val tx = mock(Transaction::class.java)
+     private val goalDoc = mock(DocumentSnapshot::class.java)
+     private val entryDoc = mock(DocumentSnapshot::class.java)
+@@ -36,6 +40,8 @@
+         `when`(firestore.collection("users")).thenReturn(users); `when`(users.document("a")).thenReturn(user)
+         `when`(user.collection("savingsGoals")).thenReturn(goals); `when`(goals.document("active")).thenReturn(parent)
+         `when`(parent.collection("operations")).thenReturn(receipts); `when`(receipts.document(any())).thenReturn(receiptRef)
++        `when`(parent.collection("rejections")).thenReturn(rejections); `when`(rejections.document(any())).thenReturn(rejectionRef)
++        `when`(tx.get(rejectionRef)).thenReturn(rejectionDoc)
+         `when`(parent.collection("entries")).thenReturn(entries); `when`(entries.document("entry")).thenReturn(entryRef)
+         `when`(tx.get(parent)).thenReturn(goalDoc); `when`(tx.get(receiptRef)).thenReturn(receiptDoc); `when`(tx.get(entryRef)).thenReturn(entryDoc)
+         doAnswer { invocation ->
+@@ -50,6 +56,7 @@
+             "createdAt" to Timestamp(1, 0), "updatedAt" to Timestamp(2, 0))
+         `when`(goalDoc.get(any<String>())).thenAnswer { fields[it.getArgument<String>(0)] }
+     }
++    private fun clock(date: String) = Clock.fixed(LocalDate.parse(date).atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC)
+     @Test fun `production create and entry mutation write exact parent ledger and immutable receipt payloads`() = runTest {
+         setup(); remote.apply("a", GoalOperation("create", "CREATE", goal = config))
+         val parentData = argumentCaptor<Map<String, Any>>()
+@@ -73,8 +80,9 @@
+         `when`(receiptDoc.getString("kind")).thenReturn("CREATE"); `when`(receiptDoc.getString("entryId")).thenReturn("")
+         `when`(receiptDoc.getLong("version")).thenReturn(0L); `when`(receiptDoc.get("payload")).thenReturn(op.payload())
+         `when`(receiptDoc.getTimestamp("createdAt")).thenReturn(Timestamp(1, 0))
+-        remote.apply("a", op)
++        assertEquals(GoalRemoteOutcome.Confirmed, remote.apply("a", op))
+         verify(tx, never()).get(parent); verify(tx, never()).set(any<DocumentReference>(), any<Map<String, Any>>())
++        verify(tx, never()).get(rejectionRef)
+         `when`(receiptDoc.get("payload")).thenReturn(op.payload() + ("openingMinor" to 1L))
+         try { remote.apply("a", op); fail() } catch (_: IllegalStateException) {}
+     }
+@@ -118,6 +126,87 @@
+         source.setResult(GoalRemoteOutcome.Confirmed); runCurrent(); later.join()
+         assertEquals(GoalRemoteOutcome.Confirmed, result)
+         verify(firestore, times(1)).runTransaction(any<Transaction.Function<GoalRemoteOutcome>>())
++    }
++    @Test fun `expired create and deadline changing edit write only the immutable expiry fence`() = runTest {
++        setup()
++        val dated = FirestoreGoalRemote(firestore, clock("2026-03-01")) { owner }
++        val proposal = config.copy(deadline = "2026-02-28")
++        proposal.let { SavingsMath.validate(it, LocalDate.parse("2026-01-31")) }
++        val create = GoalOperation("expired-create", "CREATE", goal = proposal)
++        assertEquals(true, (dated.apply("a", create) as GoalRemoteOutcome.Rejected).deadlineExpired)
++        val marker = argumentCaptor<Map<String, Any>>()
++        verify(tx).set(eq(rejectionRef), marker.capture())
++        assertEquals(mapOf("kind" to "CREATE", "version" to 0L, "payload" to proposal.values(), "createdAt" to FieldValue.serverTimestamp()), marker.firstValue)
++        clearInvocations(tx); existing()
++        val edit = GoalOperation("expired-edit", "EDIT", 0, goal = proposal, previousDeadline = config.deadline)
++        assertEquals(true, (dated.apply("a", edit) as GoalRemoteOutcome.Rejected).deadlineExpired)
++        verify(tx).set(eq(rejectionRef), any<Map<String, Any>>())
++        verify(tx, never()).update(eq(parent), any<Map<String, Any>>()); verify(tx, never()).set(eq(parent), any<Map<String, Any>>())
++        verify(tx, never()).set(eq(receiptRef), any<Map<String, Any>>())
++    }
++    @Test fun `matching expiry marker reconciles without a parent or financial write and rejects changed payload`() = runTest {
++        setup()
++        val op = GoalOperation("expired", "CREATE", goal = config.copy(deadline = "2025-12-31"))
++        `when`(rejectionDoc.exists()).thenReturn(true)
++        `when`(rejectionDoc.getString("kind")).thenReturn("CREATE"); `when`(rejectionDoc.getLong("version")).thenReturn(0L)
++        `when`(rejectionDoc.get("payload")).thenReturn(op.payload()); `when`(rejectionDoc.getTimestamp("createdAt")).thenReturn(Timestamp(1, 0))
++        assertTrue((remote.apply("a", op) as GoalRemoteOutcome.Rejected).deadlineExpired)
++        verify(tx, never()).get(parent); verify(tx, never()).set(any<DocumentReference>(), any<Map<String, Any>>())
++        try { remote.apply("a", op.copy(goal = op.goal!!.copy(openingMinor = 1))); fail() } catch (_: IllegalStateException) {}
++    }
++    @Test fun `unchanged overdue edit remains legal and does not create an expiry fence`() = runTest {
++        setup(); existing()
++        val dated = FirestoreGoalRemote(firestore, clock("2028-01-01")) { owner }
++        assertEquals(GoalRemoteOutcome.Confirmed, dated.apply("a", GoalOperation("overdue", "EDIT", 0, goal = config.copy(name = "Still editable"), previousDeadline = config.deadline)))
++        verify(tx, never()).set(eq(rejectionRef), any<Map<String, Any>>())
++        verify(tx).update(eq(parent), any<Map<String, Any>>())
++    }
++    @Test fun `expired outstanding Task can be fenced without awaiting it or submitting another financial mutation`() = runTest {
++        setup()
++        var day = "2026-01-31"
++        val mutableClock = object : Clock() {
++            override fun getZone() = ZoneOffset.UTC
++            override fun withZone(zone: ZoneId): Clock = clock(day).withZone(zone)
++            override fun instant() = clock(day).instant()
++        }
++        val dated = FirestoreGoalRemote(firestore, mutableClock) { owner }
++        val source = TaskCompletionSource<GoalRemoteOutcome>()
++        val expiryTask = TaskCompletionSource<GoalRemoteOutcome>()
++        var expiryOutcome: GoalRemoteOutcome? = null
++        val op = GoalOperation("outstanding-expiry", "CREATE", goal = config.copy(deadline = "2026-02-28"))
++        var invocation = 0
++        doAnswer { args ->
++            invocation++
++            if (invocation == 1) source.task else {
++                expiryOutcome = args.getArgument<Transaction.Function<GoalRemoteOutcome>>(0).apply(tx)
++                expiryTask.task
++            }
++        }.`when`(firestore).runTransaction(any<Transaction.Function<GoalRemoteOutcome>>())
++        val wait = backgroundScope.launch { withTimeoutOrNull(10000) { dated.apply("a", op) } }
++        runCurrent(); advanceTimeBy(10001); runCurrent(); wait.join()
++        day = "2026-03-01"
++        val fenceWait = backgroundScope.launch { withTimeoutOrNull(10000) { dated.apply("a", op) } }
++        runCurrent(); advanceTimeBy(10001); runCurrent(); fenceWait.join()
++        assertFalse(source.task.isComplete); assertEquals(2, invocation)
++        source.setException(java.io.IOException("Old write fenced by rules"))
++        var result: GoalRemoteOutcome? = null
++        val reconcile = backgroundScope.launch { result = dated.apply("a", op) }; runCurrent()
++        assertEquals(2, invocation) // Reuse the outstanding fence even after the original Task completes.
++        expiryTask.setResult(expiryOutcome!!); runCurrent(); reconcile.join()
++        assertTrue((result as GoalRemoteOutcome.Rejected).deadlineExpired)
++        verify(tx).set(eq(rejectionRef), any<Map<String, Any>>())
++        verify(tx, never()).set(eq(parent), any<Map<String, Any>>()); verify(tx, never()).update(eq(parent), any<Map<String, Any>>())
++    }
++    @Test fun `server refusal of a client proposed expiry is not returned as a rejection`() = runTest {
++        setup()
++        doAnswer { args ->
++            args.getArgument<Transaction.Function<GoalRemoteOutcome>>(0).apply(tx)
++            TaskCompletionSource<GoalRemoteOutcome>().also { it.setException(java.io.IOException("Server date does not establish expiry")) }.task
++        }.`when`(firestore).runTransaction(any<Transaction.Function<GoalRemoteOutcome>>())
++        val dated = FirestoreGoalRemote(firestore, clock("2028-01-01")) { owner }
++        try { dated.apply("a", GoalOperation("clock-ahead", "CREATE", goal = config)); fail() } catch (_: java.io.IOException) {}
++        verify(tx).set(eq(rejectionRef), any<Map<String, Any>>())
++        verify(tx, never()).set(eq(parent), any<Map<String, Any>>())
+     }
+     @Test fun `parent and untruncated ledger listeners include metadata and are removed on cancellation`() = runTest {
+         setup()
+diff --git a/app/src/test/java/com/clarity/finance/data/repository/FirestoreGoalRepositoryTest.kt b/app/src/test/java/com/clarity/finance/data/repository/FirestoreGoalRepositoryTest.kt
+--- a/app/src/test/java/com/clarity/finance/data/repository/FirestoreGoalRepositoryTest.kt
++++ b/app/src/test/java/com/clarity/finance/data/repository/FirestoreGoalRepositoryTest.kt
+@@ -14,6 +14,7 @@
+ import org.junit.rules.TemporaryFolder
+ import java.io.IOException
+ import com.google.firebase.firestore.FirebaseFirestoreException
++import java.time.*
+ 
+ @OptIn(ExperimentalCoroutinesApi::class)
+ class FirestoreGoalRepositoryTest {
+@@ -21,6 +22,39 @@
+     private val operation = GoalOperation("create", "CREATE", goal = GoalConfig("Fixture", 49000000, 1120000, "2025-01-01", "2027-01-01"))
+     private fun accessError(message: String): FirebaseFirestoreException = org.mockito.Mockito.mock(FirebaseFirestoreException::class.java).also {
+         org.mockito.Mockito.`when`(it.message).thenReturn(message)
++    }
++    private class TestClock(var day: LocalDate) : Clock() {
++        override fun getZone() = ZoneOffset.UTC
++        override fun instant() = day.atStartOfDay(ZoneOffset.UTC).toInstant()
++        override fun withZone(zone: ZoneId): Clock = Clock.fixed(instant(), zone)
++    }
++    private class ExpiryServer(private val clock: TestClock) : GoalRemote {
++        val snapshot = MutableStateFlow(GoalSnapshot(known = true, entries = emptyList(), fromCache = false))
++        val receipts = mutableMapOf<String, GoalOperation>()
++        val fences = mutableMapOf<String, GoalOperation>()
++        var online = false
++        var loseAcknowledgement = false
++        var mutations = 0
++        override fun observe(uid: String) = snapshot
++        override suspend fun apply(uid: String, operation: GoalOperation): GoalRemoteOutcome {
++            if (!online) throw IOException("Offline")
++            receipts[operation.operationId]?.let { check(it == operation); return GoalRemoteOutcome.Confirmed }
++            fences[operation.operationId]?.let { check(it == operation); return GoalRemoteOutcome.Rejected("Server-fenced expired deadline", true) }
++            val before = snapshot.value.goal
++            checkGoalVersion(operation, before)
++            if (operation.goal != null && SavingsMath.date(operation.goal.deadline) <= clock.day &&
++                (operation.kind == "CREATE" || operation.goal.deadline != before!!.config.deadline)) {
++                fences[operation.operationId] = operation
++                return GoalRemoteOutcome.Rejected("Server-fenced expired deadline", true)
++            }
++            operation.validate(today = clock.day)
++            val saved = goalMutationBalance(operation, before, snapshot.value.entries.orEmpty().find { it.id == operation.entry?.id })
++            receipts[operation.operationId] = operation; mutations++
++            snapshot.value = snapshot.value.copy(goal = SavingsGoal(operation.goal ?: before!!.config, saved, operation.nextVersion, operation.operationId),
++                entries = if (operation.entry == null) snapshot.value.entries else snapshot.value.entries.orEmpty().filterNot { it.id == operation.entry.id } + operation.entry)
++            if (loseAcknowledgement) throw IOException("Acknowledgement lost")
++            return GoalRemoteOutcome.Confirmed
++        }
+     }
+     private class Remote : GoalRemote {
+         val snapshots = MutableStateFlow(GoalSnapshot(known = true, entries = emptyList(), fromCache = false))
+@@ -213,4 +247,98 @@
+         assertEquals(1, remoteCalls); assertTrue(store.getRecords("a", operation.type).isEmpty())
+         assertNull(repo.observe("a").first().recoveryError); sync.cancelAndJoin()
+     }
++    @Test fun `offline CREATE expires before any commit then durable deadline revision creates savings once`() = runTest {
++        val clock = TestClock(LocalDate.parse("2026-01-31"))
++        val store = SubmissionRecoveryStore(PreferenceDataStoreFactory.create(scope = backgroundScope, produceFile = { temp.newFile("expired-create.preferences_pb") }))
++        val server = ExpiryServer(clock)
++        var repo = FirestoreGoalRepository(server, store, clock)
++        val original = operation.copy(goal = operation.goal!!.copy(startDate = "2026-01-31", deadline = "2026-02-28"))
++        original.validate(today = clock.day); repo.submit("a", original)
++        var sync = backgroundScope.launch { repo.synchronize("a") }; runCurrent()
++        assertEquals(0, server.mutations)
++        clock.day = LocalDate.parse("2026-03-01"); server.online = true
++        advanceTimeBy(5000); runCurrent()
++        assertEquals("EXPIRED", store.getRecords("a", original.type).single().status)
++        assertNull(server.snapshot.value.goal); assertEquals(0, server.mutations)
++        sync.cancelAndJoin()
++        val replacement = original.copy(operationId = "revised-create", goal = original.goal!!.copy(deadline = "2026-05-31"))
++        repo.reviseExpired("a", original, replacement); repo.reviseExpired("a", original, replacement)
++        // New repository reads the exact replacement from durable storage before submission.
++        repo = FirestoreGoalRepository(server, store, clock)
++        assertEquals(replacement, repo.observe("a").first { it.attempts.isNotEmpty() }.attempts.single().operation)
++        sync = backgroundScope.launch { repo.synchronize("a") }; runCurrent()
++        assertEquals(1, server.mutations); assertEquals(1120000L, server.snapshot.value.goal!!.savedMinor)
++        assertEquals(original.goal.startDate, server.snapshot.value.goal!!.config.startDate)
++        assertTrue(store.getRecords("a", original.type).isEmpty()); assertEquals(setOf(replacement.operationId), server.receipts.keys)
++        assertTrue((server.apply("a", original) as GoalRemoteOutcome.Rejected).deadlineExpired)
++        assertEquals(1, server.mutations); sync.cancelAndJoin()
++    }
++    @Test fun `expired deadline changing EDIT revises without resetting contributions or opening delta`() = runTest {
++        val clock = TestClock(LocalDate.parse("2026-01-31")); val server = ExpiryServer(clock)
++        val config = operation.goal!!.copy(startDate = "2025-12-31", deadline = "2026-06-30")
++        val contribution = SavingsEntry("c", "contribution", 1000000, "2026-01-01")
++        server.snapshot.value = GoalSnapshot(SavingsGoal(config, 2120000, 1, "previous"), listOf(contribution), true, false)
++        val original = GoalOperation("expired-edit", "EDIT", 1, goal = config.copy(openingMinor = 1200000, deadline = "2026-02-28"), previousDeadline = config.deadline)
++        val store = SubmissionRecoveryStore(PreferenceDataStoreFactory.create(scope = backgroundScope, produceFile = { temp.newFile("expired-edit.preferences_pb") }))
++        val repo = FirestoreGoalRepository(server, store, clock)
++        original.validate(today = clock.day); repo.submit("a", original)
++        val sync = backgroundScope.launch { repo.synchronize("a") }; runCurrent()
++        clock.day = LocalDate.parse("2026-03-01"); server.online = true; advanceTimeBy(5000); runCurrent()
++        assertEquals("EXPIRED", store.getRecords("a", original.type).single().status)
++        assertEquals(2120000L, server.snapshot.value.goal!!.savedMinor); assertEquals(listOf(contribution), server.snapshot.value.entries)
++        val replacement = original.copy(operationId = "revised-edit", goal = original.goal!!.copy(deadline = "2026-07-31"))
++        try { repo.reviseExpired("a", original, replacement.copy(goal = replacement.goal!!.copy(openingMinor = 0))); fail() } catch (_: IllegalArgumentException) {}
++        repo.reviseExpired("a", original, replacement); advanceTimeBy(5000); runCurrent()
++        assertEquals(2200000L, server.snapshot.value.goal!!.savedMinor); assertEquals(listOf(contribution), server.snapshot.value.entries)
++        assertEquals(1, server.mutations); assertTrue(store.getRecords("a", original.type).isEmpty()); sync.cancelAndJoin()
++    }
++    @Test fun `earlier committed CREATE and EDIT reconcile after expiry instead of permitting replacement`() = runTest {
++        for (kind in listOf("CREATE", "EDIT")) {
++            val clock = TestClock(LocalDate.parse("2026-01-31")); val server = ExpiryServer(clock)
++            val config = operation.goal!!.copy(startDate = "2025-12-31", deadline = "2026-06-30")
++            if (kind == "EDIT") server.snapshot.value = GoalSnapshot(SavingsGoal(config, 2120000, 1, "previous"),
++                listOf(SavingsEntry("c", "contribution", 1000000, "2026-01-01")), true, false)
++            val original = GoalOperation("accepted-$kind", kind, if (kind == "EDIT") 1 else null,
++                goal = config.copy(deadline = "2026-02-28"), previousDeadline = if (kind == "EDIT") config.deadline else null)
++            val store = SubmissionRecoveryStore(PreferenceDataStoreFactory.create(scope = backgroundScope, produceFile = { temp.newFile("accepted-$kind.preferences_pb") }))
++            val repo = FirestoreGoalRepository(server, store, clock); repo.submit("a", original)
++            server.online = true; server.loseAcknowledgement = true
++            val sync = backgroundScope.launch { repo.synchronize("a") }; runCurrent()
++            assertEquals(1, server.mutations)
++            clock.day = LocalDate.parse("2026-03-01")
++            try { repo.reviseExpired("a", original, original.copy(operationId = "forbidden", goal = original.goal!!.copy(deadline = "2026-08-31"))); fail() } catch (_: IllegalStateException) {}
++            advanceTimeBy(5000); runCurrent()
++            assertEquals(1, server.mutations); assertTrue(server.fences.isEmpty()); assertTrue(store.getRecords("a", original.type).isEmpty())
++            assertEquals(if (kind == "CREATE") 1120000L else 2120000L, server.snapshot.value.goal!!.savedMinor)
++            sync.cancelAndJoin()
++        }
++    }
++    @Test fun `failed atomic deadline replacement retains original and a cancelled post persistence await retries idempotently`() = runTest {
++        val clock = TestClock(LocalDate.parse("2026-03-01"))
++        val actual = PreferenceDataStoreFactory.create(scope = backgroundScope, produceFile = { temp.newFile("replace.preferences_pb") })
++        var failReplacement = false; var waitAfterPersist: CompletableDeferred<Unit>? = null
++        val wrapped = object : DataStore<Preferences> {
++            override val data = actual.data
++            override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
++                if (failReplacement) throw IOException("Local write failed")
++                val result = actual.updateData(transform); waitAfterPersist?.await(); return result
++            }
++        }
++        val store = SubmissionRecoveryStore(wrapped)
++        val original = operation.copy(goal = operation.goal!!.copy(deadline = "2026-02-28"))
++        store.saveOperation(SubmissionRecord.create("a", original.recordId, original, "EXPIRED", original.type))
++        val replacement = original.copy(operationId = "revised", goal = original.goal!!.copy(deadline = "2026-05-31"))
++        val repo = FirestoreGoalRepository(Remote(), store, clock)
++        failReplacement = true
++        try { repo.reviseExpired("a", original, replacement); fail() } catch (_: IOException) {}
++        assertEquals("EXPIRED", store.getRecords("a", original.type).single().status)
++        failReplacement = false; waitAfterPersist = CompletableDeferred()
++        val job = backgroundScope.launch { withTimeoutOrNull(10000) { repo.reviseExpired("a", original, replacement) } }
++        runCurrent(); advanceTimeBy(10001); runCurrent(); job.join()
++        val saved = store.getRecords("a", original.type).single()
++        assertEquals(SubmissionRecord.create("a", replacement.recordId, replacement, "PENDING", replacement.type).payloadJson, saved.payloadJson)
++        waitAfterPersist!!.complete(Unit); waitAfterPersist = null
++        repo.reviseExpired("a", original, replacement)
++        assertEquals(saved, store.getRecords("a", original.type).single())
++    }
+ }
+diff --git a/app/src/test/java/com/clarity/finance/viewmodel/GoalViewModelTest.kt b/app/src/test/java/com/clarity/finance/viewmodel/GoalViewModelTest.kt
+--- a/app/src/test/java/com/clarity/finance/viewmodel/GoalViewModelTest.kt
++++ b/app/src/test/java/com/clarity/finance/viewmodel/GoalViewModelTest.kt
+@@ -52,6 +52,10 @@
+         override suspend fun synchronize(uid: String) { synchronization++; awaitCancellation() }
+         override suspend fun retry(uid: String, operation: GoalOperation) { source(uid).value = source(uid).value.copy(attempts = listOf(GoalAttempt(operation, "PENDING"))) }
+         override suspend fun dismissRejected(uid: String, operation: GoalOperation) { source(uid).value = source(uid).value.copy(attempts = emptyList()) }
++        override suspend fun reviseExpired(uid: String, original: GoalOperation, replacement: GoalOperation) {
++            check(source(uid).value.attempts.single().operation == original)
++            submit(uid, replacement)
++        }
+     }
+     private fun runGoalTest(block: suspend TestScope.() -> Unit) = runTest(dispatcher) {
+         try { block() } finally { repo.gate?.complete(Unit); repo.staleGate?.complete(Unit); store.clear() }
+@@ -170,4 +174,29 @@
+             assertEquals(1120000L, vm.state.value.progress!!.savedMinor)
+         }
+     }
++    @Test fun `server expired proposal opens deadline only revision preserving its values and start date`() = runGoalTest {
++        val original = GoalOperation("expired", "CREATE", goal = config.copy(startDate = "2026-01-01", deadline = "2026-01-15"))
++        repo.source("a").value = GoalSnapshot(known = true, entries = emptyList(), fromCache = false, attempts = listOf(GoalAttempt(original, "EXPIRED")))
++        runCurrent(); vm.reviseDeadline(vm.state.value.snapshot.attempts.single())
++        assertFalse(vm.state.value.canChange); assertTrue(vm.state.value.canSaveForm)
++        assertEquals("11200.00", vm.state.value.form!!.opening); assertEquals(original.goal!!.startDate, vm.state.value.form!!.startDate)
++        vm.save(); runCurrent(); assertTrue(repo.submissions.isEmpty()); assertEquals("EXPIRED", vm.state.value.snapshot.attempts.single().status)
++        vm.update(vm.state.value.form!!.copy(deadline = "2026-12-31")); vm.save(); vm.save(); runCurrent()
++        val replacement = repo.submissions.single().second
++        assertNotEquals(original.operationId, replacement.operationId)
++        assertEquals(original.goal, replacement.goal!!.copy(deadline = original.goal.deadline))
++        assertEquals(original.expectedVersion, replacement.expectedVersion)
++        assertEquals("PENDING", vm.state.value.snapshot.attempts.single().status)
++    }
++    @Test fun `cancelled local deadline revision retains its source and stable replacement identity for retry`() = runGoalTest {
++        val original = GoalOperation("expired", "CREATE", goal = config.copy(startDate = "2026-01-01", deadline = "2026-01-15"))
++        repo.source("a").value = GoalSnapshot(known = true, entries = emptyList(), fromCache = false, attempts = listOf(GoalAttempt(original, "EXPIRED")))
++        runCurrent(); vm.reviseDeadline(vm.state.value.snapshot.attempts.single()); vm.update(vm.state.value.form!!.copy(deadline = "2026-12-31"))
++        repo.gate = CompletableDeferred(); vm.save(); runCurrent(); advanceTimeBy(10001); runCurrent()
++        val uncertain = vm.state.value.unknown!!
++        assertEquals(original, vm.state.value.replacementSource); assertEquals("EXPIRED", vm.state.value.snapshot.attempts.single().status)
++        vm.closeForm(); repo.gate!!.complete(Unit); vm.retryUnknown(); runCurrent()
++        assertTrue(repo.submissions.all { it.second == uncertain }); assertNull(vm.state.value.unknown); assertNull(vm.state.value.replacementSource)
++        assertEquals(uncertain, vm.state.value.snapshot.attempts.single().operation)
++    }
+ }
+diff --git a/firestore-tests/savings-tests.js b/firestore-tests/savings-tests.js
+--- a/firestore-tests/savings-tests.js
++++ b/firestore-tests/savings-tests.js
+@@ -11,11 +11,11 @@
+     const entry = (d, id = 'entry', uid = 'alice') => doc(d, 'users', uid, 'savingsGoals', 'active', 'entries', id);
+     const ev = (e) => ({ kind: e.kind, amountMinor: e.amountMinor, entryDate: e.entryDate, note: e.note, deleted: e.deleted });
+     const gv = (g) => Object.fromEntries(['name', 'targetMinor', 'openingMinor', 'startDate', 'deadline'].map(k => [k, g[k]]));
+-    function create(d, changes = {}, extras = () => {}) {
++    function create(d, changes = {}, extras = () => {}, operationId = 'create') {
+         const g = { ...config(), ...changes };
+-        const parent = { ...g, savedMinor: g.openingMinor, version: 0, lastOperationId: 'create', lastEntryId: '', createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
++        const parent = { ...g, savedMinor: g.openingMinor, version: 0, lastOperationId: operationId, lastEntryId: '', createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
+         const b = writeBatch(d); b.set(goal(d), parent);
+-        b.set(receipt(d, 'create'), { kind: 'CREATE', entryId: '', version: 0, payload: gv(g), createdAt: serverTimestamp() });
++        b.set(receipt(d, operationId), { kind: 'CREATE', entryId: '', version: 0, payload: gv(g), createdAt: serverTimestamp() });
+         extras(b, parent); return b.commit();
+     }
+     async function ledger(d, id, changes, kind = 'ENTRY_CREATE', overrides = {}, extra = () => {}) {
+@@ -33,15 +33,88 @@
+         b.set(receipt(d, op), { kind, entryId: id, version, payload: ev(e), createdAt: serverTimestamp() });
+         extra(b, e); return b.commit();
+     }
+-    async function edit(d, changes = {}, overrides = {}) {
++    async function edit(d, changes = {}, overrides = {}, operationId = null) {
+         const before = (await getDoc(goal(d))).data();
+-        const c = { ...gv(before), ...changes }, version = before.version + 1, op = `edit-${version}`;
++        const c = { ...gv(before), ...changes }, version = before.version + 1, op = operationId || `edit-${version}`;
+         const b = writeBatch(d);
+         b.update(goal(d), { ...c, savedMinor: before.savedMinor - before.openingMinor + c.openingMinor, version, lastOperationId: op,
+             lastEntryId: '', updatedAt: serverTimestamp(), ...overrides });
+         b.set(receipt(d, op), { kind: 'EDIT', entryId: '', version, payload: gv(c), createdAt: serverTimestamp() });
+         return b.commit();
+     }
++    const dayOffset = days => new Date(Date.now() + 330 * 60000 + days * 86400000).toISOString().slice(0, 10);
++    const expiredConfig = () => ({ ...config(), startDate: dayOffset(-40), deadline: dayOffset(-1) });
++    const fence = (d, id) => doc(d, 'users/alice/savingsGoals/active/rejections', id);
++    const fenceData = (kind = 'CREATE', version = 0, payload = expiredConfig()) => ({ kind, version, payload, createdAt: serverTimestamp() });
++    it('expiry fence permits CREATE deadline revision once and prevents replay even with a future deadline', async () => {
++        const d = db(), original = expiredConfig();
++        await assertSucceeds(setDoc(fence(d, 'create'), fenceData('CREATE', 0, original)));
++        assert.equal((await getDoc(goal(d))).exists(), false);
++        await assertFails(create(d, { ...original, deadline: config().deadline }));
++        await assertSucceeds(create(d, { ...original, deadline: config().deadline }, () => {}, 'revised-create'));
++        assert.equal((await getDoc(goal(d))).data().savedMinor, 1120000);
++        assert.equal((await getDocs(collection(goal(d), 'operations'))).size, 1);
++        await assertFails(updateDoc(fence(d, 'create'), { payload: config() }));
++        await assertFails(deleteDoc(fence(d, 'create')));
++    });
++    it('expiry fence permits changed EDIT deadline revision without losing allocations or duplicating opening delta', async () => {
++        const d = db(); await create(d, { startDate: dayOffset(-40) }); await ledger(d, 'c', {});
++        const baseline = (await getDoc(goal(d))).data();
++        const proposal = { ...gv(baseline), openingMinor: 1200000, deadline: dayOffset(-1) };
++        await assertSucceeds(setDoc(fence(d, 'edit-2'), fenceData('EDIT', 2, proposal)));
++        assert.deepEqual((await getDoc(goal(d))).data(), baseline);
++        await assertFails(edit(d, { ...proposal, deadline: dayOffset(400) }));
++        await assertSucceeds(edit(d, { ...proposal, deadline: dayOffset(400) }, {}, 'revised-edit'));
++        assert.equal((await getDoc(goal(d))).data().savedMinor, 2200000);
++        assert.equal((await getDocs(collection(goal(d), 'entries'))).size, 1);
++        assert.equal((await getDoc(entry(d, 'c'))).data().amountMinor, 1000000);
++    });
++    it('expiry fences enforce server Colombo date strict schema owner isolation and cannot reject unchanged overdue edits', async () => {
++        const d = db();
++        for (const bad of [{ payload: { ...expiredConfig(), deadline: dayOffset(1) } }, { payload: { ...expiredConfig(), deadline: '2025-02-29' } },
++            { payload: { ...expiredConfig(), openingMinor: -1 } }, { payload: { ...expiredConfig(), extra: true } },
++            { kind: 'ENTRY_CREATE' }, { version: 1 }, { version: 1.5 }, { extra: true }, { createdAt: new Date(0) }])
++            await assertFails(setDoc(fence(d, 'bad'), { ...fenceData(), ...bad }));
++        for (const foreign of [db('bob'), environment().unauthenticatedContext().firestore()]) {
++            await assertFails(setDoc(fence(foreign, 'foreign'), fenceData()));
++            await assertFails(getDoc(fence(foreign, 'foreign')));
++        }
++        await environment().withSecurityRulesDisabled(async context => {
++            await setDoc(goal(context.firestore()), { ...expiredConfig(), savedMinor: 1120000, version: 0, lastOperationId: 'seed', lastEntryId: '',
++                createdAt: new Date(0), updatedAt: new Date(0) });
++        });
++        await assertFails(setDoc(fence(d, 'unchanged'), fenceData('EDIT', 1, expiredConfig())));
++        await assertSucceeds(edit(d, { name: 'Unchanged overdue deadline remains editable' }));
++    });
++    it('accepted receipt wins expiry fencing and receipt plus fence cannot be created together', async () => {
++        const d = db();
++        await assertFails(create(d, {}, b => b.set(fence(d, 'create'), fenceData())));
++        const historical = expiredConfig();
++        await environment().withSecurityRulesDisabled(async context => {
++            const admin = context.firestore();
++            await setDoc(goal(admin), { ...historical, savedMinor: 1120000, version: 0, lastOperationId: 'create', lastEntryId: '', createdAt: new Date(0), updatedAt: new Date(0) });
++            await setDoc(receipt(admin, 'create'), { kind: 'CREATE', entryId: '', version: 0, payload: historical, createdAt: new Date(0) });
++        });
++        await assertFails(setDoc(fence(d, 'create'), fenceData('CREATE', 0, historical)));
++        assert.equal((await getDoc(receipt(d, 'create'))).exists(), true);
++        assert.equal((await getDoc(goal(d))).data().savedMinor, 1120000);
++    });
++    it('expiry fence blocks an outstanding legacy transaction that never read the fence', async () => {
++        const d = db(); let release, didRead;
++        const gate = new Promise(resolve => { release = resolve; });
++        const read = new Promise(resolve => { didRead = resolve; });
++        const old = runTransaction(d, async tx => {
++            await tx.get(goal(d)); await tx.get(receipt(d, 'create')); didRead(); await gate;
++            const p = config();
++            tx.set(goal(d), { ...p, savedMinor: p.openingMinor, version: 0, lastOperationId: 'create', lastEntryId: '', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
++            tx.set(receipt(d, 'create'), { kind: 'CREATE', entryId: '', version: 0, payload: p, createdAt: serverTimestamp() });
++        });
++        try { await read; await setDoc(fence(d, 'create'), fenceData()); } finally { release(); }
++        await assertFails(old);
++        assert.equal((await getDoc(goal(d))).exists(), false);
++        await assertSucceeds(create(d, {}, () => {}, 'replacement'));
++        assert.equal((await getDoc(goal(d))).data().savedMinor, 1120000);
++    });
+     it('AT07 AT08 owner creation allocation corrections deletion and edits preserve separate finances', async () => {
+         const d = db(); await assertSucceeds(create(d));
+         await assertSucceeds(ledger(d, 'c', {})); assert.equal((await getDoc(goal(d))).data().savedMinor, 2120000);
+diff --git a/firestore.rules b/firestore.rules
+--- a/firestore.rules
++++ b/firestore.rules
+@@ -51,6 +51,7 @@
+     function gNewReceipt(uid, data) {
+       let op = gReceipt(uid, data.lastOperationId);
+       return !exists(/databases/$(database)/documents/users/$(uid)/savingsGoals/active/operations/$(data.lastOperationId))
++        && !existsAfter(/databases/$(database)/documents/users/$(uid)/savingsGoals/active/rejections/$(data.lastOperationId))
+         && op.version == data.version && op.entryId == data.lastEntryId;
+     }
+     function gEffect(entry) { return entry.deleted ? 0 : (entry.kind == 'contribution' ? entry.amountMinor : -entry.amountMinor); }
+@@ -120,6 +121,7 @@
+     match /users/{uid}/savingsGoals/active/operations/{operationId} {
+       allow read: if gOwner(uid);
+       allow create: if gOwner(uid) && gId(operationId)
++        && !existsAfter(/databases/$(database)/documents/users/$(uid)/savingsGoals/active/rejections/$(operationId))
+         && request.resource.data.keys().hasAll(['kind','entryId','version','payload','createdAt'])
+         && request.resource.data.keys().hasOnly(['kind','entryId','version','payload','createdAt'])
+         && request.resource.data.kind in ['CREATE','EDIT','ENTRY_CREATE','ENTRY_UPDATE','ENTRY_DELETE']
+@@ -131,6 +133,34 @@
+             && request.resource.data.payload == gGoalValues(getAfter(/databases/$(database)/documents/users/$(uid)/savingsGoals/active).data))
+           || (request.resource.data.kind in ['ENTRY_CREATE','ENTRY_UPDATE','ENTRY_DELETE'] && gId(request.resource.data.entryId)
+             && request.resource.data.payload == gEntryValues(getAfter(/databases/$(database)/documents/users/$(uid)/savingsGoals/active/entries/$(request.resource.data.entryId)).data)));
++      allow update, delete: if false;
++    }
++
++    // Expiry fences never alter savings. Their acknowledgement safely permits deadline-only replacement.
++    match /users/{uid}/savingsGoals/active/rejections/{operationId} {
++      function expiredPayload(data) {
++        let p = data.payload;
++        return p is map && p.keys().hasAll(['name','targetMinor','openingMinor','startDate','deadline'])
++          && p.keys().hasOnly(['name','targetMinor','openingMinor','startDate','deadline'])
++          && p.name is string && p.name.size() > 0 && p.name.size() <= 100 && p.name.matches('.*[^ \\t\\r\\n].*')
++          && p.targetMinor is int && p.targetMinor > 0 && p.openingMinor is int && p.openingMinor >= 0
++          && gDate(p.startDate) && gDay(p.startDate) <= gToday()
++          && gDate(p.deadline) && p.deadline > p.startDate && gDay(p.deadline) <= gToday();
++      }
++      function unchangedParent(data) {
++        let path = /databases/$(database)/documents/users/$(uid)/savingsGoals/active;
++        return data.kind == 'CREATE' ? (data.version == 0 && !exists(path) && !existsAfter(path))
++          : (data.version > 0 && exists(path) && get(path).data.version == data.version - 1
++            && get(path).data.deadline != data.payload.deadline && getAfter(path).data == get(path).data);
++      }
++      allow read: if gOwner(uid);
++      allow create: if gOwner(uid) && gId(operationId)
++        && request.resource.data.keys().hasAll(['kind','version','payload','createdAt'])
++        && request.resource.data.keys().hasOnly(['kind','version','payload','createdAt'])
++        && request.resource.data.kind in ['CREATE','EDIT'] && request.resource.data.version is int
++        && request.resource.data.createdAt == request.time && expiredPayload(request.resource.data)
++        && unchangedParent(request.resource.data)
++        && !existsAfter(/databases/$(database)/documents/users/$(uid)/savingsGoals/active/operations/$(operationId));
+       allow update, delete: if false;
+     }
+ 

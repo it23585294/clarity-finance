@@ -108,14 +108,3 @@ History order is actual transaction/expense/result date descending, then immutab
 Latest recorded application evidence: **292 unit tests**, final **8 isolated API26 Android cases**, successful app/test builds and lint **0 errors/16 warnings**. **147 rules tests** are reused unchanged evidence. Focused/earlier counts overlap and must not be added. These are recorded application checks, not reruns performed for documentation cleanup.
 
 Five human captures were correct with approximate clock-based feedback, not exact stopwatch measurements. Actual TalkBack remains unexecuted. Historical API35 native/system instability is unresolved; a later boot was disk-blocked, so there is no clean final full-suite API35 claim. Final-render performance, deployed-source byte equality and broader live migration/in-flight races have explicit limits in the verification record. No blanket crash-free, security or release-certification claim is made.
-
-## Editing the report
-
-The only canonical report is under `docs/report/`; do not add final-v2/draft copies. Edit its Markdown and SVG-generating source in [tools/report/figures.py](tools/report/figures.py). The [document renderer](tools/report/render_report.py) uses existing python-docx, Markdown, lxml and PyMuPDF report tools; they are not Android dependencies. Its optional `--python-tools` points to an already installed local report-library directory. On Windows with Microsoft Word available:
-
-```powershell
-python -B tools/report/render_report.py --python-tools <existing-report-library-directory> --export-pdf
-python -B tools/report/verify_report.py --python-tools <existing-report-library-directory> --inspection-output <private-directory-outside-repository>
-```
-
-Figure labels are ASCII in explicit UTF-8 sources; arrows are vector shapes. Regenerate embedded PNGs as well as DOCX/PDF after a figure edit. Inspect every rendered page and keep the minimum 15 pages without padding/tiny diagrams. Administrative unknowns and truthful AI assistance are recorded once on the cover; complete/review them before submission.

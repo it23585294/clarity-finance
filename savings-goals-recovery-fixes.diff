@@ -1,0 +1,709 @@
+diff --git a/SAVINGS_GOALS.md b/SAVINGS_GOALS.md
+--- a/SAVINGS_GOALS.md
++++ b/SAVINGS_GOALS.md
+@@ -10,7 +10,7 @@
+ 
+ Rule arithmetic checks integer representation bounds before computing opposite-sign deltas; it must not rely on overflowing addition. Client calculations use checked integer/BigInteger intermediate arithmetic and BigDecimal display. Rules enforce owner, exact allowed fields, types, real calendar/leap dates, Colombo date boundaries, server timestamps and immutable creation/start dates. Client-only checks include typed decimal syntax, schedule/progress presentation and UI feedback.
+ 
+-Recovery reuses SubmissionRecoveryStore with UID, goal operation type and record ID. Payloads and operation IDs are immutable. One unresolved mutation per owner/goal prevents independently queued stale versions from being silently rebased. A timeout retains an unknown/pending outcome; only receipt/payload reconciliation proves acknowledgement. Pending/rejected proposals never replace confirmed savings or ledger history. Dashboard observation is read-only; synchronisation runs only in the savings feature. Account/target changes invalidate old jobs and callbacks. No ordinary income/expense/crypto/project writes are involved.
++Recovery reuses SubmissionRecoveryStore with UID, goal operation type and record ID. Payloads and operation IDs are immutable. One unresolved mutation per owner/goal prevents independently queued stale versions from being silently rebased. A timeout retains an uncertain outcome; an acknowledged atomic transaction or exact matching receipt establishes success. Only a successful server transaction verifying a permanent invariant contradiction establishes dismissible rejection; exception classes and authentication/access errors do not. Pending/rejected proposals never replace confirmed savings or ledger history. Dashboard observation is read-only; synchronisation runs only in the savings feature. Account/target changes invalidate old jobs and callbacks. No ordinary income/expense/crypto/project writes are involved.
+ 
+ Dates use Asia/Colombo. Each monthly date is derived from the original start-day anchor, with month-end clamping. The deadline is included once; no later date is offered. The inspectable schedule is computed, not stored as a growing document. Remaining/overfunding/progress and required contribution are derived; only the visual bar is capped. A reached goal requires zero further contribution; an overdue goal never divides by zero.
+ 
+@@ -40,7 +40,7 @@
+ 
+ The existing expense, income, linked receipt, project/milestone and crypto rule blocks are unchanged (text comparison with baseline after removing the savings block). The entire reviewed local firestore.rules needs later publication after review; nothing has been deployed. SHA-256 of that local file: `8DAEDA5AAB408DB4716D16306DC4CF508D0CE56E0A1CB1AA196BDA524A520584`.
+ 
+-## Actual local verification — 26 October 2026
++## Initial milestone verification — 26 October 2026 (before focused recovery correction)
+ 
+ Baseline: `dbfc3c7a6d9217f13e0cb8e157c5f56107ceab85`. No applicable AGENTS.md was found. No commits, pushes, dependency edits, Firebase target changes, rules publication or live financial writes were performed. The unrelated `.vscode/settings.json` and `reporting-review-fixes.diff` retain their initial hashes; the Git index is unchanged.
+ 
+@@ -70,6 +70,44 @@
+ Result on the API 37 Android emulator: **OK (7 tests)**, comprising three savings checks and the four existing dashboard checks. The isolated tests use the production navigation, ViewModels and screens with fake repositories at **320 dp and 1.3 font scale**. They cover explicit creation, AT07/08 figures, the schedule dialog, allocation correction, deletion/keep confirmation, dashboard navigation/value, pending/rejected deletion retaining confirmed savings, account changes and overdue-deadline revision. The existing dashboard tests exercise reporting/navigation and malformed/overflow history protections. Initial UI fixture failures in scroll helpers, operation-count expectation and today inclusion were corrected before the final run. These are isolated UI checks, not live Firebase acceptance.
+ 
+ Local logs/reports are ignored build artifacts: `build/savings-full-checks.log`, `build/savings-full-rules.log`, `build/savings-android-ui.log`, Android unit XML under `app/build/test-results/testDebugUnitTest` and lint reports under `app/build/reports`. `git diff --check` and a separate new-file trailing-whitespace scan are clean. No pre-existing source changed outside the integration/rules/test files listed below. Emulator app storage and the existing DNS workaround were preserved.
++
++## Focused recovery correction — 26 October 2026
++
++The initial implementation incorrectly mapped broad argument/state exceptions and authentication/access codes to FAILED. A later failed reconciliation attempt did not establish that an earlier timed-out Firebase transaction could never commit, yet FAILED exposed dismissal. This correction changes only that recovery policy, its UI gating, tests and this report. The initial 21-file milestone and unrelated local work remain intact.
++
++Task lifecycle was inspected in the existing cached dependency sources: Firebase BoM 34.2.0 selects Firestore 26.0.0, and coroutines-play-services is 1.11.0. Task.await() delegates to awaitImpl(null); cancelling its coroutine does not cancel the receiving Task. Firestore TransactionRunner completes its result Task after commit acknowledgement and may retry callbacks. Transaction.commit() adds VerifyMutation preconditions for documents read but not written. No dependency versions were changed.
++
++Current outcome policy:
++
++- Persist UNCERTAIN before starting/awaiting a Firebase transaction. Timeouts and CancellationException retain the exact operation ID and immutable payload; cancellation propagates. A later account/auth/permission error cannot disprove an earlier commit. Legacy FAILED records are also non-dismissable and reconciled again, rather than trusted as rejection proofs.
++- Retain an outstanding SDK Task keyed by UID and operation identity, with an exact payload check. New waiters reuse it instead of starting overlapping transactions. Account checks still run before reawaiting. A repository sweep mutex also prevents concurrent recovery workers from submitting together. A process restart can lose a Task handle, so durable uncertainty and server reconciliation remain necessary.
++- Remote results are explicit Confirmed, Rejected or Uncertain outcomes. Matching immutable receipts reconcile before other checks. A successful atomic write also acknowledges the receipt it created. Mismatched receipts remain an error and are never treated as success.
++- Rejected is returned only from a no-write server transaction after receipt absence and a permanent contradiction are checked: an already-existing fixed goal for CREATE, a parent version beyond the immutable expected version, or a deterministic ledger identity/balance violation at that expected version. The existing rules forbid parent deletion/version rollback and ledger changes without a matching version increment. Consequently an older outstanding attempt cannot later repair these contradictions while retaining its expected version. Pure balance/identity validation is the only exception context classified this way; decode, SDK, auth and access failures are not proofs.
++- The callback returns the rejection outcome rather than throwing it. The SDK must successfully verify its read set before that outcome is exposed. If an earlier transaction commits between receipt read and verification, the SDK retries and reconciles its receipt. If verification fails without a successful outcome, the proposal stays uncertain. Rules are unchanged.
++- Only persisted REJECTED records expose Dismiss rejected proposal, with the same guard in the ViewModel and repository. Retrying preserves the original identity/payload/version. Dismissal permits a separately corrected proposal with a new identity; uncertain operations cannot be silently replaced or discarded. If access remains unavailable or no authoritative proof can be established, uncertainty remains retained rather than being forced to failure.
++- Local decode, recovery-store/status and cleanup errors are handled outside the remote outcome boundary and shown as UID-scoped recovery bookkeeping errors. A confirmed remote outcome remains acknowledged if local cleanup fails; the record remains and cleanup retries without another remote submission in that process. The UI distinguishes confirmed-with-local-cleanup-pending from an uncertain remote outcome. After restart, exact receipt reconciliation remains safe.
++
++Fresh verification for this correction:
++
++```powershell
++.\gradlew.bat :app:testDebugUnitTest --tests '*FirestoreGoal*Test' --tests '*GoalViewModelTest' --console=plain
++```
++
++Result: **27 focused tests passed**. The required suspending regression starts A's underlying work independently of its cancelled await, times out A before any mutation, restarts repository recovery, makes B throw an access error before receipt reconciliation, asserts retained UNCERTAIN status/identical payload/non-dismissability, then permits A to commit and verifies that C reconciles its receipt with exactly one mutation and clears recovery. The previous commit-before-timeout test is retained. Additional coverage exercises an actual pending TaskCompletionSource reused after await timeout/account change, a changed-payload refusal, proven rejection/correction, legacy failures, raw errors, local cleanup failure and UID-isolated feedback. No deferred wait occurs inside a Mockito answer. The first fixture run hit Android's unmocked SparseArray while constructing Firebase's error-code enum; the exception object is now mocked while all asynchronous operation behavior remains genuinely suspending.
++
++```powershell
++.\gradlew.bat :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --console=plain
++```
++
++Result: **BUILD SUCCESSFUL; 175 unit tests, zero failures/errors; both APK builds successful; lint 0 errors / 20 warnings.** After that full run, two assertions were strengthened in the existing remote tests (negative-balance rejection and running-payload immutability), and an explanatory production comment was added; no production behavior changed. A fresh `:app:testDebugUnitTest --tests '*FirestoreGoalRemoteTest'` run passed **all seven** remote tests with those assertions.
++
++`npm.cmd test -- --grep 'read-only rejection|verified stale version'` from firestore-tests passed both new emulator races. Fresh full `npm.cmd test` then passed **101 tests** (all 99 previous tests retained). One case verifies that an earlier commit invalidates a stale receipt-absence read and causes reconciliation. The other verifies a stale-version rejection while an older write is still outstanding, then proves the late write cannot commit. Depending on SDK validation order, the late stale write can receive PERMISSION_DENIED before its callback retries; the earlier verified contradiction, not that error, is the rejection proof. This was observed and the fixture asserts the exact permitted denial without changing rules.
++
++After `adb install -r` for both APKs, fresh isolated Android execution of `com.clarity.finance.GoalNavigationTest` on API 37 passed **3 tests** at 320 dp/1.3 font scale. The expanded pending/rejection check verifies that a legacy FAILED proposal shows uncertain feedback, retains the original confirmed contribution and hides Dismiss; a proven REJECTED fixture then exposes correction/dismissal. The four dashboard Android checks are reused from the initial seven-test milestone run and were not rerun for this correction. No live repositories or records were used. Emulator storage and DNS configuration were preserved.
++
++Fresh logs: `build/savings-recovery-focused.log`, `build/savings-recovery-final-checks.log`, `build/savings-recovery-task-final.log`, `build/savings-recovery-rules-focused.log`, `build/savings-recovery-rules-full.log`, `build/savings-recovery-android-ui.log`. Earlier 169-unit/99-emulator/seven-Android evidence above remains historical and is not substituted for the fresh results. Live delayed-commit/network/auth scenarios and API 26 runtime checks remain unexecuted. Hilt/Koin remains outside scope.
++
++A local pre-correction snapshot was taken before editing, including existing uncommitted milestone files. The exported correction-only diff compares against that snapshot, not HEAD, and is verified by applying it to a separate snapshot copy and comparing resulting file SHA-256 values. Correction files are FirestoreGoalRepository.kt, FirestoreGoalRemote.kt, GoalRepository.kt, GoalViewModel.kt, GoalScreen.kt, their three unit-test files, GoalNavigationTest.kt, firestore-tests/savings-tests.js and this report. Other milestone/source files, firestore.rules, dependencies, Firebase targets, unrelated IDE settings and reporting-review-fixes.diff remain unchanged. No publication, live write, commit or push occurred.
+ 
+ ## Exact milestone files
+ 
+diff --git a/app/src/androidTest/java/com/clarity/finance/GoalNavigationTest.kt b/app/src/androidTest/java/com/clarity/finance/GoalNavigationTest.kt
+--- a/app/src/androidTest/java/com/clarity/finance/GoalNavigationTest.kt
++++ b/app/src/androidTest/java/com/clarity/finance/GoalNavigationTest.kt
+@@ -130,7 +130,14 @@
+         text("Saved: LKR 21200.00"); text("Saved proposal awaiting server confirmation. Confirmed savings are retained.")
+         compose.runOnIdle {
+             val attempt = data.snapshots.value.attempts.single()
+-            data.snapshots.value = data.snapshots.value.copy(attempts = listOf(attempt.copy(status = "FAILED", error = "Isolated conflict")))
++            data.snapshots.value = data.snapshots.value.copy(attempts = listOf(attempt.copy(status = "FAILED", error = "Earlier outcome unknown")))
++        }
++        text("Proposal outcome uncertain: Earlier outcome unknown. Retained until server reconciliation; it cannot be dismissed.")
++        compose.onNodeWithText("Dismiss rejected proposal").assertDoesNotExist()
++        text("Saved: LKR 21200.00")
++        compose.runOnIdle {
++            val attempt = data.snapshots.value.attempts.single()
++            data.snapshots.value = data.snapshots.value.copy(attempts = listOf(attempt.copy(status = "REJECTED", error = "Isolated conflict")))
+         }
+         text("Saved: LKR 21200.00"); text("Rejected proposal: Isolated conflict. Confirmed savings are retained.")
+         click("Dismiss rejected proposal")
+diff --git a/app/src/main/java/com/clarity/finance/data/repository/FirestoreGoalRemote.kt b/app/src/main/java/com/clarity/finance/data/repository/FirestoreGoalRemote.kt
+--- a/app/src/main/java/com/clarity/finance/data/repository/FirestoreGoalRemote.kt
++++ b/app/src/main/java/com/clarity/finance/data/repository/FirestoreGoalRemote.kt
+@@ -3,6 +3,7 @@
+ import com.clarity.finance.data.model.*
+ import com.google.firebase.Timestamp
+ import com.google.firebase.firestore.*
++import com.google.android.gms.tasks.Task
+ import kotlinx.coroutines.CancellationException
+ import kotlinx.coroutines.channels.awaitClose
+ import kotlinx.coroutines.flow.*
+@@ -12,6 +13,8 @@
+ private data class GoalEntries(val entries: List<SavingsEntry>, val cached: Boolean, val pending: Boolean)
+ 
+ class FirestoreGoalRemote(private val firestore: FirebaseFirestore, private val activeUid: () -> String?) : GoalRemote {
++    private data class Running(val operation: GoalOperation, val task: Task<GoalRemoteOutcome>)
++    private val running = mutableMapOf<Pair<String, String>, Running>()
+     private fun parent(uid: String) = firestore.collection("users").document(uid).collection("savingsGoals").document("active")
+     private fun goalFlow(uid: String): Flow<GoalDocument> = callbackFlow {
+         val listener = parent(uid).addSnapshotListener(MetadataChanges.INCLUDE) { doc, error ->
+@@ -60,12 +63,25 @@
+         }
+     }
+ 
+-    override suspend fun apply(uid: String, operation: GoalOperation) {
++    override suspend fun apply(uid: String, operation: GoalOperation): GoalRemoteOutcome {
+         operation.validate(temporal = false)
+         check(activeUid() == uid) { "Account changed. Saved goal operation belongs to the original account." }
++        val key = uid to operation.operationId
++        val task = synchronized(running) {
++            running[key]?.also { check(it.operation == operation) { "Running operation payload cannot change." } }?.task
++                ?: transaction(uid, operation).also { running[key] = Running(operation, it) }
++        }
++        try { return task.await() }
++        finally {
++            // Await cancellation does not cancel Firebase. Keep an outstanding Task for the next waiter.
++            if (task.isComplete) synchronized(running) { if (running[key]?.task === task) running.remove(key) }
++        }
++    }
++
++    private fun transaction(uid: String, operation: GoalOperation): Task<GoalRemoteOutcome> {
+         val goalRef = parent(uid)
+         val receiptRef = goalRef.collection("operations").document(operation.operationId)
+-        firestore.runTransaction { tx ->
++        return firestore.runTransaction<GoalRemoteOutcome> { tx ->
+             check(activeUid() == uid) { "Account changed. Reopen Savings Goal." }
+             val receipt = tx.get(receiptRef)
+             if (receipt.exists()) {
+@@ -73,15 +89,29 @@
+                     receipt.getLong("version") == operation.nextVersion && receipt.get("payload") == operation.payload() &&
+                     receipt.getTimestamp("createdAt") != null) { "Operation identity conflict. Keep the saved payload for inspection." }
+                 check(activeUid() == uid) { "Account changed." }
+-                return@runTransaction
++                return@runTransaction GoalRemoteOutcome.Confirmed
+             }
+             val goalDoc = tx.get(goalRef)
+             val before = if (goalDoc.exists()) goalDoc.goal() else null
++            // These contradictions are permanent under the existing no-delete/monotonic-version rules.
++            // Returning (rather than throwing) verifies the read set at commit. If an older attempt wins
++            // first, verification retries this callback, which then reconciles its matching receipt.
++            if (operation.kind == "CREATE" && before != null)
++                return@runTransaction GoalRemoteOutcome.Rejected("A goal already exists. Reopen its latest details.")
++            if (operation.kind != "CREATE" && before != null && before.version > operation.expectedVersion!!)
++                return@runTransaction GoalRemoteOutcome.Rejected("Goal changed elsewhere. Reopen the latest version before making this change.")
+             checkGoalVersion(operation, before)
+             val entryRef = operation.entry?.let { goalRef.collection("entries").document(it.id) }
+             val entryDoc = entryRef?.let { tx.get(it) }
+             val oldEntry = if (entryDoc?.exists() == true) entryDoc.entry() else null
+-            val saved = goalMutationBalance(operation, before, oldEntry)
++            // Only this pure balance/identity calculation is classified here. With the expected
++            // parent version fixed and these ledger reads verified, its violations cannot be
++            // repaired by an older outstanding attempt. Decode/access/SDK failures are not proofs.
++            val saved = try { goalMutationBalance(operation, before, oldEntry) }
++            catch (e: IllegalArgumentException) { return@runTransaction GoalRemoteOutcome.Rejected(e.message ?: "Invalid resulting allocation balance.") }
++            catch (e: IllegalStateException) { return@runTransaction GoalRemoteOutcome.Rejected(e.message ?: "Entry conflicts with the confirmed ledger.") }
++            if (operation.goal != null && before != null && operation.goal.startDate != before.config.startDate)
++                return@runTransaction GoalRemoteOutcome.Rejected("Goal start date cannot change.")
+             // Reconcile first: an acknowledged create remains acknowledged even after its deadline passes.
+             operation.validate()
+             if (operation.goal != null && before != null) {
+@@ -107,7 +137,8 @@
+             }
+             tx.set(receiptRef, mapOf("kind" to operation.kind, "entryId" to (operation.entry?.id ?: ""), "version" to operation.nextVersion,
+                 "payload" to operation.payload(), "createdAt" to FieldValue.serverTimestamp()))
+-        }.await()
++            GoalRemoteOutcome.Confirmed
++        }
+     }
+     private fun DocumentSnapshot.string(field: String) = get(field) as? String ?: error("Missing or invalid $field.")
+     private fun DocumentSnapshot.long(field: String) = get(field) as? Long ?: error("Missing or invalid integer $field.")
+diff --git a/app/src/main/java/com/clarity/finance/data/repository/FirestoreGoalRepository.kt b/app/src/main/java/com/clarity/finance/data/repository/FirestoreGoalRepository.kt
+--- a/app/src/main/java/com/clarity/finance/data/repository/FirestoreGoalRepository.kt
++++ b/app/src/main/java/com/clarity/finance/data/repository/FirestoreGoalRepository.kt
+@@ -2,7 +2,6 @@
+ 
+ import com.clarity.finance.data.local.SubmissionRecord
+ import com.clarity.finance.data.local.SubmissionRecoveryStore
+-import com.google.firebase.firestore.FirebaseFirestoreException
+ import com.google.gson.Gson
+ import kotlinx.coroutines.*
+ import kotlinx.coroutines.flow.*
+@@ -12,7 +11,9 @@
+ class FirestoreGoalRepository(private val remote: GoalRemote, private val store: SubmissionRecoveryStore) : GoalRepository {
+     private val gson = Gson()
+     private val mutex = Mutex()
++    private val synchronization = Mutex()
+     private val acknowledged = MutableStateFlow<Pair<String, String>?>(null)
++    private val bookkeepingError = MutableStateFlow<Pair<String, String>?>(null)
+     private val types = setOf("GOAL_CREATE", "GOAL_EDIT", "GOAL_ENTRY_CREATE", "GOAL_ENTRY_UPDATE", "GOAL_ENTRY_DELETE")
+     private fun record(uid: String, operation: GoalOperation) = SubmissionRecord.create(uid, operation.recordId, operation, "PENDING", operation.type)
+     override suspend fun submit(uid: String, operation: GoalOperation) = mutex.withLock {
+@@ -27,11 +28,11 @@
+     override suspend fun retry(uid: String, operation: GoalOperation) = mutex.withLock {
+         val saved = store.getRecords(uid, operation.type).singleOrNull { it.recordId == operation.recordId } ?: error("Saved operation no longer exists.")
+         check(saved.payloadJson == record(uid, operation).payloadJson) { "Retry must use the immutable saved payload." }
+-        store.updateOperationStatus(saved.copy(status = "PENDING", errorReason = null))
++        store.updateOperationStatus(saved.copy(status = if (saved.status in setOf("PENDING", "REJECTED")) "PENDING" else "UNCERTAIN", errorReason = null))
+     }
+     override suspend fun dismissRejected(uid: String, operation: GoalOperation) = mutex.withLock {
+         val saved = store.getRecords(uid, operation.type).singleOrNull { it.recordId == operation.recordId } ?: error("Saved operation no longer exists.")
+-        check(saved.status == "FAILED" && saved.payloadJson == record(uid, operation).payloadJson) { "Only a definitively rejected saved proposal can be dismissed." }
++        check(saved.status == "REJECTED" && saved.payloadJson == record(uid, operation).payloadJson) { "Only a server-established rejection can be dismissed; uncertain and legacy failed operations must be reconciled." }
+         store.removeRecord(uid, saved.recordId, saved.resolvedType)
+     }
+     override fun observe(uid: String): Flow<GoalSnapshot> = flow {
+@@ -53,31 +54,55 @@
+             delay(5000L)
+           }
+         }
+-        combine(server, saved, acknowledged) { snapshot, (attempts, error), accepted -> snapshot.copy(attempts = attempts,
+-            recoveryError = error, acknowledgedOperationId = accepted?.takeIf { it.first == uid }?.second) }.collect { emit(it) }
++        combine(server, saved, acknowledged, bookkeepingError) { snapshot, (attempts, error), accepted, local -> snapshot.copy(attempts = attempts,
++            recoveryError = listOfNotNull(error, local?.takeIf { it.first == uid }?.second).takeIf { it.isNotEmpty() }?.joinToString("\n"),
++            acknowledgedOperationId = accepted?.takeIf { it.first == uid }?.second) }.collect { emit(it) }
+     }
+     override suspend fun synchronize(uid: String) {
+         while (currentCoroutineContext().isActive) {
+-            val pending = types.flatMap { store.getRecords(uid, it) }.filter { it.status == "PENDING" }
+-            for (saved in pending) {
+-                try {
+-                    val operation = decode(saved)
+-                    val acknowledged = withTimeoutOrNull(10000L) { remote.apply(uid, operation); true } ?: false
+-                    if (acknowledged) mutex.withLock {
+-                        this@FirestoreGoalRepository.acknowledged.value = uid to operation.operationId
+-                        store.removeRecord(uid, saved.recordId, saved.resolvedType)
+-                    }
+-                } catch (e: CancellationException) { throw e }
+-                catch (e: Exception) {
+-                    if (e is IllegalArgumentException || e is IllegalStateException || (e is FirebaseFirestoreException && e.code in setOf(
+-                            FirebaseFirestoreException.Code.PERMISSION_DENIED, FirebaseFirestoreException.Code.UNAUTHENTICATED,
+-                            FirebaseFirestoreException.Code.ALREADY_EXISTS, FirebaseFirestoreException.Code.NOT_FOUND))) {
+-                        mutex.withLock { store.updateOperationStatus(saved.copy(status = "FAILED", errorReason = e.message ?: "Goal change rejected.")) }
+-                    }
+-                    // Transient errors and timed-out awaits retain the same pending payload; the transaction may still commit.
++            try {
++                synchronization.withLock {
++                    // Multiple savings ViewModels may be alive; only one recovery sweep submits at a time.
++                    val pending = types.flatMap { store.getRecords(uid, it) }.filter { it.status != "REJECTED" }
++                    for (saved in pending) synchronizeRecord(uid, saved)
+                 }
++                if (bookkeepingError.value?.first == uid) bookkeepingError.value = null
++            } catch (e: CancellationException) { throw e }
++            catch (e: Exception) {
++                // Decode/store/status/cleanup failures are local errors, never evidence of remote rejection.
++                bookkeepingError.value = uid to "Local goal recovery bookkeeping unavailable: ${e.message}. Saved proposals are retained."
+             }
+             delay(5000L)
++        }
++    }
++    private suspend fun synchronizeRecord(uid: String, saved: SubmissionRecord) {
++        val operation = decode(saved)
++        val current = mutex.withLock {
++            val row = store.getRecords(uid, saved.resolvedType).singleOrNull { it.recordId == saved.recordId } ?: return
++            check(row.payloadJson == saved.payloadJson) { "Saved operation changed. Reopen recovery." }
++            if (row.status == "REJECTED") return
++            // Persist uncertainty BEFORE starting a Firebase Task, including across process death/cancelled awaits.
++            row.copy(status = "UNCERTAIN", errorReason = "Awaiting server reconciliation; an earlier transaction may still complete.")
++                .also { store.updateOperationStatus(it) }
++        }
++        val result = if (acknowledged.value == (uid to operation.operationId)) GoalRemoteOutcome.Confirmed else try {
++            withTimeoutOrNull(10000L) { remote.apply(uid, operation) }
++                ?: GoalRemoteOutcome.Uncertain("Timed out awaiting Firebase; the transaction may still complete.")
++        } catch (e: CancellationException) { throw e }
++        catch (e: Exception) {
++            // In particular, account/auth/access errors cannot disprove a previous commit.
++            GoalRemoteOutcome.Uncertain("Reconciliation unavailable: ${e.message ?: "Remote outcome unknown"}")
++        }
++        // Keep all local bookkeeping outside the remote catch/classification boundary.
++        mutex.withLock {
++            when (result) {
++                GoalRemoteOutcome.Confirmed -> {
++                    acknowledged.value = uid to operation.operationId
++                    store.removeRecord(uid, saved.recordId, saved.resolvedType)
++                }
++                is GoalRemoteOutcome.Rejected -> store.updateOperationStatus(current.copy(status = "REJECTED", errorReason = result.reason))
++                is GoalRemoteOutcome.Uncertain -> store.updateOperationStatus(current.copy(errorReason = result.reason))
++            }
+         }
+     }
+     private fun decode(record: SubmissionRecord): GoalOperation = gson.fromJson(record.payloadJson, GoalOperation::class.java).also {
+diff --git a/app/src/main/java/com/clarity/finance/data/repository/GoalRepository.kt b/app/src/main/java/com/clarity/finance/data/repository/GoalRepository.kt
+--- a/app/src/main/java/com/clarity/finance/data/repository/GoalRepository.kt
++++ b/app/src/main/java/com/clarity/finance/data/repository/GoalRepository.kt
+@@ -24,7 +24,11 @@
+         }
+     }
+ }
+-data class GoalAttempt(val operation: GoalOperation, val status: String, val error: String? = null)
++data class GoalAttempt(val operation: GoalOperation, val status: String, val error: String? = null) {
++    // Legacy FAILED records did not establish logical rejection and must be reconciled again.
++    val isRejected get() = status == "REJECTED"
++    val isUncertain get() = status in setOf("UNCERTAIN", "FAILED", "CONFLICT")
++}
+ data class GoalSnapshot(val goal: SavingsGoal? = null, val entries: List<SavingsEntry>? = null,
+     val known: Boolean = false, val fromCache: Boolean = true, val attempts: List<GoalAttempt> = emptyList(),
+     val error: String? = null, val recoveryError: String? = null, val acknowledgedOperationId: String? = null)
+@@ -40,5 +44,13 @@
+ 
+ interface GoalRemote {
+     fun observe(uid: String): Flow<GoalSnapshot>
+-    suspend fun apply(uid: String, operation: GoalOperation)
++    suspend fun apply(uid: String, operation: GoalOperation): GoalRemoteOutcome
+ }
++
++sealed interface GoalRemoteOutcome {
++    /** The atomic write was acknowledged, or its exact immutable receipt was reconciled. */
++    data object Confirmed : GoalRemoteOutcome
++    /** A successful server transaction verified receipt absence and an invariant preventing this logical operation. */
++    data class Rejected(val reason: String) : GoalRemoteOutcome
++    data class Uncertain(val reason: String) : GoalRemoteOutcome
++}
+diff --git a/app/src/main/java/com/clarity/finance/ui/goals/GoalScreen.kt b/app/src/main/java/com/clarity/finance/ui/goals/GoalScreen.kt
+--- a/app/src/main/java/com/clarity/finance/ui/goals/GoalScreen.kt
++++ b/app/src/main/java/com/clarity/finance/ui/goals/GoalScreen.kt
+@@ -49,8 +49,12 @@
+     if (state.localPending != null) Text("Saved proposal awaiting server confirmation. Confirmed savings are retained.")
+     if (state.unknown != null) Text("Local save outcome unknown. Keep the original proposal; retry checks the same identity.")
+     state.snapshot.attempts.forEach {
+-        Text(if (it.status == "FAILED") "Rejected proposal: ${it.error ?: "Conflict or validation failure"}. Confirmed savings are retained."
+-            else "Saved proposal awaiting server confirmation. Confirmed savings are retained.")
++        Text(when {
++            state.snapshot.acknowledgedOperationId == it.operation.operationId -> "Server confirmed proposal; completing local recovery cleanup."
++            it.isRejected -> "Rejected proposal: ${it.error ?: "Conflict or validation failure"}. Confirmed savings are retained."
++            it.isUncertain -> "Proposal outcome uncertain: ${it.error ?: "Reconciliation required"}. Retained until server reconciliation; it cannot be dismissed."
++            else -> "Saved proposal awaiting server confirmation. Confirmed savings are retained."
++        })
+     }
+ }
+ 
+@@ -78,7 +82,7 @@
+                         Text("Proposed ${if (it.deleted) "deletion of " else ""}${it.kind}: LKR ${SavingsMath.money(it.amountMinor)} on ${it.entryDate}.")
+                         if (it.note.isNotBlank()) Text("Proposed note: ${it.note}")
+                     }
+-                    if (attempt.status == "FAILED") {
++                    if (attempt.isRejected) {
+                         Text("Dismiss a rejected proposal to reopen the latest details and correct them. Retrying keeps the original payload and version.")
+                         OutlinedButton(onClick = { viewModel.retry(attempt) }, enabled = !state.busy) { Text("Retry original proposal") }
+                         OutlinedButton(onClick = { viewModel.dismiss(attempt) }, enabled = !state.busy) { Text("Dismiss rejected proposal") }
+diff --git a/app/src/main/java/com/clarity/finance/viewmodel/GoalViewModel.kt b/app/src/main/java/com/clarity/finance/viewmodel/GoalViewModel.kt
+--- a/app/src/main/java/com/clarity/finance/viewmodel/GoalViewModel.kt
++++ b/app/src/main/java/com/clarity/finance/viewmodel/GoalViewModel.kt
+@@ -149,7 +149,7 @@
+     }
+     fun retryUnknown() { state.value.unknown?.let { submit(it) } }
+     fun retry(attempt: GoalAttempt) { if (state.value.snapshot.attempts.contains(attempt)) action { repository.retry(it, attempt.operation) } }
+-    fun dismiss(attempt: GoalAttempt) { if (attempt.status == "FAILED" && state.value.snapshot.attempts.contains(attempt)) action { repository.dismissRejected(it, attempt.operation) } }
++    fun dismiss(attempt: GoalAttempt) { if (attempt.isRejected && state.value.snapshot.attempts.contains(attempt)) action { repository.dismissRejected(it, attempt.operation) } }
+     private fun action(block: suspend (String) -> Unit) {
+         if (state.value.busy) return
+         val owner = uid ?: return
+diff --git a/app/src/test/java/com/clarity/finance/data/repository/FirestoreGoalRemoteTest.kt b/app/src/test/java/com/clarity/finance/data/repository/FirestoreGoalRemoteTest.kt
+--- a/app/src/test/java/com/clarity/finance/data/repository/FirestoreGoalRemoteTest.kt
++++ b/app/src/test/java/com/clarity/finance/data/repository/FirestoreGoalRemoteTest.kt
+@@ -2,6 +2,7 @@
+ 
+ import com.clarity.finance.data.model.*
+ import com.google.android.gms.tasks.Task
++import com.google.android.gms.tasks.TaskCompletionSource
+ import com.google.firebase.Timestamp
+ import com.google.firebase.firestore.*
+ import kotlinx.coroutines.*
+@@ -38,10 +39,10 @@
+         `when`(parent.collection("entries")).thenReturn(entries); `when`(entries.document("entry")).thenReturn(entryRef)
+         `when`(tx.get(parent)).thenReturn(goalDoc); `when`(tx.get(receiptRef)).thenReturn(receiptDoc); `when`(tx.get(entryRef)).thenReturn(entryDoc)
+         doAnswer { invocation ->
+-            invocation.getArgument<Transaction.Function<Unit>>(0).apply(tx)
+-            val task = mock(Task::class.java) as Task<Unit>
+-            `when`(task.isComplete).thenReturn(true); `when`(task.isSuccessful).thenReturn(true); `when`(task.result).thenReturn(Unit); task
+-        }.`when`(firestore).runTransaction(any<Transaction.Function<Unit>>())
++            val result = invocation.getArgument<Transaction.Function<GoalRemoteOutcome>>(0).apply(tx)
++            val task = mock(Task::class.java) as Task<GoalRemoteOutcome>
++            `when`(task.isComplete).thenReturn(true); `when`(task.isSuccessful).thenReturn(true); `when`(task.result).thenReturn(result); task
++        }.`when`(firestore).runTransaction(any<Transaction.Function<GoalRemoteOutcome>>())
+     }
+     private fun existing() {
+         `when`(goalDoc.exists()).thenReturn(true)
+@@ -83,6 +84,40 @@
+         `when`(tx.get(parent)).thenAnswer { owner = "b"; goalDoc }
+         try { remote.apply("a", GoalOperation("edit", "EDIT", 0, goal = config)); fail() } catch (_: IllegalStateException) {}
+         verify(tx, never()).update(eq(parent), any<Map<String, Any>>())
++    }
++    @Test fun `verified immutable contradiction returns rejection only as successful read transaction outcome`() = runTest {
++        setup(); existing()
++        val result = remote.apply("a", GoalOperation("different-create", "CREATE", goal = config))
++        assertTrue(result is GoalRemoteOutcome.Rejected)
++        `when`(goalDoc.get("version")).thenReturn(1L)
++        val stale = remote.apply("a", GoalOperation("old-edit", "EDIT", 0, goal = config))
++        assertTrue(stale is GoalRemoteOutcome.Rejected)
++        `when`(goalDoc.get("version")).thenReturn(0L)
++        val impossibleWithdrawal = remote.apply("a", GoalOperation("negative", "ENTRY_CREATE", 0,
++            entry = SavingsEntry("entry", "withdrawal", 1120001, "2025-01-01")))
++        assertTrue(impossibleWithdrawal is GoalRemoteOutcome.Rejected)
++        verify(tx, never()).set(any<DocumentReference>(), any<Map<String, Any>>())
++        verify(tx, never()).update(any<DocumentReference>(), any<Map<String, Any>>())
++    }
++    @Test fun `cancelled Task await and account error retain original outstanding transaction without overlapping submission`() = runTest {
++        setup()
++        val source = TaskCompletionSource<GoalRemoteOutcome>()
++        doReturn(source.task).`when`(firestore).runTransaction(any<Transaction.Function<GoalRemoteOutcome>>())
++        val op = GoalOperation("pending-task", "CREATE", goal = config)
++        var timedOut = false
++        val first = backgroundScope.launch { timedOut = withTimeoutOrNull(10000) { remote.apply("a", op) } == null }
++        runCurrent(); advanceTimeBy(10001); runCurrent(); first.join()
++        assertTrue(timedOut); assertFalse(source.task.isComplete)
++        try { remote.apply("a", op.copy(goal = config.copy(openingMinor = 1))); fail() } catch (_: IllegalStateException) {}
++        owner = "b"
++        try { remote.apply("a", op); fail() } catch (_: IllegalStateException) {}
++        owner = "a"
++        var result: GoalRemoteOutcome? = null
++        val later = backgroundScope.launch { result = remote.apply("a", op) }; runCurrent()
++        verify(firestore, times(1)).runTransaction(any<Transaction.Function<GoalRemoteOutcome>>())
++        source.setResult(GoalRemoteOutcome.Confirmed); runCurrent(); later.join()
++        assertEquals(GoalRemoteOutcome.Confirmed, result)
++        verify(firestore, times(1)).runTransaction(any<Transaction.Function<GoalRemoteOutcome>>())
+     }
+     @Test fun `parent and untruncated ledger listeners include metadata and are removed on cancellation`() = runTest {
+         setup()
+diff --git a/app/src/test/java/com/clarity/finance/data/repository/FirestoreGoalRepositoryTest.kt b/app/src/test/java/com/clarity/finance/data/repository/FirestoreGoalRepositoryTest.kt
+--- a/app/src/test/java/com/clarity/finance/data/repository/FirestoreGoalRepositoryTest.kt
++++ b/app/src/test/java/com/clarity/finance/data/repository/FirestoreGoalRepositoryTest.kt
+@@ -1,6 +1,8 @@
+ package com.clarity.finance.data.repository
+ 
+ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
++import androidx.datastore.preferences.core.Preferences
++import androidx.datastore.core.DataStore
+ import com.clarity.finance.data.local.*
+ import com.clarity.finance.data.model.*
+ import kotlinx.coroutines.*
+@@ -11,17 +13,22 @@
+ import org.junit.Test
+ import org.junit.rules.TemporaryFolder
+ import java.io.IOException
++import com.google.firebase.firestore.FirebaseFirestoreException
+ 
+ @OptIn(ExperimentalCoroutinesApi::class)
+ class FirestoreGoalRepositoryTest {
+     @get:Rule val temp = TemporaryFolder()
+     private val operation = GoalOperation("create", "CREATE", goal = GoalConfig("Fixture", 49000000, 1120000, "2025-01-01", "2027-01-01"))
++    private fun accessError(message: String): FirebaseFirestoreException = org.mockito.Mockito.mock(FirebaseFirestoreException::class.java).also {
++        org.mockito.Mockito.`when`(it.message).thenReturn(message)
++    }
+     private class Remote : GoalRemote {
+         val snapshots = MutableStateFlow(GoalSnapshot(known = true, entries = emptyList(), fromCache = false))
+         var failure: Exception? = IOException("Offline")
+         var gate: CompletableDeferred<Unit>? = null
+         var beforeGate = false
+         var writes = 0
++        var outcome: GoalRemoteOutcome? = null
+         val receipts = mutableMapOf<Pair<String, String>, GoalOperation>()
+         val calls = mutableListOf<Pair<String, GoalOperation>>()
+         override fun observe(uid: String) = snapshots
+@@ -30,11 +37,13 @@
+             if (receipts.containsKey(key)) { check(receipts[key] == op); return }
+             receipts[key] = op; writes++
+         }
+-        override suspend fun apply(uid: String, operation: GoalOperation) {
++        override suspend fun apply(uid: String, operation: GoalOperation): GoalRemoteOutcome {
+             calls += uid to operation
+             if (beforeGate) commit(uid, operation)
+             gate?.await(); failure?.let { throw it }
++            outcome?.let { return it }
+             commit(uid, operation)
++            return GoalRemoteOutcome.Confirmed
+         }
+     }
+     @Test fun `offline operation survives store reopen scoped by owner type and record while observation remains read only`() = runTest {
+@@ -67,7 +76,7 @@
+         repo.submit("a", operation)
+         var sync = backgroundScope.launch { repo.synchronize("a") }; runCurrent()
+         advanceTimeBy(10001); runCurrent()
+-        assertEquals("PENDING", store.getRecords("a", operation.type).single().status)
++        assertEquals("UNCERTAIN", store.getRecords("a", operation.type).single().status)
+         try { repo.submit("a", operation.copy(operationId = "different")); fail() } catch (_: IllegalStateException) {}
+         try { repo.dismissRejected("a", operation); fail() } catch (_: IllegalStateException) {}
+         sync.cancelAndJoin()
+@@ -78,22 +87,27 @@
+     }
+     @Test fun `rejection remains inspectable and immutable while different goal operations are blocked`() = runTest {
+         val store = SubmissionRecoveryStore(PreferenceDataStoreFactory.create(scope = backgroundScope, produceFile = { temp.newFile("failed.preferences_pb") }))
+-        val remote = Remote().apply { failure = IllegalStateException("Stale version conflict") }
++        val remote = Remote().apply { failure = null; outcome = GoalRemoteOutcome.Rejected("Verified stale version conflict") }
+         val repo = FirestoreGoalRepository(remote, store)
+         repo.submit("a", operation)
+         val sync = backgroundScope.launch { repo.synchronize("a") }; runCurrent()
+-        assertEquals("FAILED", store.getRecords("a", operation.type).single().status)
++        assertEquals("REJECTED", store.getRecords("a", operation.type).single().status)
+         try { repo.submit("a", operation.copy(kind = "EDIT", expectedVersion = 0)); fail() } catch (_: IllegalStateException) {}
+         try { repo.retry("a", operation.copy(goal = operation.goal!!.copy(openingMinor = 1))); fail() } catch (_: IllegalStateException) {}
+         repo.retry("a", operation); advanceTimeBy(5000); runCurrent()
+-        repo.dismissRejected("a", operation); assertTrue(store.getRecords("a", operation.type).isEmpty()); sync.cancelAndJoin()
++        repo.dismissRejected("a", operation); assertTrue(store.getRecords("a", operation.type).isEmpty())
++        val corrected = operation.copy(operationId = "corrected", goal = operation.goal!!.copy(name = "Corrected proposal"))
++        repo.submit("a", corrected)
++        assertEquals(SubmissionRecord.create("a", corrected.recordId, corrected, "PENDING", corrected.type).payloadJson,
++            store.getRecords("a", corrected.type).single().payloadJson)
++        sync.cancelAndJoin()
+     }
+     @Test fun `receipt payload match is strict and cancelled work propagates`() = runTest {
+         val store = SubmissionRecoveryStore(PreferenceDataStoreFactory.create(scope = backgroundScope, produceFile = { temp.newFile("cancel.preferences_pb") }))
+         val remote = Remote().apply { failure = CancellationException("Stop") }
+         val repo = FirestoreGoalRepository(remote, store); repo.submit("a", operation)
+         val job = backgroundScope.launch { repo.synchronize("a") }; runCurrent()
+-        assertTrue(job.isCancelled); assertEquals("PENDING", store.getRecords("a", operation.type).single().status)
++        assertTrue(job.isCancelled); assertEquals("UNCERTAIN", store.getRecords("a", operation.type).single().status)
+         val wrong = operation.copy(goalId = "other")
+         try { repo.submit("a", wrong); fail() } catch (_: IllegalArgumentException) {}
+     }
+@@ -108,4 +122,95 @@
+         assertEquals(op, recovered); assertEquals(entry.values(), recovered.payload())
+         try { op.copy(expectedVersion = Long.MAX_VALUE).validate(false); fail() } catch (_: IllegalArgumentException) {}
+     }
++    @Test fun `late attempt A commit survives timeout then B access error and reconciles exactly one mutation`() = runTest {
++        val store = SubmissionRecoveryStore(PreferenceDataStoreFactory.create(scope = backgroundScope, produceFile = { temp.newFile("late.preferences_pb") }))
++        val commitA = CompletableDeferred<Unit>()
++        val receipt = mutableMapOf<Pair<String, String>, GoalOperation>()
++        val calls = mutableListOf<Pair<String, GoalOperation>>()
++        var mutations = 0
++        val remote = object : GoalRemote {
++            override fun observe(uid: String) = MutableStateFlow(GoalSnapshot())
++            override suspend fun apply(uid: String, operation: GoalOperation): GoalRemoteOutcome {
++                calls += uid to operation
++                when (calls.size) {
++                    1 -> {
++                        // Models Firebase's Task lifetime, independent of the coroutine awaiting it.
++                        backgroundScope.launch { commitA.await(); receipt[uid to operation.operationId] = operation; mutations++ }
++                        awaitCancellation()
++                    }
++                    2 -> throw accessError("PERMISSION_DENIED before receipt reconciliation")
++                    else -> {
++                        check(receipt[uid to operation.operationId] == operation) { "Exact matching receipt required" }
++                        return GoalRemoteOutcome.Confirmed
++                    }
++                }
++            }
++        }
++        var repo = FirestoreGoalRepository(remote, store)
++        repo.submit("a", operation)
++        val payload = store.getRecords("a", operation.type).single().payloadJson
++        var sync = backgroundScope.launch { repo.synchronize("a") }; runCurrent()
++        advanceTimeBy(10001); runCurrent()
++        assertEquals(0, mutations); assertEquals("UNCERTAIN", store.getRecords("a", operation.type).single().status)
++        sync.cancelAndJoin()
++        // A repository restart must not turn a later access error into a rejection of the logical operation.
++        repo = FirestoreGoalRepository(remote, store)
++        sync = backgroundScope.launch { repo.synchronize("a") }; runCurrent()
++        assertEquals(2, calls.size)
++        val retained = store.getRecords("a", operation.type).single()
++        assertEquals(payload, retained.payloadJson); assertEquals("UNCERTAIN", retained.status)
++        assertFalse(repo.observe("a").first { it.attempts.isNotEmpty() }.attempts.single().isRejected)
++        try { repo.dismissRejected("a", operation); fail("Uncertain proposal must not be discardable") } catch (_: IllegalStateException) {}
++        repo.retry("a", operation); assertEquals("UNCERTAIN", store.getRecords("a", operation.type).single().status)
++        commitA.complete(Unit); runCurrent(); assertEquals(1, mutations)
++        advanceTimeBy(5000); runCurrent()
++        assertTrue(store.getRecords("a", operation.type).isEmpty()); assertEquals(1, receipt.size); assertEquals(1, mutations)
++        assertTrue(calls.all { it == "a" to operation }); assertEquals(3, calls.size)
++        sync.cancelAndJoin()
++    }
++    @Test fun `legacy failure and raw argument state or auth errors are uncertain and never dismissible`() = runTest {
++        val store = SubmissionRecoveryStore(PreferenceDataStoreFactory.create(scope = backgroundScope, produceFile = { temp.newFile("legacy.preferences_pb") }))
++        val remote = Remote()
++        val repo = FirestoreGoalRepository(remote, store)
++        store.saveOperation(SubmissionRecord.create("a", operation.recordId, operation, "FAILED", operation.type, "Old unproven failure"))
++        try { repo.dismissRejected("a", operation); fail() } catch (_: IllegalStateException) {}
++        val sync = backgroundScope.launch { repo.synchronize("a") }
++        for (failure in listOf(IllegalArgumentException("Unknown argument failure"), IllegalStateException("Account changed"),
++            accessError("UNAUTHENTICATED: signed out"))) {
++            remote.failure = failure; runCurrent(); advanceTimeBy(5000); runCurrent()
++            assertEquals("UNCERTAIN", store.getRecords("a", operation.type).single().status)
++            try { repo.dismissRejected("a", operation); fail() } catch (_: IllegalStateException) {}
++        }
++        sync.cancelAndJoin()
++    }
++    @Test fun `confirmed remote result with local cleanup failure remains retained and retries only bookkeeping`() = runTest {
++        val actual = PreferenceDataStoreFactory.create(scope = backgroundScope, produceFile = { temp.newFile("cleanup.preferences_pb") })
++        var failUpdates = false
++        val faulty = object : DataStore<Preferences> {
++            override val data = actual.data
++            override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
++                if (failUpdates) throw IllegalStateException("Local disk bookkeeping failure")
++                return actual.updateData(transform)
++            }
++        }
++        val store = SubmissionRecoveryStore(faulty)
++        var remoteCalls = 0
++        val remote = object : GoalRemote {
++            override fun observe(uid: String) = MutableStateFlow(GoalSnapshot())
++            override suspend fun apply(uid: String, operation: GoalOperation): GoalRemoteOutcome {
++                remoteCalls++; failUpdates = true; return GoalRemoteOutcome.Confirmed
++            }
++        }
++        val repo = FirestoreGoalRepository(remote, store); repo.submit("a", operation)
++        val sync = backgroundScope.launch { repo.synchronize("a") }; runCurrent()
++        assertEquals("UNCERTAIN", store.getRecords("a", operation.type).single().status)
++        val snapshot = repo.observe("a").first { it.recoveryError != null }
++        assertTrue(snapshot.recoveryError!!.contains("Local goal recovery bookkeeping"))
++        assertEquals(operation.operationId, snapshot.acknowledgedOperationId)
++        assertNull(repo.observe("b").first().recoveryError)
++        try { repo.dismissRejected("a", operation); fail() } catch (_: IllegalStateException) {}
++        failUpdates = false; advanceTimeBy(5000); runCurrent()
++        assertEquals(1, remoteCalls); assertTrue(store.getRecords("a", operation.type).isEmpty())
++        assertNull(repo.observe("a").first().recoveryError); sync.cancelAndJoin()
++    }
+ }
+diff --git a/app/src/test/java/com/clarity/finance/viewmodel/GoalViewModelTest.kt b/app/src/test/java/com/clarity/finance/viewmodel/GoalViewModelTest.kt
+--- a/app/src/test/java/com/clarity/finance/viewmodel/GoalViewModelTest.kt
++++ b/app/src/test/java/com/clarity/finance/viewmodel/GoalViewModelTest.kt
+@@ -69,7 +69,7 @@
+         assertEquals(1120000L, vm.state.value.progress!!.savedMinor)
+         assertEquals("PENDING", vm.state.value.snapshot.attempts.single().status)
+         val op = repo.submissions.single().second
+-        repo.source("a").value = confirmed.copy(attempts = listOf(GoalAttempt(op, "FAILED", "Conflict"))); runCurrent()
++        repo.source("a").value = confirmed.copy(attempts = listOf(GoalAttempt(op, "REJECTED", "Conflict"))); runCurrent()
+         assertEquals(1120000L, vm.state.value.progress!!.savedMinor); assertTrue(vm.state.value.blocked)
+         vm.dismiss(vm.state.value.snapshot.attempts.single()); runCurrent()
+         assertFalse(vm.state.value.blocked)
+@@ -158,4 +158,16 @@
+         repo.source("a").value = confirmed.copy(acknowledgedOperationId = op.operationId); runCurrent()
+         assertNull(vm.state.value.localPending); assertNull(vm.state.value.unknown); assertFalse(vm.state.value.blocked)
+     }
++    @Test fun `uncertain and legacy failed proposals cannot be dismissed through the ViewModel`() = runGoalTest {
++        runCurrent()
++        val op = GoalOperation("uncertain", "EDIT", 0, goal = config)
++        for (status in listOf("UNCERTAIN", "FAILED")) {
++            repo.source("a").value = confirmed.copy(attempts = listOf(GoalAttempt(op, status, "Access unavailable"))); runCurrent()
++            val attempt = vm.state.value.snapshot.attempts.single()
++            assertTrue(attempt.isUncertain); assertFalse(attempt.isRejected)
++            vm.dismiss(attempt); runCurrent()
++            assertEquals(1, vm.state.value.snapshot.attempts.size)
++            assertEquals(1120000L, vm.state.value.progress!!.savedMinor)
++        }
++    }
+ }
+diff --git a/firestore-tests/savings-tests.js b/firestore-tests/savings-tests.js
+--- a/firestore-tests/savings-tests.js
++++ b/firestore-tests/savings-tests.js
+@@ -159,6 +159,67 @@
+         }
+         assert.equal((await getDoc(goal(d))).data().savedMinor, 1120000);
+     });
++    it('read-only rejection verifies receipt absence so a racing earlier commit reconciles instead', async () => {
++        const d = db(); await create(d);
++        let release, sawAbsent;
++        const gate = new Promise(resolve => { release = resolve; });
++        const firstRead = new Promise(resolve => { sawAbsent = resolve; });
++        let first = true, callbacks = 0;
++        const proof = runTransaction(d, async tx => {
++            callbacks++;
++            const accepted = await tx.get(receipt(d, 'op-1'));
++            if (accepted.exists()) return 'confirmed';
++            await tx.get(goal(d));
++            if (first) { first = false; sawAbsent(); await gate; }
++            // Models the production no-write result: the SDK verifies every read before returning it.
++            return 'rejected';
++        });
++        try { await firstRead; await ledger(d, 'c', {}); }
++        finally { release(); }
++        assert.equal(await proof, 'confirmed');
++        assert(callbacks >= 2, 'A stale receipt-absence read must not establish rejection');
++        assert.equal((await getDoc(goal(d))).data().savedMinor, 2120000);
++        assert.equal((await getDocs(collection(goal(d), 'entries'))).size, 1);
++    });
++    it('verified stale version prevents an older outstanding allocation from committing later', async () => {
++        const d = db(); await create(d);
++        let release, didRead;
++        const gate = new Promise(resolve => { release = resolve; });
++        const started = new Promise(resolve => { didRead = resolve; });
++        let first = true;
++        const allocation = runTransaction(d, async tx => {
++            const accepted = await tx.get(receipt(d, 'old-op'));
++            if (accepted.exists()) return 'confirmed';
++            const parent = (await tx.get(goal(d))).data();
++            if (parent.version > 0) return 'rejected';
++            if (first) { first = false; didRead(); await gate; }
++            const e = { kind: 'contribution', amountMinor: 100, entryDate: now(), note: '', deleted: false, version: 1,
++                lastOperationId: 'old-op', createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
++            tx.update(goal(d), { savedMinor: parent.savedMinor + 100, version: 1, lastOperationId: 'old-op', lastEntryId: 'old-entry', updatedAt: serverTimestamp() });
++            tx.set(entry(d, 'old-entry'), e);
++            tx.set(receipt(d, 'old-op'), { kind: 'ENTRY_CREATE', entryId: 'old-entry', version: 1, payload: ev(e), createdAt: serverTimestamp() });
++            return 'confirmed';
++        });
++        try {
++            await started; await edit(d, { name: 'Newer confirmed version' });
++            const rejection = await runTransaction(d, async tx => {
++                const accepted = await tx.get(receipt(d, 'old-op'));
++                const parent = await tx.get(goal(d));
++                return !accepted.exists() && parent.data().version > 0 ? 'rejected' : 'unproven';
++            });
++            assert.equal(rejection, 'rejected');
++        } finally { release(); }
++        const lateOutcome = await allocation.catch(error => {
++            // Depending on SDK validation order, the stale write can be denied by the atomic rules
++            // before it retries its callback. The earlier verified contradiction is the rejection proof.
++            assert.equal(error.code, 'permission-denied');
++            return 'rejected';
++        });
++        assert.equal(lateOutcome, 'rejected');
++        assert.equal((await getDoc(receipt(d, 'old-op'))).exists(), false);
++        assert.equal((await getDoc(goal(d))).data().savedMinor, 1120000);
++        assert.equal((await getDocs(collection(goal(d), 'entries'))).size, 0);
++    });
+     it('rejects signed delta wraparound using exact 64-bit REST integers', async () => {
+         // JS Number cannot represent Long.MAX_VALUE. REST integerValue strings keep this adversarial fixture exact.
+         const project = 'demo-clarity-test';
