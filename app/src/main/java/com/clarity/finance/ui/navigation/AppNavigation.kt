@@ -1,13 +1,9 @@
 package com.clarity.finance.ui.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -30,35 +26,24 @@ fun AppNavigation(graph: Koin = GlobalContext.get()) {
     val sessionState by authViewModel.sessionState.collectAsStateWithLifecycle()
 
     if (sessionState is SessionState.Initializing) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
+        com.clarity.finance.ui.pilot.LoadingPanel("Opening Clarity")
         return
     }
 
     val startDestination = if (sessionState is SessionState.SignedIn) "home" else "login"
 
-    LaunchedEffect(sessionState) {
-        when (sessionState) {
-            is SessionState.SignedIn -> {
-                if (navController.currentDestination?.route != "home" && navController.currentDestination?.route != "dashboard" && navController.currentDestination?.route != "income") {
-                    navController.navigate("home") {
-                        popUpTo(0) { inclusive = true }
-                    }
-                }
-            }
-            is SessionState.SignedOut -> {
-                if (navController.currentDestination?.route != "login" && navController.currentDestination?.route != "register") {
-                    navController.navigate("login") {
-                        popUpTo(0) { inclusive = true }
-                    }
-                }
-            }
-            else -> {}
+    val owner = (sessionState as? SessionState.SignedIn)?.user?.uid
+    var navigationOwner by rememberSaveable { mutableStateOf(owner) }
+    LaunchedEffect(owner) {
+        if (navigationOwner != owner) {
+            navController.navigate(if (owner == null) "login" else "home") { popUpTo(0) { inclusive = true } }
+            navigationOwner = owner
         }
     }
+    if (navigationOwner != owner) return // Never render a restored old-account destination.
 
-    androidx.compose.runtime.CompositionLocalProvider(com.clarity.finance.ui.LocalCatalogue provides catalogueState.catalogue) {
+    val visibleCatalogue = if (catalogueState.uid == owner) catalogueState.catalogue else com.clarity.finance.data.model.CatalogueSnapshot()
+    androidx.compose.runtime.CompositionLocalProvider(com.clarity.finance.ui.LocalCatalogue provides visibleCatalogue) {
     NavHost(navController = navController, startDestination = startDestination) {
         composable("login") {
             LoginScreen(
@@ -80,22 +65,28 @@ fun AppNavigation(graph: Koin = GlobalContext.get()) {
             val user = (sessionState as? SessionState.SignedIn)?.user
             if (user != null) {
                 val homeViewModel: com.clarity.finance.viewmodel.HomeViewModel = injectedViewModel(graph)
-                com.clarity.finance.ui.HomeScreen(
-                    viewModel = homeViewModel,
-                    onNavigateToExpenses = { navController.navigate("dashboard") },
-                    onNavigateToIncome = { navController.navigate("income") },
-                    onNavigateToPendingPayments = { navController.navigate("pendingPayments") },
-                    onNavigateToCrypto = { navController.navigate("cryptoResults") },
-                    onNavigateToDashboard = { navController.navigate("financialDashboard") },
-                    onNavigateToGoal = { navController.navigate("savingsGoal") },
-                    onNavigateToRecurring = { navController.navigate("recurringExpenses") },
-                    onNavigateToCatalogue = { navController.navigate("catalogue") }
-                )
+                val dashboardViewModel: com.clarity.finance.viewmodel.DashboardViewModel = injectedViewModel(graph)
+                val goalCardViewModel: com.clarity.finance.viewmodel.GoalCardViewModel = injectedViewModel(graph)
+                com.clarity.finance.ui.pilot.PilotShell(user.email, { navController.navigate(it) }, homeViewModel::logout) { page, select ->
+                    com.clarity.finance.ui.dashboard.DashboardScreen(
+                        viewModel = dashboardViewModel, onBack = { select("dashboard") },
+                        onAddExpense = { navController.navigate("addExpense") },
+                        onExpense = { navController.navigate("editExpense/${android.net.Uri.encode(it)}") },
+                        onIncome = { navController.navigate("addEditIncome/${android.net.Uri.encode(it)}") },
+                        onProject = { navController.navigate("projectDetail/${android.net.Uri.encode(it)}") },
+                        onCrypto = { navController.navigate("cryptoResults") }, onPayments = { navController.navigate("pendingPayments") },
+                        goalCard = { com.clarity.finance.ui.goals.GoalCard(goalCardViewModel) { navController.navigate("savingsGoal") } },
+                        selectedPage = page, onSelectPage = select,
+                        onAllExpenses = { navController.navigate("dashboard") }, onIncomeList = { navController.navigate("income") },
+                        onRecovery = { navController.navigate("catalogue") }
+                    )
+                }
             }
         }
         composable("catalogue") { com.clarity.finance.ui.CatalogueScreen(catalogueViewModel) { navController.popBackStack() } }
         composable("financialDashboard") {
             val dashboardViewModel: com.clarity.finance.viewmodel.DashboardViewModel = injectedViewModel(graph)
+
             com.clarity.finance.ui.dashboard.DashboardScreen(
                 viewModel = dashboardViewModel,
                 onBack = { navController.popBackStack() },
@@ -105,11 +96,15 @@ fun AppNavigation(graph: Koin = GlobalContext.get()) {
                 onProject = { navController.navigate("projectDetail/${android.net.Uri.encode(it)}") },
                 onCrypto = { navController.navigate("cryptoResults") },
                 onPayments = { navController.navigate("pendingPayments") },
+                onAllExpenses = { navController.navigate("dashboard") },
+                onIncomeList = { navController.navigate("income") },
+                onRecovery = { navController.navigate("catalogue") },
                 goalCard = {
                     val goalCardViewModel: com.clarity.finance.viewmodel.GoalCardViewModel = injectedViewModel(graph)
                     com.clarity.finance.ui.goals.GoalCard(goalCardViewModel) { navController.navigate("savingsGoal") }
                 }
             )
+
         }
         composable("recurringExpenses") {
             val recurringViewModel: com.clarity.finance.viewmodel.RecurringViewModel = injectedViewModel(graph)
@@ -222,10 +217,12 @@ fun AppNavigation(graph: Koin = GlobalContext.get()) {
         }
         composable("addExpense") {
             val addExpenseViewModel: com.clarity.finance.viewmodel.AddExpenseViewModel = injectedViewModel(graph)
+
             com.clarity.finance.ui.expenses.AddExpenseScreen(
                 viewModel = addExpenseViewModel,
                 onNavigateBack = { navController.popBackStack() }
             )
+
         }
         composable(
             route = "editExpense/{expenseId}",
@@ -233,11 +230,13 @@ fun AppNavigation(graph: Koin = GlobalContext.get()) {
         ) { backStackEntry ->
             val expenseId = backStackEntry.arguments?.getString("expenseId") ?: return@composable
             val editExpenseViewModel: com.clarity.finance.viewmodel.EditExpenseViewModel = injectedViewModel(graph)
+
             com.clarity.finance.ui.expenses.EditExpenseScreen(
                 viewModel = editExpenseViewModel,
                 expenseId = expenseId,
                 onNavigateBack = { navController.popBackStack() }
             )
+
         }
     }
 }
