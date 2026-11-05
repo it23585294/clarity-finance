@@ -1,0 +1,366 @@
+{
+  "baseline": "d38965de521aa1a02eade787c0d3ae95545beeeb",
+  "scope": "Phase B UI only; supplements preserved Phase A",
+  "sourceAndTestChanges": [
+    "app/src/androidTest/java/com/clarity/finance/IncomeListAccessibilityTest.kt",
+    "app/src/androidTest/java/com/clarity/finance/PaymentNavigationTest.kt",
+    "app/src/androidTest/java/com/clarity/finance/PhaseBFixtures.kt",
+    "app/src/androidTest/java/com/clarity/finance/PhaseBInteractionTest.kt",
+    "app/src/androidTest/java/com/clarity/finance/PhaseBKeyboardTest.kt",
+    "app/src/androidTest/java/com/clarity/finance/PhaseBVisualTest.kt",
+    "app/src/androidTest/java/com/clarity/finance/PilotFixtures.kt",
+    "app/src/main/java/com/clarity/finance/ui/CatalogueScreen.kt",
+    "app/src/main/java/com/clarity/finance/ui/income/AddEditIncomeScreen.kt",
+    "app/src/main/java/com/clarity/finance/ui/income/IncomeListScreen.kt",
+    "app/src/main/java/com/clarity/finance/ui/payments/AddPaymentScreen.kt",
+    "app/src/main/java/com/clarity/finance/ui/payments/ExpectedPaymentsScreen.kt",
+    "app/src/main/java/com/clarity/finance/ui/payments/PaymentConfirmationScreen.kt",
+    "app/src/main/java/com/clarity/finance/ui/payments/ProjectDetailScreen.kt",
+    "app/src/main/java/com/clarity/finance/ui/pilot/DesignComponents.kt",
+    "app/src/main/java/com/clarity/finance/ui/pilot/FinancialFeedback.kt",
+    "app/src/test/java/com/clarity/finance/ui/pilot/FinancialFeedbackTest.kt"
+  ],
+  "unchangedPhaseASupport": [
+    "app/src/main/java/com/clarity/finance/ui/pilot/PilotTheme.kt",
+    "app/src/main/java/com/clarity/finance/ui/pilot/PresentationFormat.kt"
+  ],
+  "deletions": [],
+  "backendFilesChanged": 0,
+  "archiveFileCount": 84,
+  "hashAlgorithm": "SHA-256",
+  "manifestSelfHash": "Verified against saved source after ZIP creation; omitted from this list to avoid self-reference.",
+  "files": [
+    {
+      "path": "PHASE_B_UI_UX_IMPLEMENTATION.md",
+      "sha256": "DA4D31C4C69178E8DA51367C76611D088B7A373135482D0B3582336244596A93"
+    },
+    {
+      "path": "app/src/androidTest/java/com/clarity/finance/IncomeListAccessibilityTest.kt",
+      "sha256": "DA72C3614CB90294AC8C355A73274489F183A2D28DBA0F2F5D8389D725932D6D"
+    },
+    {
+      "path": "app/src/androidTest/java/com/clarity/finance/PaymentNavigationTest.kt",
+      "sha256": "CBEDBECA5A393CB1A24EAD4BAB58585C4671EF463EA12B75A976036573D9DC06"
+    },
+    {
+      "path": "app/src/androidTest/java/com/clarity/finance/PhaseBFixtures.kt",
+      "sha256": "B553EED6C478763A552C943CB8BEAE41121F4FB6C739215A91CE7651A4EE472B"
+    },
+    {
+      "path": "app/src/androidTest/java/com/clarity/finance/PhaseBInteractionTest.kt",
+      "sha256": "43915FA4CD81685C64C7B9DCC8D1B67847A0E81E8362D579A827574B89F1CFD9"
+    },
+    {
+      "path": "app/src/androidTest/java/com/clarity/finance/PhaseBKeyboardTest.kt",
+      "sha256": "A95F6660D0270316DA913651F71419E8983BC7524900E94DCD11D0B743C1C8D6"
+    },
+    {
+      "path": "app/src/androidTest/java/com/clarity/finance/PhaseBVisualTest.kt",
+      "sha256": "F67B8126681C55B502D1BFE46DFD175DC864FCA13599CB32BF2C51B9F1BD92EB"
+    },
+    {
+      "path": "app/src/androidTest/java/com/clarity/finance/PilotFixtures.kt",
+      "sha256": "8BE3D570847CD505FAE000A2CA6FB1EC41DBAED6D21BBC570FE2C2CAB471D305"
+    },
+    {
+      "path": "app/src/main/java/com/clarity/finance/ui/CatalogueScreen.kt",
+      "sha256": "F838D9B17DA82D21AB53DCD8C1DAED9628D8BF4B024A09E07032898842ABA119"
+    },
+    {
+      "path": "app/src/main/java/com/clarity/finance/ui/income/AddEditIncomeScreen.kt",
+      "sha256": "B50872B59F065A5286443AE09C007FE1D4030DD3925405B8D096BEFD079482B3"
+    },
+    {
+      "path": "app/src/main/java/com/clarity/finance/ui/income/IncomeListScreen.kt",
+      "sha256": "DF1DAA5E0EBEF3EF4A920F9AC740BD8AB8DC753B7F5BAA7542213C920CCBBA2F"
+    },
+    {
+      "path": "app/src/main/java/com/clarity/finance/ui/payments/AddPaymentScreen.kt",
+      "sha256": "6E85CBF367FA400C7002D631CAB04E3EBD45E026C41664821A4EF6FF59A11F08"
+    },
+    {
+      "path": "app/src/main/java/com/clarity/finance/ui/payments/ExpectedPaymentsScreen.kt",
+      "sha256": "8B0A252A2B3282210AB06E00B668FDFD0F6BB860CA92FBEAFDB9DBAD8033A64D"
+    },
+    {
+      "path": "app/src/main/java/com/clarity/finance/ui/payments/PaymentConfirmationScreen.kt",
+      "sha256": "902D17C2EF0860EFDBCFF59BF2CA003AA10C140052A75879C09F58537232FC5B"
+    },
+    {
+      "path": "app/src/main/java/com/clarity/finance/ui/payments/ProjectDetailScreen.kt",
+      "sha256": "8BE92A35A1F90825FF2D4624A24DA2F2B9AF956A041B303A9BDBD5A6251F7C6F"
+    },
+    {
+      "path": "app/src/main/java/com/clarity/finance/ui/pilot/DesignComponents.kt",
+      "sha256": "AB7BC58CAC640E1BBBCE118EEB187BE1DFC4F7255695B3E1554D7F4ABC6852C6"
+    },
+    {
+      "path": "app/src/main/java/com/clarity/finance/ui/pilot/FinancialFeedback.kt",
+      "sha256": "F8EF7DE48A28BB3C01A64F240313993BCBACE9EF4B882D0387B2F51FF976E28E"
+    },
+    {
+      "path": "app/src/main/java/com/clarity/finance/ui/pilot/PilotTheme.kt",
+      "sha256": "24438548D1EE0040FF6F24AACDBAD5B0746A58B2E7CB6DD291AEC587042EEC46"
+    },
+    {
+      "path": "app/src/main/java/com/clarity/finance/ui/pilot/PresentationFormat.kt",
+      "sha256": "4C01D6AA6D2F58B061719FCD47B0285AB760D57EC5CAB79D14F2E8E67CB484A2"
+    },
+    {
+      "path": "app/src/test/java/com/clarity/finance/ui/pilot/FinancialFeedbackTest.kt",
+      "sha256": "85D9B3C6A58198E77D4FF530D82663568B3FC7AEC166F3AAABCC10A107122121"
+    },
+    {
+      "path": "design/phase-b/index.html",
+      "sha256": "1E1F9D586C26E4323CBD3CD41DFE6770E20CC2905C2BE9C3BA29C20294CE50B2"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-agreement-form-320-2x.png",
+      "sha256": "EA12945D217A3CF2E6A178BC8951C972F41972854A363686E94A9C81CF42D649"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-agreement-form-dark.png",
+      "sha256": "96877AC9B584EB78C66E901E0D0051FCCEF7093ABCA86BFAB0D465960B7661D7"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-agreement-form-device320-2x.png",
+      "sha256": "EA12945D217A3CF2E6A178BC8951C972F41972854A363686E94A9C81CF42D649"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-agreement-form.png",
+      "sha256": "CB187D61C7014EB3D0F22DEB0C58FFB7C8F2B6F54650C7B4FD4639D631F9A8A2"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-agreements-initial-320-2x.png",
+      "sha256": "A3D2143E1839C1F27C4CAEDE963470B4EA40A06498B7463BA0053AFCE05EBFFC"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-agreements-initial-dark.png",
+      "sha256": "36CE97A6E5D65E098C22C5A7C3C65A9DA5F3CDBD995054C68D74F99CCD9E4AED"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-agreements-initial-device320-2x.png",
+      "sha256": "A3D2143E1839C1F27C4CAEDE963470B4EA40A06498B7463BA0053AFCE05EBFFC"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-agreements-initial.png",
+      "sha256": "474DF3509F2693148F09F02910419ABA9766796293370AE90C38D72E23F98C8E"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-cached-pending-income.png",
+      "sha256": "8EAE0664F6D2A3CB6AE1A01F3A0F3C398B0BDA2B2706E29C0F94A33FAA3EB5F7"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-catalogue-initial-320-2x.png",
+      "sha256": "581EBB121C2DD70F4AECE6339B0D22050AF45BCA71FA39D29203560433BAD1DF"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-catalogue-initial-dark.png",
+      "sha256": "E36E603487FFC8CEE5848CB05039D393D1930F2D78BA8485C41A726C852EDC02"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-catalogue-initial-device320-2x.png",
+      "sha256": "581EBB121C2DD70F4AECE6339B0D22050AF45BCA71FA39D29203560433BAD1DF"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-catalogue-initial.png",
+      "sha256": "F3DCE82145BDBFC5CAEA1CEC4A37CC8AEFCBC98BD4CD92083C7FC0661E683C81"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-direct-receipt-320-2x.png",
+      "sha256": "E5E514AB407B7B4B58922C98B779E0A175BF89778C2432A29649646CA80BE917"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-direct-receipt-dark.png",
+      "sha256": "ACF6FB4011BA0B3274C6B657069A71F6CD27BA258BB58C3262F5E59EE9612DAD"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-direct-receipt-device320-2x.png",
+      "sha256": "E5E514AB407B7B4B58922C98B779E0A175BF89778C2432A29649646CA80BE917"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-direct-receipt.png",
+      "sha256": "7CEE7E7FA578A453CEC9568EC596A335325ABC0078E6614D9BD5C1C01F696515"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-enlarged-milestone.png",
+      "sha256": "86D8D7D4356FEAF10630B32231467576158B164F839AA9D12E02E77216C3693A"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-income-archived-320-2x.png",
+      "sha256": "8E5C6988C6776A30AF0A78CAB164D9B5984194A632BB3ED001D4AA3123FB0BA5"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-income-archived-choice-320-2x.png",
+      "sha256": "C13BAFF6E949C289D5130F84AC08B5A161E2D2B03EC67890A49F9FBA83C1DEC6"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-income-archived-choice-dark.png",
+      "sha256": "65D522D87151AF3347933317065FE94598A74BB3480A40CB102DE27740CA5C5E"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-income-archived-choice-device320-2x.png",
+      "sha256": "8FAF6131FCEEC995CF5551B712FC97B0527BC6D0AD19BBD9E1998336719AD97E"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-income-archived-choice.png",
+      "sha256": "4DDDB80B04A63160A1B568231C1EBD01138CF8CF8AE5214DC8DB0CC68F9A4FAD"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-income-archived-dark.png",
+      "sha256": "94204B83EC361B65CAA444D65BC92CF4A4A78C25C8A1260E826CB41A505F04C6"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-income-archived-device320-2x.png",
+      "sha256": "8E5C6988C6776A30AF0A78CAB164D9B5984194A632BB3ED001D4AA3123FB0BA5"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-income-archived.png",
+      "sha256": "6B97863B6F0C00DDA576F91CA855BD749603BFEDFE7BF556A30E25528B1E636A"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-income-form-320-2x.png",
+      "sha256": "912FB712E70D6BD80DB727C87B49FB6BD4618A33699EB9F4D90C4943E89D561C"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-income-form-dark.png",
+      "sha256": "FCF90F65EEC774E0EBB8B5FCD75981138D72D926BDFDD4B1571B962EB71AB66F"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-income-form-device320-2x.png",
+      "sha256": "7F1B7B10C4FC23C5D2A72E8DE99B5D0991ADF4521D4F57C643FB555346CC18C3"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-income-form.png",
+      "sha256": "8B22DDF75EF772803DC53B52D874E605149A8B04EAB4F6E89CA62B2B8C059ECE"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-income-initial-320-2x.png",
+      "sha256": "BEC0D48DD90751B92596D57756475E15CA24D24A43634682E86BCE500D72BBAD"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-income-initial-dark.png",
+      "sha256": "AB6124CACBD9F71F139A4BF9926107CC3C32677F9388553C1BF3232FCF36BCAF"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-income-initial-device320-2x.png",
+      "sha256": "BEC0D48DD90751B92596D57756475E15CA24D24A43634682E86BCE500D72BBAD"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-income-initial.png",
+      "sha256": "BB7534E72E42F06B18E35965E2044BCD7EB3EB7F5B0517B702A87D7CE341353F"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-income-keyboard-2x.png",
+      "sha256": "7CBCA3251F61F53BA502C9A2637478916E0A5ED1B4819C5DDC071DBDC7FE1B0B"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-locked-receipt.png",
+      "sha256": "819C47423D5D99311C65A273A7116165A270787B537A10C8A86872FBCAA6F6F8"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-milestone-form-320-2x.png",
+      "sha256": "6CD432338964A7F796382C5C88067FF01C54D1A6CD046C4104682A92AFE45853"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-milestone-form-dark.png",
+      "sha256": "F735E244B2B41846B6FEF12513DFA239B5C1F53801A3CE3881473C068259BD05"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-milestone-form-device320-2x.png",
+      "sha256": "0259F9F0DF83035AEA2BB785E042CFC245C980E5B83E69F6FBB4BC013CBFE0FF"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-milestone-form.png",
+      "sha256": "ED22AC8A4E5BAFE8A38C138A9EFD340251C493B270304127D9E011C4CE5F2717"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-pending-missing-catalogue.png",
+      "sha256": "A966A908235E9D5E0BC17754E2B28D6FCF3802367EE0C83B9E28DBD27FC5CA55"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-project-initial-320-2x.png",
+      "sha256": "F25CD13A4AF392D033DFD9046B65C33E80C118A038B07F2861AF7627D74CFE67"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-project-initial-dark.png",
+      "sha256": "64570591CDC3DC67F7D076A19143B488B104F52168A7782835F41B27C593D76B"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-project-initial-device320-2x.png",
+      "sha256": "F25CD13A4AF392D033DFD9046B65C33E80C118A038B07F2861AF7627D74CFE67"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-project-initial.png",
+      "sha256": "5E1930D973AE88DC694F46DE6E499EBCBE89F0A12C626AAC5533B4851683FF88"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-receipt-keyboard-2x.png",
+      "sha256": "2E320B862D6EBDAA633A11BFB6A92C6C5C0710540D57368FCEB4B68C3BD0A564"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-recovery-eligibility.png",
+      "sha256": "EFC01ACB989865D0933422D7677498605AD197DFF2E8D21DFA8A27BAE46091F7"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-uncertain-agreement.png",
+      "sha256": "EC81A1ABA82FCE762F68263DC9F94FA6B5B6F6497451455DEF85AB1282987A7D"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-uncertain-recovery-320-2x.png",
+      "sha256": "C6BC4D540DA15D4729D791F1368F72CA41F0AC4F80B7C35FB99B76E675FC3762"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-uncertain-recovery-dark.png",
+      "sha256": "636814C931969C2AA00F154F9AADDD1A457CCDF28C9CC967D902BB8B0B2A9815"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-uncertain-recovery-device320-2x.png",
+      "sha256": "0218D784B3196A92E395D25AECF92E7A724A7F406E9BC5AD98370113F8F5EF04"
+    },
+    {
+      "path": "design/phase-b/phase-b-after-uncertain-recovery.png",
+      "sha256": "E2D0207A96D523ED2717C682DBE0E1234581B003CAC55FF567E0F8ED512A9685"
+    },
+    {
+      "path": "design/phase-b/phase-b-before-agreement-form.png",
+      "sha256": "27AB939BCB71414F7AEB038134A493DEBD3A02D25915FD9182E68FBCBE1DE29F"
+    },
+    {
+      "path": "design/phase-b/phase-b-before-agreements-initial.png",
+      "sha256": "DC86450B1F8FCE7D31031A9161074D091D75588E13047565B60F0029F45BE0A3"
+    },
+    {
+      "path": "design/phase-b/phase-b-before-catalogue-initial.png",
+      "sha256": "DA187F4272B5B76684EF27652B0AF803D8BF9679A832481C3423122CCD1AAA1D"
+    },
+    {
+      "path": "design/phase-b/phase-b-before-direct-receipt.png",
+      "sha256": "3DCEB3E21E1E08F438C437322A248A8288B89A723CBE9EC29CA2CEA5F89D4D17"
+    },
+    {
+      "path": "design/phase-b/phase-b-before-income-archived.png",
+      "sha256": "6B56560762340A8A01FB1886D9FD22058E2A0E6D3311C2A6729A0E9F9C039A0C"
+    },
+    {
+      "path": "design/phase-b/phase-b-before-income-form.png",
+      "sha256": "B64281B8E2A8CF25003F4C5314BC2D1B20362F908255C38308F52AA5FDE3A364"
+    },
+    {
+      "path": "design/phase-b/phase-b-before-income-initial.png",
+      "sha256": "5C8F9E57EB1543BCC6A34A2CB8B56BF67F4A05EA59528EE468C06BAC82271A31"
+    },
+    {
+      "path": "design/phase-b/phase-b-before-milestone-form.png",
+      "sha256": "67092B5CE60F5BC6BE81ED9A8C54D86584AF630ABF1818C9856CC474728EE6D8"
+    },
+    {
+      "path": "design/phase-b/phase-b-before-project-initial.png",
+      "sha256": "3028654C36419670F40ECF23462AB29207641B0F82E2D77C88DE3D9750A85EF7"
+    },
+    {
+      "path": "design/phase-b/phase-b-before-uncertain-recovery.png",
+      "sha256": "E96E178016CA12EFA6604132739071EA69A02580BEBC9AE912397D1D3F8841A3"
+    }
+  ]
+}

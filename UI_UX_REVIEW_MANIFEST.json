@@ -1,0 +1,66 @@
+{
+  "purpose": "Static UI/UX audit and design review only; fictional data; no production changes.",
+  "baseline": "d38965de521aa1a02eade787c0d3ae95545beeeb",
+  "date": "2026-11-04",
+  "contentFileCount": 11,
+  "archiveFileCount": 12,
+  "checksumAlgorithm": "SHA-256",
+  "selfChecksum": "This manifest is excluded from its own recursive checksum. Its archived bytes are compared directly with the saved source.",
+  "files": [
+    {
+      "path": "UI_UX_AUDIT_AND_PLAN.md",
+      "bytes": 56282,
+      "sha256": "D893757A9287A7C9242E396245D3A412352C2A3A002C8D62BA7A9E95E3BD1B7A"
+    },
+    {
+      "path": "design/ui-ux/01-overview.svg",
+      "bytes": 9240,
+      "sha256": "48E18B4E1F836C82FD745429329C1513584F84A38C405A5D44EA82A02DAA3D04"
+    },
+    {
+      "path": "design/ui-ux/02-add-expense.svg",
+      "bytes": 6966,
+      "sha256": "2E2B8DB47ED5194E6B4D6129B9E8BEBDA22937F80B95BE8683605565EE07E7B6"
+    },
+    {
+      "path": "design/ui-ux/03-history.svg",
+      "bytes": 9288,
+      "sha256": "29CEA329A6658F7CD0CF053DA698E45C6F38B0352ABE3980B46718414808F0E7"
+    },
+    {
+      "path": "design/ui-ux/04-expense-inspection.svg",
+      "bytes": 5539,
+      "sha256": "5F4BBF12F9BB8C76717D6B11037E87823833D841852B3E270B1BDE9425F4ACD4"
+    },
+    {
+      "path": "design/ui-ux/05-pending-cached.svg",
+      "bytes": 8513,
+      "sha256": "70DDADFBE69112C5D76EFC6B465B1941AB140AA275E01F1126ED8F5A46B7D293"
+    },
+    {
+      "path": "design/ui-ux/06-overview-dark.svg",
+      "bytes": 9278,
+      "sha256": "DFEE0096B1EEDA87B9F02E6D0E6AC31785DA6D684AD2C2683FA32D1A5C7C7E5E"
+    },
+    {
+      "path": "design/ui-ux/07-narrow-enlarged.svg",
+      "bytes": 6525,
+      "sha256": "CE8D2628E3A514028354A07EDB141ABDE8F51AA77F3963A7EBDFF6F50B996392"
+    },
+    {
+      "path": "design/ui-ux/08-change-state-variants.svg",
+      "bytes": 6222,
+      "sha256": "31A0709D037B36498F4A5BF9835D7AFE6C19AD85B437A1A6A9F4E182F076C1D3"
+    },
+    {
+      "path": "design/ui-ux/index.html",
+      "bytes": 5385,
+      "sha256": "9C4C926C37647937D0D3C13AEDDD27E29C62D664A90B98FF6B244941F08F4470"
+    },
+    {
+      "path": "design/ui-ux/visual-tokens.json",
+      "bytes": 4061,
+      "sha256": "9991BD0653F66746AFAEAEF7C45C81902E698065707164EED0761D23EA2F09D6"
+    }
+  ]
+}

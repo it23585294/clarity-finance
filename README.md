@@ -1,6 +1,21 @@
 # Clarity Finance
 
-A personal finance application for tracking expenses and managing budgets. Built with Android, Kotlin, Jetpack Compose, and Firebase.
+A manual personal-finance application for received income, expenses, pending agreements and milestones, realised crypto results, one explicit savings goal, and user-confirmed recurring expenses. Built with Kotlin, Jetpack Compose, Koin and Firebase.
+
+## Current application and evidence
+
+The signed-in landing is Overview, with History / Plans / More navigation and a prominent Add Expense action. The shared teal design follows the system light/dark setting. Cash surplus, crypto, current pending balances and recorded savings remain separate; the app does not transfer money or verify a bank balance.
+
+- [Final FR01-FR21 acceptance assessment and limitations](FINAL_APP_ACCEPTANCE.md)
+- [Completed human capture feedback and isolated review procedure](HUMAN_ACCEPTANCE.md)
+- [Design conventions and rollout checkpoints](design/phase-a/CONVENTIONS.md)
+- [Phase B](PHASE_B_UI_UX_IMPLEMENTATION.md), [Phase C](PHASE_C_UI_UX_IMPLEMENTATION.md), [Phase D](PHASE_D_UI_UX_IMPLEMENTATION.md), and [approved colours](COLOUR_REVIEW.md)
+
+History sorts actual transaction dates descending, then immutable server creation time descending, with a stable ID fallback for equal/unknown times. Filters preserve that order. Server-saved time can differ from original offline-entry order. App-wide sync runs for an eligible signed-in process/session; it resumes after reopening and is not guaranteed while force-stopped. Pending proposals never silently become confirmed totals.
+
+Production source uses Firebase; isolated Android tests and the opt-in debug human-review activity use fictional repositories. Before starting any debug/instrumentation build on an existing device, inspect saved default auth/recovery: Application starts synchronization before a test body. The guarded local launcher is documented in HUMAN_ACCEPTANCE.md. Never treat fixture acknowledgement as cloud evidence. Credentials/configuration, build outputs and review archives are excluded from source finalization.
+
+Human five-capture correctness is verified, but timing was approximate clock observation, not a measured stopwatch pass. TalkBack remains unexecuted and API35 instability remains documented. Original assignment PDFs remain the authority for submission/report requirements; phase reports retain actual failures and corrected reruns.
 
 ## Setup Instructions
 
@@ -14,15 +29,15 @@ Expenses are stored at `/users/{userId}/expenses/{expenseId}`.
 
 - `amountMinor` (Number): The amount in LKR cents (strictly positive). E.g., `1000` means 10.00 LKR.
 - `currency` (String): Must be `"LKR"`.
-- `categoryId` (String): E.g., `"Food & Dining"`, `"Transport"`, `"Other"`.
-- `paymentChannelId` (String): E.g., `"Cash"`, `"Primary bank/card"`.
+- `categoryId` (String): Stable catalogue ID, e.g. `"food_dining"`, `"transport"`, `"other"`, or an owner-scoped custom ID; labels can be renamed/archived.
+- `paymentChannelId` (String): E.g., `"cash"`, `"primary_bank_card"`.
 - `spendingType` (String): `"committed"` or `"discretionary"`.
 - `expenseDate` (String): Date of expense in `yyyy-MM-dd` ISO format.
 - `note` (String, Optional): Max 500 characters.
 - `createdAt` (Timestamp): Server timestamp of creation.
 - `updatedAt` (Timestamp): Server timestamp of last update.
 
-*Note on Local Pending Writes: The UI relies on `snapshot.metadata.hasPendingWrites()` to identify and render offline pending records.*
+*Pending proposals are persisted in the UID-scoped durable recovery queue before submission. SDK pending-write/cache metadata is also inspected; it does not by itself establish confirmation. Read-only creation timestamps are not transaction dates or new write fields.*
 
 ## Security Rules Deployment
 
