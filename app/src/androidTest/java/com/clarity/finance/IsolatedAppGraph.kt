@@ -18,7 +18,7 @@ fun isolatedAppGraph(
     income: IncomeRepository = unusedRepository(),
     payment: PaymentRepository = unusedRepository(),
     crypto: CryptoRepository = unusedRepository(),
-    reporting: ReportingRepository = unusedRepository(),
+    reporting: ReportingRepository = emptyReportingObserver(),
     goal: GoalRepository = emptyGoalObserver(),
     recurring: RecurringRepository = unusedRepository(),
     catalogue: CatalogueRepository = object : CatalogueRepository {
@@ -63,3 +63,12 @@ private fun emptyGoalObserver(): GoalRepository = Proxy.newProxyInstance(
 private inline fun <reified T> unusedRepository(): T = Proxy.newProxyInstance(
     T::class.java.classLoader, arrayOf(T::class.java)
 ) { _, method, _ -> error("Unexpected isolated repository call: ${method.name}") } as T
+
+/** Explicit fake observers for the new overview landing; never resolves a live repository. */
+private fun emptyReportingObserver() = object : ReportingRepository {
+    override fun expenses(uid: String, month: com.clarity.finance.data.model.ReportingMonth) = flowOf(ReportingBatch(emptyList<com.clarity.finance.data.model.Expense>(), false))
+    override fun income(uid: String, month: com.clarity.finance.data.model.ReportingMonth) = flowOf(ReportingBatch(emptyList<com.clarity.finance.data.model.Income>(), false))
+    override fun crypto(uid: String, month: com.clarity.finance.data.model.ReportingMonth) = flowOf(ReportingBatch(emptyList<com.clarity.finance.data.model.CryptoResult>(), false))
+    override fun projects(uid: String) = flowOf(ReportingBatch(emptyList<com.clarity.finance.data.model.ExpectedPayment>(), false))
+    override fun recovery(uid: String) = flowOf(ReportingRecovery())
+}
