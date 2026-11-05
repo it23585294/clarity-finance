@@ -2,6 +2,36 @@
 
 Clarity Finance is a manual personal-finance Android app for recording what was received, spent and explicitly set aside. It combines everyday expense capture with monthly reporting, pending freelance agreements, realised crypto results, one savings goal and reviewed recurring expenses.
 
+## Download and install
+
+[Download Clarity 1.0 APK](https://github.com/it23585294/clarity-finance/releases/download/v1.0-submission-20261105/Clarity-Finance-1.0-debug.apk) | [GitHub Release](https://github.com/it23585294/clarity-finance/releases/tag/v1.0-submission-20261105) | [SHA-256 checksum](https://github.com/it23585294/clarity-finance/releases/download/v1.0-submission-20261105/Clarity-Finance-1.0-debug.apk.sha256)
+
+**Android 8.0/API26 or newer. Version 1.0, versionCode 1.** This is the existing **debug-signed, debuggable application APK**, not the test APK or a Play Store publication. The assignment permits a debug APK. Normal app-icon launch opens the production Firebase sign-in flow; opt-in debug test helpers are not the launcher.
+
+This repository and its releases are **private**. Downloaders need authorized GitHub access and a signed-in browser/session; a direct link does not grant access. Repository visibility and assessor access are not changed by publishing this release.
+
+1. On Android, open the download link in an authorized GitHub session and download `Clarity-Finance-1.0-debug.apk`. Alternatively, open the Release page and choose that APK under Assets.
+2. Open the downloaded APK. If prompted, allow installation from the browser or file manager you are using, then return to the installer.
+3. Choose Install (or the in-place update offered for a compatible existing installation), then open **Clarity** from the app icon.
+4. Existing users: an update must use the matching signing certificate. If Android reports a signing/package conflict, stop and obtain a matching-signed build. **Do not uninstall or clear app data to bypass it**: unsynchronised proposals may be lost. The separate-device check used `install -r` with a matching certificate and preserved storage.
+
+APK SHA-256:
+
+```text
+61512e5e8884077dcef4dde8c94075f54fff18f1c7e572938dc49bed5c453752
+```
+
+Application build source: [`4b7a468928a231a371e793a72e1e37c9f7755c59`](https://github.com/it23585294/clarity-finance/commit/4b7a468928a231a371e793a72e1e37c9f7755c59). The release tag also contains documentation-only publication instructions; application/build/security inputs remain identical to the verified APK. See [APK build/install verification](docs/APK_SUBMISSION.md).
+
+## First use
+
+1. Connect to the internet. Use **Create an account** to register with your own email/password, or **Sign In** with an existing account. Authentication requires connectivity; no credentials are supplied in this repository.
+2. **Overview** shows the selected month's recorded income, expenses and cash surplus. Use its Received Income link for actual receipts; crypto, current pending and savings remain separate.
+3. Choose **Add Expense**, enter a positive LKR amount, review category/channel/spending type and actual date, optionally add a note, then Save.
+4. **History** lets you change month, switch Expenses/Income, filter categories and inspect records. Use existing edit/backdate/delete actions; linked receipts retain agreement protections.
+5. **Plans** opens Pending Payments, Savings Goal and Recurring Expenses. **More** opens Crypto Results, Categories & Sources, scoped Saved Changes and Sign Out.
+6. Offline proposals can be saved locally, but **pending is not confirmed**. Confirmed totals retain their previous contributions while changes await acknowledgement. Reconnect with the app open to reconcile; if it was stopped, reopen it. Synchronization is not guaranteed while force-stopped. Do not clear storage or repeatedly create replacement records for an uncertain outcome.
+
 ## Final interface
 
 <p>
